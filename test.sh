@@ -1,7 +1,7 @@
 #!/bin/bash
 cc -o spell main.c
 
-tests=(0,1,42,254,255)
+tests=(0 1 42 254 255)
 faile_count=0
 
 for i in ${tests[@]}; do
