@@ -19,6 +19,7 @@ int main(int argc, char **argv) {
     while (*new_endptr != '\0') {
         if (*new_endptr != '+' && *new_endptr != '-') {
             fprintf(stderr, "不明な演算子\n");
+            return 1;
         }
         char operator = *new_endptr;
 
