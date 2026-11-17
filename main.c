@@ -11,11 +11,10 @@ struct Token {
     Token *next;
 };
 
-Token* new_token(TokenKind token_kind, struct Token pre_token) {
+Token* new_token(TokenKind token_kind, struct Token* pre_token) {
     struct Token* next_token_ptr = calloc(1, sizeof(struct Token));
-
-    pre_token.next = next_token_ptr;
-
+    (*pre_token).next = next_token_ptr;
+    (*next_token_ptr).kind = token_kind;
     return next_token_ptr;
 }
 
