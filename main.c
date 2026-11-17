@@ -11,6 +11,14 @@ struct Token {
     Token *next;
 };
 
+Token* new_token(TokenKind token_kind, struct Token pre_token) {
+    struct Token* next_token_ptr = calloc(1, sizeof(struct Token));
+
+    pre_token.next = next_token_ptr;
+
+    return next_token_ptr;
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "1つの引数を指定してください\n");
