@@ -193,29 +193,15 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    token = tokenize(argv[1]);
+    Node* tree = expr();
+
     printf(".intel_syntax noprefix\n");
     printf(".global main\n");
     printf("main:\n");
 
-    char* endptr;
-    long num = strtol(argv[1], &endptr, 10);
-    printf("  mov rax, %ld\n", num);
-
-    char* new_endptr = endptr;
-    while (*new_endptr != '\0') {
-        if (*new_endptr != '+' && *new_endptr != '-') {
-            fprintf(stderr, "不明な演算子\n");
-            return 1;
-        }
-        char operator = *new_endptr;
-
-        num = strtol(new_endptr+1, &new_endptr, 10);
-        if (operator == '+') {
-            printf("  add rax, %ld\n", num);
-        } else {
-            printf("  sub rax, %ld\n", num);
-        }
-    }
+    gen(tree);
+    printf("  pop rax\n");
     
     printf("  ret\n");
     printf(".section .note.GNU-stack,\"\",@progbits\n");
