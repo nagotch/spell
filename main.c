@@ -138,7 +138,9 @@ Node* primary() {
 }
 
 Node* unary() {
-    if (consume('-')) {
+    if (consume('+')) {
+        return primary();
+    } else if (consume('-')) {
         Node* node = create_binary_operation_node(ND_SUB, create_number_node(0), primary());
         return node;
     }
