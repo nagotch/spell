@@ -98,6 +98,31 @@ bool at_eof() {
     return false;
 }
 
+typedef enum {ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM} NodeKind;
+
+typedef struct Node Node;
+struct Node {
+    NodeKind kind;
+    Node* left_child;
+    Node* right_child;
+    long val;
+};
+
+Node* create_binary_operation_node(NodeKind kind, Node* left_child, Node* right_child) {
+    struct Node* new_node_ptr = calloc(1, sizeof(struct Node));
+    new_node_ptr -> kind = kind;
+    new_node_ptr -> left_child = left_child;
+    new_node_ptr -> right_child = right_child;
+    return new_node_ptr;
+}
+
+Node* create_number_node(long num) {
+    struct Node* num_node_ptr = calloc(1, sizeof(struct Node));
+    num_node_ptr -> kind = ND_NUM;
+    num_node_ptr -> val = num;
+    return num_node_ptr;
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "1つの引数を指定してください\n");
