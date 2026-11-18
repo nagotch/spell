@@ -151,9 +151,9 @@ Node* mul() {
     Node* node = unary();
     while (true) {
         if (consume('*')) {
-            node = create_binary_operation_node(ND_MUL, node, primary());
+            node = create_binary_operation_node(ND_MUL, node, unary());
         } else if (consume('/')) {
-            node = create_binary_operation_node(ND_DIV, node, primary());
+            node = create_binary_operation_node(ND_DIV, node, unary());
         } else {
             break;
         }
