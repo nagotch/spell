@@ -72,7 +72,7 @@ struct Token* token = NULL;
 
 bool consume(char* symbol) {
     int len = strlen(symbol);
-    if (token -> kind == TK_SYMBOL && token -> len == len && memcmp(symbol, token -> str, token -> len)) {
+    if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
         token = token -> next;
         return true;
     }
@@ -81,7 +81,7 @@ bool consume(char* symbol) {
 
 void expect(char* symbol) {
     int len = strlen(symbol);
-    if (token -> kind == TK_SYMBOL && token -> len == len && memcmp(symbol, token -> str, token -> len)) {
+    if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
         token = token -> next;
         return;
     }
