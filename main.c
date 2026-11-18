@@ -39,10 +39,10 @@ struct Token* tokenize(char* s) {
         for (int i = 0; targets[i] != '\0'; i++) {
             char target = targets[i];
             if (**endptr == target) {
-                (*endptr)++;
                 last_token_ptr = new_token(TK_SYMBOL, last_token_ptr);
                 last_token_ptr -> str = *endptr;
                 last_token_ptr -> len = 1;
+                (*endptr)++;
                 is_symbol = true;
                 break;
             }
