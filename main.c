@@ -22,6 +22,7 @@ Token* new_token(TokenKind token_kind, struct Token* pre_token_ptr) {
 
 struct Token* tokenize(char* s) {
     struct Token first_token;
+    first_token.next = NULL;
     struct Token* last_token_ptr = &first_token;
 
     char** endptr = &s;
@@ -36,7 +37,7 @@ struct Token* tokenize(char* s) {
         for (int i = 0; targets[i] != '\0'; i++) {
             char target = targets[i];
             if (**endptr == target) {
-                endptr++;
+                (*endptr)++;
                 last_token_ptr = new_token(TK_SYMBOL, last_token_ptr);
                 last_token_ptr -> symbol = target;
                 is_symbol = true;
@@ -57,6 +58,7 @@ struct Token* tokenize(char* s) {
         fprintf(stderr, "不明な文字%s", *endptr);
         exit(1);
     }
+    last_token_ptr = new_token(TK_EOF, last_token_ptr);
     return first_token.next;
 }
 
