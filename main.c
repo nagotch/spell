@@ -137,13 +137,23 @@ Node* primary() {
     }
 }
 
+Node* unary() {
+    if (consume('+')) {
+        return primary();
+    } else if (consume('-')) {
+        Node* node = create_binary_operation_node(ND_SUB, create_number_node(0), primary());
+        return node;
+    }
+    return primary();
+}
+
 Node* mul() {
-    Node* node = primary();
+    Node* node = unary();
     while (true) {
         if (consume('*')) {
-            node = create_binary_operation_node(ND_MUL, node, primary());
+            node = create_binary_operation_node(ND_MUL, node, unary());
         } else if (consume('/')) {
-            node = create_binary_operation_node(ND_DIV, node, primary());
+            node = create_binary_operation_node(ND_DIV, node, unary());
         } else {
             break;
         }
