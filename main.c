@@ -52,11 +52,11 @@ struct Token* tokenize(char* s) {
         }
 
         if (isdigit(**endptr)) {
-            char** prev_endptr = endptr;
+            char* prev_endptr = *endptr;
             long num = strtol(*endptr, endptr, 10);
             last_token_ptr = new_token(TK_NUM, last_token_ptr);
             last_token_ptr -> val = num;
-            last_token_ptr -> len = endptr - prev_endptr;
+            last_token_ptr -> len = *endptr - prev_endptr;
             continue;
         }
 
