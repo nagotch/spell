@@ -138,11 +138,11 @@ Node* primary() {
 }
 
 Node* unary() {
-    Node* node = primary();
     if (consume('-')) {
-        node = create_binary_operation_node(ND_SUB, create_number_node(0), node);
+        Node* node = create_binary_operation_node(ND_SUB, create_number_node(0), primary());
+        return node;
     }
-    return node;
+    return primary();
 }
 
 Node* mul() {
