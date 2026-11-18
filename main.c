@@ -65,18 +65,17 @@ struct Token* tokenize(char* s) {
 struct Token* token = NULL;
 
 bool consume(char symbol) {
-    if (token -> symbol == symbol) {
+    if (token -> kind == TK_SYMBOL && token -> symbol == symbol) {
         token = token -> next;
         return true;
     }
     return false;
 }
 
-char expect() {
-    if (token -> kind == TK_SYMBOL) {
-        char symbol = token -> symbol;
+void expect(char symbol) {
+    if (token -> kind == TK_SYMBOL && token -> symbol == symbol) {
         token = token -> next;
-        return symbol;
+        return;
     }
     fprintf(stderr, "予期されないToken\n");
     exit(1);
