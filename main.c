@@ -137,8 +137,16 @@ Node* primary() {
     }
 }
 
-Node* mul() {
+Node* unary() {
     Node* node = primary();
+    if (consume('-')) {
+        node = create_binary_operation_node(ND_SUB, create_number_node(0), node);
+    }
+    return node;
+}
+
+Node* mul() {
+    Node* node = unary();
     while (true) {
         if (consume('*')) {
             node = create_binary_operation_node(ND_MUL, node, primary());
