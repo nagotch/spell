@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <string.h>
 
 typedef enum { TK_NUM, TK_SYMBOL, TK_EOF } TokenKind;
 
@@ -9,7 +10,8 @@ typedef struct Token Token;
 struct Token {
     TokenKind kind;
     long val;
-    char symbol;
+    char* str;
+    int len;
     Token *next;
 };
 
@@ -39,7 +41,8 @@ struct Token* tokenize(char* s) {
             if (**endptr == target) {
                 (*endptr)++;
                 last_token_ptr = new_token(TK_SYMBOL, last_token_ptr);
-                last_token_ptr -> symbol = target;
+                last_token_ptr -> str = *endptr;
+                last_token_ptr -> len = 1;
                 is_symbol = true;
                 break;
             }
@@ -49,9 +52,12 @@ struct Token* tokenize(char* s) {
         }
 
         if (isdigit(**endptr)) {
-            long num = strtol(*endptr, endptr, 10);
+            char** strtol_endptr;
+            long num = strtol(*endptr, strtol_endptr, 10);
             last_token_ptr = new_token(TK_NUM, last_token_ptr);
             last_token_ptr -> val = num;
+            last_token_ptr -> len = strtol_endptr - endptr;
+            endptr = strtol_endptr;
             continue;
         }
 
@@ -64,16 +70,18 @@ struct Token* tokenize(char* s) {
 
 struct Token* token = NULL;
 
-bool consume(char symbol) {
-    if (token -> kind == TK_SYMBOL && token -> symbol == symbol) {
+bool consume(char* symbol) {
+    int len = strlen(symbol);
+    if (token -> kind == TK_SYMBOL && token -> len == len && memcmp(symbol, token -> str, token -> len)) {
         token = token -> next;
         return true;
     }
     return false;
 }
 
-void expect(char symbol) {
-    if (token -> kind == TK_SYMBOL && token -> symbol == symbol) {
+void expect(char* symbol) {
+    int len = strlen(symbol);
+    if (token -> kind == TK_SYMBOL && token -> len == len && memcmp(symbol, token -> str, token -> len)) {
         token = token -> next;
         return;
     }
@@ -126,9 +134,9 @@ Node* create_number_node(long num) {
 Node* expr();
 
 Node* primary() {
-    if (consume('(')) {
+    if (consume("(")) {
         Node* node = expr();
-        expect(')');
+        expect(")");
         return node;
     } else {
         long num = expect_number();
@@ -138,9 +146,9 @@ Node* primary() {
 }
 
 Node* unary() {
-    if (consume('+')) {
+    if (consume("+")) {
         return primary();
-    } else if (consume('-')) {
+    } else if (consume("-")) {
         Node* node = create_binary_operation_node(ND_SUB, create_number_node(0), primary());
         return node;
     }
@@ -150,9 +158,9 @@ Node* unary() {
 Node* mul() {
     Node* node = unary();
     while (true) {
-        if (consume('*')) {
+        if (consume("*")) {
             node = create_binary_operation_node(ND_MUL, node, unary());
-        } else if (consume('/')) {
+        } else if (consume("/")) {
             node = create_binary_operation_node(ND_DIV, node, unary());
         } else {
             break;
@@ -164,9 +172,9 @@ Node* mul() {
 Node* expr() {
     Node* node = mul();
     while (true) {
-        if (consume('+')) {
+        if (consume("+")) {
             node = create_binary_operation_node(ND_ADD, node, mul());
-        } else if (consume('-')) {
+        } else if (consume("-")) {
             node = create_binary_operation_node(ND_SUB, node, mul());
         } else {
             break;
