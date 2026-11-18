@@ -28,7 +28,7 @@ struct Token* tokenize(char* s) {
     char** endptr = &s;
     while (**endptr != '\0') {
         if (isspace(**endptr)) {
-            endptr++;
+            (*endptr)++;
             continue;
         }
 
