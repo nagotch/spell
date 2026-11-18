@@ -57,6 +57,7 @@ struct Token* tokenize(char* s) {
             last_token_ptr = new_token(TK_NUM, last_token_ptr);
             last_token_ptr -> val = num;
             last_token_ptr -> len = *endptr - prev_endptr;
+            last_token_ptr -> str = prev_endptr;
             continue;
         }
 
