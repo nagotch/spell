@@ -151,6 +151,20 @@ Node* mul() {
     return node;
 }
 
+Node* expr() {
+    Node* node = mul();
+    while (true) {
+        if (consume('+')) {
+            node = create_binary_operation_node(ND_ADD, node, mul());
+        } else if (consume('-')) {
+            node = create_binary_operation_node(ND_SUB, node, mul());
+        } else {
+            break;
+        }
+    }
+    return node;
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "1つの引数を指定してください\n");
