@@ -165,6 +165,28 @@ Node* expr() {
     return node;
 }
 
+void gen(Node* node) {
+    if (node -> kind == ND_NUM) {
+        printf("  push %ld\n", node -> val);
+        return;
+    }
+    gen(node -> left_child);
+    gen(node -> right_child);
+    printf("  pop rdi\n");
+    printf("  pop rax\n");
+    if (node -> kind == ND_ADD) {
+        printf("  add rax, rdi\n");
+    } else if (node -> kind == ND_SUB) {
+        printf("  sub rax, rdi\n");
+    } else if (node -> kind == ND_MUL) {
+        printf("  imul rax, rdi\n");
+    } else if (node -> kind == ND_DIV) {
+        printf("  cqo\n");
+        printf("  idiv rdi");
+    }
+    printf("  push rax");
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "1つの引数を指定してください\n");
