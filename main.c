@@ -123,6 +123,20 @@ Node* create_number_node(long num) {
     return num_node_ptr;
 }
 
+Node* expr();
+
+Node* primary() {
+    if (token -> kind == TK_SYMBOL && token -> symbol == '(') {
+        Node* node = expr();
+        expect(')');
+        return node;
+    } else {
+        long num = expect_number();
+        Node* node = create_number_node(num);
+        return node;
+    }
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "1つの引数を指定してください\n");
