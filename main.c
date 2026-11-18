@@ -126,7 +126,7 @@ Node* create_number_node(long num) {
 Node* expr();
 
 Node* primary() {
-    if (token -> kind == TK_SYMBOL && token -> symbol == '(') {
+    if (consume('(')) {
         Node* node = expr();
         expect(')');
         return node;
