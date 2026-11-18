@@ -2,19 +2,25 @@
 cc -o spell main.c
 
 tests=(
-    "0 0"
-    "1 1"
-    "42 42"
-    "254 254"
-    "255 255"
-    "5+20-4 21"
-    "10-3-2 5"
+    "0|0"
+    "1|1"
+    "42|42"
+    "254|254"
+    "255|255"
+    "5+20-4|21"
+    "10-3-2|5"
+    "2*3+4|10"
+    "2+3*4|14"
+    "(2+3)*4|20"
+    "20/4|5"
+    "7/2|3"
+    "12 + 3 * ( 2 + 4 )|30"
 )
 fail_count=0
 i=0
 for tst in "${tests[@]}"; do
     i=$(($i+1))
-    read -r input expected <<< "$tst"
+    IFS='|' read -r input expected <<< "$tst"
     ./spell "$input" > tmp.s
     cc -o tmp tmp.s
     ./tmp
