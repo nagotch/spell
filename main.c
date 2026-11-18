@@ -62,6 +62,43 @@ struct Token* tokenize(char* s) {
     return first_token.next;
 }
 
+struct Token* token = NULL;
+
+bool consume(char symbol) {
+    if (token -> symbol == symbol) {
+        token = token -> next;
+        return true;
+    }
+    return false;
+}
+
+char expect() {
+    if (token -> kind == TK_SYMBOL) {
+        char symbol = token -> symbol;
+        token = token -> next;
+        return symbol;
+    }
+    fprintf(stderr, "予期されないToken\n");
+    exit(1);
+}
+
+long expect_number() {
+    if (token -> kind == TK_NUM) {
+        long num = token -> val;
+        token = token -> next;
+        return num;
+    }
+    fprintf(stderr, "予期されない数値\n");
+    exit(1);
+}
+
+bool at_eof() {
+    if (token -> kind == TK_EOF) {
+        return true;
+    }
+    return false;
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "1つの引数を指定してください\n");
