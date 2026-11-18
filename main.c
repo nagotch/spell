@@ -182,9 +182,9 @@ void gen(Node* node) {
         printf("  imul rax, rdi\n");
     } else if (node -> kind == ND_DIV) {
         printf("  cqo\n");
-        printf("  idiv rdi");
+        printf("  idiv rdi\n");
     }
-    printf("  push rax");
+    printf("  push rax\n");
 }
 
 int main(int argc, char **argv) {
