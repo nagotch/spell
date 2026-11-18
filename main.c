@@ -137,6 +137,20 @@ Node* primary() {
     }
 }
 
+Node* mul() {
+    Node* node = primary();
+    while (true) {
+        if (consume('*')) {
+            node = create_binary_operation_node(ND_MUL, node, primary());
+        } else if (consume('/')) {
+            node = create_binary_operation_node(ND_DIV, node, primary());
+        } else {
+            break;
+        }
+    }
+    return node;
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "1つの引数を指定してください\n");
