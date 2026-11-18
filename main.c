@@ -55,7 +55,9 @@ struct Token* tokenize(char* s) {
         }
 
         fprintf(stderr, "不明な文字%s", *endptr);
+        exit(1);
     }
+    return first_token.next;
 }
 
 int main(int argc, char **argv) {
