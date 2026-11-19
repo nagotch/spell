@@ -73,7 +73,7 @@ Token* tokenize(char* s) {
             continue;
         }
 
-        if (!memcmp(*endptr, "return", 6) && !can_use_variables(*endptr[6])) {
+        if (!strncmp(*endptr, "return", 6) && !can_use_variables((*endptr)[6])) {
             last_token_ptr = new_token(TK_RETURN, last_token_ptr);
             last_token_ptr -> len = 6;
             last_token_ptr -> str = *endptr;
