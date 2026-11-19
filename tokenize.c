@@ -35,6 +35,8 @@ struct Token* tokenize(char* s) {
             ")",
             "<",
             ">",
+            "=",
+            ";",
         };
         size_t targets_size = sizeof(targets) / sizeof(targets[0]);
         for (int i = 0; i < targets_size; i++) {
@@ -60,6 +62,14 @@ struct Token* tokenize(char* s) {
             last_token_ptr -> val = num;
             last_token_ptr -> len = *endptr - prev_endptr;
             last_token_ptr -> str = prev_endptr;
+            continue;
+        }
+
+        if ('a' <= **endptr && **endptr <= 'z') {
+            last_token_ptr = new_token(TK_IDENT, last_token_ptr);
+            last_token_ptr -> str = *endptr;
+            last_token_ptr -> len = 1;
+            (*endptr)++;
             continue;
         }
 

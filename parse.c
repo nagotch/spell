@@ -1,5 +1,7 @@
 #include "spell.h"
 
+Node* code[100];
+
 bool consume(char* symbol) {
     int len = strlen(symbol);
     if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
@@ -7,6 +9,15 @@ bool consume(char* symbol) {
         return true;
     }
     return false;
+}
+
+Token* consume_ident() {
+    if (token -> kind == TK_IDENT) {
+        Token* pre_token = token;
+        token = token -> next;
+        return pre_token;
+    }
+    return NULL;
 }
 
 void expect(char* symbol) {
@@ -51,8 +62,19 @@ Node* create_number_node(long num) {
     return num_node_ptr;
 }
 
+Node* create_ident_node(Token* tok) {
+    Node* ident_node_ptr = calloc(1, sizeof(Node));
+    ident_node_ptr -> kind = ND_LVAR;
+    ident_node_ptr -> offset = (tok -> str[0] - 'a' + 1) * 8;
+    return ident_node_ptr;
+}
+
 Node* primary() {
-    if (consume("(")) {
+    Token* ident_token = consume_ident();
+    if (ident_token != NULL) {
+        Node* node = create_ident_node(ident_token);
+        return node;
+    } else if (consume("(")) {
         Node* node = expr();
         expect(")");
         return node;
@@ -133,6 +155,29 @@ Node* equality() {
     return node;
 }
 
+Node* assign() {
+    Node* node = equality();
+    if (consume("=")) {
+        node = create_binary_operation_node(ND_ASSIGN, node, assign());
+    }
+    return node;
+}
+
 Node* expr() {
-    return equality();
+    return assign();
+}
+
+Node* stmt() {
+    Node* node = expr();
+    expect(";");
+    return node;
+}
+
+void program() {
+    int i = 0;
+    while (!at_eof()) {
+        code[i] = stmt();
+        i++;
+    }
+    code[i] = NULL;
 }
