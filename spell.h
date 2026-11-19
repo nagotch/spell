@@ -26,8 +26,17 @@ struct Node {
     int offset;
 };
 
+typedef struct LVar LVar;
+struct LVar {
+    char* name;
+    int len;
+    int offset;
+    LVar* next;
+};
+
 extern Token* token;
 extern Node* code[100];
+extern LVar* locals;
 
 Token* new_token(TokenKind token_kind, Token* pre_token_ptr);
 Token* tokenize(char* s);
@@ -49,3 +58,4 @@ Node* stmt();
 void program();
 void gen(Node* node);
 void gen_lval(Node* node);
+LVar* find_lvar(Token* tok);
