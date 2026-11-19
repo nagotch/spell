@@ -70,6 +70,7 @@ struct Token* tokenize(char* s) {
             last_token_ptr -> str = *endptr;
             last_token_ptr -> len = 1;
             (*endptr)++;
+            continue;
         }
 
         fprintf(stderr, "不明な文字%s", *endptr);
