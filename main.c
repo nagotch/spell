@@ -35,14 +35,29 @@ struct Token* tokenize(char* s) {
         }
 
         bool is_symbol = false;
-        char* targets = "+-*/()";
-        for (int i = 0; targets[i] != '\0'; i++) {
-            char target = targets[i];
-            if (**endptr == target) {
+        char* targets[] = {
+            "==",
+            "!=",
+            "<=",
+            ">=",
+            "+",
+            "-",
+            "*",
+            "/",
+            "(",
+            ")",
+            "<",
+            ">",
+        };
+        size_t targets_size = sizeof(targets) / sizeof(targets[0]);
+        for (int i = 0; i < targets_size; i++) {
+            char* target = targets[i];
+            int target_len = strlen(target);
+            if (!strncmp(*endptr, target, target_len)) {
                 last_token_ptr = new_token(TK_SYMBOL, last_token_ptr);
                 last_token_ptr -> str = *endptr;
-                last_token_ptr -> len = 1;
-                (*endptr)++;
+                last_token_ptr -> len = target_len;
+                (*endptr) += target_len;
                 is_symbol = true;
                 break;
             }
