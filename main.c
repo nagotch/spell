@@ -121,7 +121,7 @@ bool at_eof() {
     return false;
 }
 
-typedef enum {ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM} NodeKind;
+typedef enum {ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM, ND_EQ, ND_NE, ND_LT, ND_LE} NodeKind;
 
 typedef struct Node Node;
 struct Node {
@@ -184,7 +184,7 @@ Node* mul() {
     return node;
 }
 
-Node* expr() {
+Node* add() {
     Node* node = mul();
     while (true) {
         if (consume("+")) {
@@ -196,6 +196,38 @@ Node* expr() {
         }
     }
     return node;
+}
+
+Node* relational() {
+    Node* node = add();
+    while (true) {
+        if (consume("<=")) {
+            node = create_binary_operation_node(ND_LE, node, add());
+        } else if (consume(">=")) {
+            node = create_binary_operation_node(ND_LE, add(), node);
+        } else if (consume("<")) {
+            node = create_binary_operation_node(ND_LT, node, add());
+        } else if (consume(">")) {
+            node = create_binary_operation_node(ND_LT, add(), node);
+        }
+    }
+    return node;
+}
+
+Node* equality() {
+    Node* node = relational();
+    while (true) {
+        if (consume("==")) {
+            node = create_binary_operation_node(ND_EQ, node, relational());
+        } else if (consume("!=")) {
+            node = create_binary_operation_node(ND_NE, node, relational());
+        }
+    }
+    return node;
+}
+
+Node* expr() {
+    return equality();
 }
 
 void gen(Node* node) {
