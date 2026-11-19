@@ -1,6 +1,7 @@
 #include "spell.h"
 
 Node* code[100];
+LVar* locals = NULL;
 
 bool consume(char* symbol) {
     int len = strlen(symbol);
@@ -63,9 +64,26 @@ Node* create_number_node(long num) {
 }
 
 Node* create_ident_node(Token* tok) {
+    LVar* var = find_lvar(tok);
     Node* ident_node_ptr = calloc(1, sizeof(Node));
     ident_node_ptr -> kind = ND_LVAR;
-    ident_node_ptr -> offset = (tok -> str[0] - 'a' + 1) * 8;
+    if (var) {
+        ident_node_ptr -> offset = var -> offset;
+    } else {
+        LVar* lvar = calloc(1, sizeof(LVar));
+        lvar -> name = tok -> str;
+        lvar -> len = tok -> len;
+        int offset;
+        if (locals) {
+            offset = locals -> offset + 8;
+        } else {
+            offset = 8;
+        }
+        lvar -> offset = offset;
+        ident_node_ptr -> offset = offset;
+        lvar -> next = locals;
+        locals = lvar;
+    }
     return ident_node_ptr;
 }
 
@@ -180,4 +198,13 @@ void program() {
         i++;
     }
     code[i] = NULL;
+}
+
+LVar* find_lvar(Token* tok) {
+    for (LVar* var = locals; var; var = var -> next) {
+        if (var -> len == tok -> len && !memcmp(var -> name, tok -> str, tok -> len)) {
+            return var;
+        }
+    }
+    return NULL;
 }

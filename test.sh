@@ -41,6 +41,10 @@ tests=(
     "a=3; a;|3"
     "a=3; b=5*6-8; a+b/2;|14"
     "a=b=3; a+b;|6"
+    "foo=3; foo;|3"
+    "foo=3; bar=5; foo+bar;|8"
+    "fo=1; foo=2; fo+foo;|3"
+    "foo1=5; foo1;|5"
 )
 
 one_test() {
