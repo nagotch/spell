@@ -259,7 +259,7 @@ void gen(Node* node) {
     } else if (node -> kind == ND_NE) {
         printf("  cmp rax, rdi\n");
         printf("  setne al\n");
-        printf("  movzb rax, a\nl");
+        printf("  movzb rax, al\n");
     } else if (node -> kind == ND_LT) {
         printf("  cmp rax, rdi\n");
         printf("  setl al\n");
