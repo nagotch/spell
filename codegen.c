@@ -40,9 +40,9 @@ void gen(Node* node) {
         gen(node -> cond);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
-        printf("  je .Lend%d", label);
+        printf("  je .Lend%d\n", label);
         gen(node -> then);
-        printf(".Lend%d", label);
+        printf(".Lend%d:\n", label);
         return;
     }
 
@@ -53,21 +53,21 @@ void gen(Node* node) {
         printf("  je .Lelse%d\n", label);
         gen(node -> then);
         printf("  jmp .Lend%d\n", label);
-        printf(".Lelse%d\n", label);
+        printf(".Lelse%d:\n", label);
         gen(node -> els);
-        printf(".Lend%d\n", label);
+        printf(".Lend%d:\n", label);
         return;
     }
 
     if (node -> kind == ND_WHILE) {
-        printf(".Lbegin%d\n", label);
+        printf(".Lbegin%d:\n", label);
         gen(node -> cond);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
         printf("  je .Lend%d\n", label);
         gen(node -> then);
         printf("  jmp .Lbegin%d\n", label);
-        printf(".Lend%d\n", label);
+        printf(".Lend%d:\n", label);
         return;
     }
 
@@ -75,7 +75,7 @@ void gen(Node* node) {
         if (node -> init) {
             gen(node -> init);
         }
-        printf(".Lbegin%d\n", label);
+        printf(".Lbegin%d:\n", label);
         if (node -> cond) {
             gen(node -> cond);
             printf("  pop rax\n");
@@ -87,7 +87,7 @@ void gen(Node* node) {
             gen(node -> inc);
         }
         printf("  jmp .Lbegin%d\n", label);
-        printf(".Lend%d\n", label);
+        printf(".Lend%d:\n", label);
         return;
     }
 
