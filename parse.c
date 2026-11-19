@@ -62,7 +62,7 @@ Node* create_number_node(long num) {
 
 Node* create_ident_node(Token* tok) {
     Node* ident_node_ptr = calloc(1, sizeof(Node));
-    ident_node_ptr -> kind = ND_NUM;
+    ident_node_ptr -> kind = ND_LVAR;
     ident_node_ptr -> offset = (tok -> str[0] - 'a' + 1) * 8;
     return ident_node_ptr;
 }
