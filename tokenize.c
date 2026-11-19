@@ -1,9 +1,9 @@
 #include "spell.h"
 
-struct Token* token = NULL;
+Token* token = NULL;
 
-Token* new_token(TokenKind token_kind, struct Token* pre_token_ptr) {
-    struct Token* next_token_ptr = calloc(1, sizeof(struct Token));
+Token* new_token(TokenKind token_kind, Token* pre_token_ptr) {
+    Token* next_token_ptr = calloc(1, sizeof(Token));
     pre_token_ptr -> next = next_token_ptr;
     next_token_ptr -> kind = token_kind;
     return next_token_ptr;
@@ -18,9 +18,9 @@ bool can_use_variables(char c) {
 }
 
 Token* tokenize(char* s) {
-    struct Token first_token;
+    Token first_token;
     first_token.next = NULL;
-    struct Token* last_token_ptr = &first_token;
+    Token* last_token_ptr = &first_token;
 
     char** endptr = &s;
     while (**endptr != '\0') {
