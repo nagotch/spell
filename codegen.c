@@ -5,13 +5,25 @@ void gen(Node* node) {
         gen_lval(node);
         printf("  pop rax\n");
         printf("  mov rax\n");
-        printf("  [rax] -> push rax\n");
+        printf("  [rax]\n");
+        printf("  push rax\n");
+        return;
+    } 
+    if (node -> kind == ND_ASSIGN) {
+        gen_lval(node -> left_child);
+        gen(node -> right_child);
+        printf("  pop rdi\n");
+        printf("  pop rax\n");
+        printf("  mov [rax]");
+        printf("  rdi");
+        printf("  push rdi");
+        return;
     }
-
     if (node -> kind == ND_NUM) {
         printf("  push %ld\n", node -> val);
         return;
     }
+
     gen(node -> left_child);
     gen(node -> right_child);
     printf("  pop rdi\n");
@@ -46,7 +58,7 @@ void gen(Node* node) {
 }
 
 void gen_lval(Node* node) {
-    if (node -> kind == ND_LVAR) {
+    if (node -> kind != ND_LVAR) {
         fprintf(stderr, "  不明な代入");
         exit(1);
     }
