@@ -1,19 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <stdbool.h>
-#include <string.h>
-
-typedef enum { TK_NUM, TK_SYMBOL, TK_EOF } TokenKind;
-
-typedef struct Token Token;
-struct Token {
-    TokenKind kind;
-    long val;
-    char* str;
-    int len;
-    Token *next;
-};
+#include "spell.h"
 
 Token* new_token(TokenKind token_kind, struct Token* pre_token_ptr) {
     struct Token* next_token_ptr = calloc(1, sizeof(struct Token));
@@ -121,16 +106,6 @@ bool at_eof() {
     return false;
 }
 
-typedef enum {ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM, ND_EQ, ND_NE, ND_LT, ND_LE} NodeKind;
-
-typedef struct Node Node;
-struct Node {
-    NodeKind kind;
-    Node* left_child;
-    Node* right_child;
-    long val;
-};
-
 Node* create_binary_operation_node(NodeKind kind, Node* left_child, Node* right_child) {
     struct Node* new_node_ptr = calloc(1, sizeof(struct Node));
     new_node_ptr -> kind = kind;
@@ -145,8 +120,6 @@ Node* create_number_node(long num) {
     num_node_ptr -> val = num;
     return num_node_ptr;
 }
-
-Node* expr();
 
 Node* primary() {
     if (consume("(")) {
