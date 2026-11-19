@@ -210,6 +210,7 @@ Node* stmt() {
         if (consume_keyword(TK_ELSE)) {
             node -> els = stmt();
         }
+        return node;
     } else if (consume_keyword(TK_WHILE)) {
         node = calloc(1, sizeof(Node));
         node -> kind = ND_WHILE;
@@ -217,22 +218,25 @@ Node* stmt() {
         node -> cond = expr();
         expect(")");
         node -> then = stmt();
+        return node;
     } else if (consume_keyword(TK_FOR)) {
         node = calloc(1, sizeof(Node));
         node -> kind = ND_FOR;
         expect("(");
-        if (!(token -> kind == TK_SYMBOL && token -> str[0] == ';')) {
+        if (!consume(";")) {
             node -> init = expr();
             expect(";");
         }
-        if (!(token -> kind == TK_SYMBOL && token -> str[0] == ';')) {
+        if (!consume(";")) {
             node -> cond = expr();
             expect(";");
         }
-        if (!(token -> kind == TK_SYMBOL && token -> str[0] == ')')) {
+        if (!consume(")")) {
             node -> inc = expr();
             expect(")");
         }
+        node -> then = stmt();
+        return node;
     } else {
         node = expr();
     }
