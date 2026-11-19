@@ -209,6 +209,8 @@ Node* relational() {
             node = create_binary_operation_node(ND_LT, node, add());
         } else if (consume(">")) {
             node = create_binary_operation_node(ND_LT, add(), node);
+        } else {
+            break;
         }
     }
     return node;
@@ -221,6 +223,8 @@ Node* equality() {
             node = create_binary_operation_node(ND_EQ, node, relational());
         } else if (consume("!=")) {
             node = create_binary_operation_node(ND_NE, node, relational());
+        } else {
+            break;
         }
     }
     return node;
