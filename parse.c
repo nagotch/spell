@@ -184,12 +184,8 @@ void program() {
 }
 
 LVar* find_lvar(Token* tok) {
-    while (!(locals -> len == tok -> len && !memcmp(locals -> name, tok -> str, tok -> len)) && locals -> next != NULL) {
-        locals = locals -> next;
+    for (LVar* var = locals; var; var = var -> next) {
+        return var;
     }
-    if (locals -> next == NULL) {
-        return NULL;
-    } else {
-        return locals;
-    }
+    return NULL;
 }
