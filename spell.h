@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-typedef enum { TK_NUM, TK_SYMBOL, TK_EOF, TK_IDENT } TokenKind;
+typedef enum { TK_NUM, TK_SYMBOL, TK_EOF, TK_IDENT, TK_RETURN } TokenKind;
 typedef struct Token Token;
 struct Token {
     TokenKind kind;
@@ -16,7 +16,7 @@ struct Token {
     Token *next;
 };
 
-typedef enum {ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM, ND_EQ, ND_NE, ND_LT, ND_LE, ND_ASSIGN, ND_LVAR} NodeKind;
+typedef enum {ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM, ND_EQ, ND_NE, ND_LT, ND_LE, ND_ASSIGN, ND_LVAR, ND_RETURN} NodeKind;
 typedef struct Node Node;
 struct Node {
     NodeKind kind;
