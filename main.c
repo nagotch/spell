@@ -252,6 +252,22 @@ void gen(Node* node) {
     } else if (node -> kind == ND_DIV) {
         printf("  cqo\n");
         printf("  idiv rdi\n");
+    } else if (node -> kind == ND_EQ) {
+        printf("  cmp rax, rdi");
+        printf("  sete al");
+        printf("  movzb rax, al");
+    } else if (node -> kind == ND_NE) {
+        printf("  cmp rax, rdi");
+        printf("  setne al");
+        printf("  movzb rax, al");
+    } else if (node -> kind == ND_LT) {
+        printf("  cmp rax, rdi");
+        printf("  setl al");
+        printf("  movzb rax, al");
+    } else if (node -> kind == ND_LE) {
+        printf("  cmp rax, rdi");
+        printf("  setle al");
+        printf("  movzb rax, al");
     }
     printf("  push rax\n");
 }
