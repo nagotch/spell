@@ -196,7 +196,6 @@ Node* expr() {
 Node* stmt() {
     Node* node;
     if (consume_keyword(TK_RETURN)) {
-        token = token -> next;
         node = calloc(1, sizeof(Node));
         node -> kind = ND_RETURN;
         node -> left_child = expr();
