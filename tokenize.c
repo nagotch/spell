@@ -73,11 +73,36 @@ Token* tokenize(char* s) {
             continue;
         }
 
-        if (!strncmp(*endptr, "return", 6) && !can_use_variables((*endptr)[6])) {
-            last_token_ptr = new_token(TK_RETURN, last_token_ptr);
-            last_token_ptr -> len = 6;
-            last_token_ptr -> str = *endptr;
-            *endptr += 6;
+        char* keywords[] = {
+            "return",
+            "if",
+            "else",
+            "while",
+            "for",
+        };
+        TokenKind kinds[] = {
+            TK_RETURN,
+            TK_IF,
+            TK_ELSE,
+            TK_WHILE,
+            TK_FOR,
+        };
+        bool is_keyword = false;
+        size_t keywords_size = sizeof(keywords) / sizeof(keywords[0]);
+        for (int i = 0; i < keywords_size; i++) {
+            char* keyword = keywords[i];
+            size_t keyword_size = strlen(keyword);
+            TokenKind kind = kinds[i];
+            if (!strncmp(*endptr, keyword, keyword_size) && !can_use_variables((*endptr)[keyword_size])) {
+                last_token_ptr = new_token(kind, last_token_ptr);
+                last_token_ptr -> len = keyword_size;
+                last_token_ptr -> str = *endptr;
+                *endptr += keyword_size;
+                is_keyword = true;
+                break;
+            }
+        }
+        if (is_keyword) {
             continue;
         }
 

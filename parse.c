@@ -21,6 +21,14 @@ Token* consume_ident() {
     return NULL;
 }
 
+bool consume_keyword(TokenKind kind) {
+    if (token -> kind == kind) {
+        token = token -> next;
+        return true;
+    }
+    return false;
+}
+
 void expect(char* symbol) {
     int len = strlen(symbol);
     if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
@@ -85,12 +93,6 @@ Node* create_ident_node(Token* tok) {
         locals = lvar;
     }
     return ident_node_ptr;
-}
-
-Node* create_return_node() {
-    Node* return_node = calloc(1, sizeof(Node));
-    return_node -> kind = ND_RETURN;
-    return return_node;
 }
 
 Node* primary() {
@@ -193,10 +195,47 @@ Node* expr() {
 
 Node* stmt() {
     Node* node;
-    if (token -> kind == TK_RETURN) {
-        token = token -> next;
-        node = create_return_node();
+    if (consume_keyword(TK_RETURN)) {
+        node = calloc(1, sizeof(Node));
+        node -> kind = ND_RETURN;
         node -> left_child = expr();
+    } else if (consume_keyword(TK_IF)) {
+        node = calloc(1, sizeof(Node));
+        node -> kind = ND_IF;
+        expect("(");
+        node -> cond = expr();
+        expect(")");
+        node -> then = stmt();
+        if (consume_keyword(TK_ELSE)) {
+            node -> els = stmt();
+        }
+        return node;
+    } else if (consume_keyword(TK_WHILE)) {
+        node = calloc(1, sizeof(Node));
+        node -> kind = ND_WHILE;
+        expect("(");
+        node -> cond = expr();
+        expect(")");
+        node -> then = stmt();
+        return node;
+    } else if (consume_keyword(TK_FOR)) {
+        node = calloc(1, sizeof(Node));
+        node -> kind = ND_FOR;
+        expect("(");
+        if (!consume(";")) {
+            node -> init = expr();
+            expect(";");
+        }
+        if (!consume(";")) {
+            node -> cond = expr();
+            expect(";");
+        }
+        if (!consume(")")) {
+            node -> inc = expr();
+            expect(")");
+        }
+        node -> then = stmt();
+        return node;
     } else {
         node = expr();
     }
