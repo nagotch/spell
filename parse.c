@@ -1,6 +1,7 @@
 #include "spell.h"
 
 Node* code[100];
+LVar* locals = NULL;
 
 bool consume(char* symbol) {
     int len = strlen(symbol);
@@ -180,4 +181,15 @@ void program() {
         i++;
     }
     code[i] = NULL;
+}
+
+LVar* find_lvar(Token* tok) {
+    while (!(locals -> len == tok -> len && !memcmp(locals -> name, tok -> str, tok -> len)) && locals -> next != NULL) {
+        locals = locals -> next;
+    }
+    if (locals -> next == NULL) {
+        return NULL;
+    } else {
+        return locals;
+    }
 }
