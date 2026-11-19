@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <string.h>
 
 typedef enum { TK_NUM, TK_SYMBOL, TK_EOF } TokenKind;
 
@@ -9,7 +10,8 @@ typedef struct Token Token;
 struct Token {
     TokenKind kind;
     long val;
-    char symbol;
+    char* str;
+    int len;
     Token *next;
 };
 
@@ -33,13 +35,29 @@ struct Token* tokenize(char* s) {
         }
 
         bool is_symbol = false;
-        char* targets = "+-*/()";
-        for (int i = 0; targets[i] != '\0'; i++) {
-            char target = targets[i];
-            if (**endptr == target) {
-                (*endptr)++;
+        char* targets[] = {
+            "==",
+            "!=",
+            "<=",
+            ">=",
+            "+",
+            "-",
+            "*",
+            "/",
+            "(",
+            ")",
+            "<",
+            ">",
+        };
+        size_t targets_size = sizeof(targets) / sizeof(targets[0]);
+        for (int i = 0; i < targets_size; i++) {
+            char* target = targets[i];
+            int target_len = strlen(target);
+            if (!strncmp(*endptr, target, target_len)) {
                 last_token_ptr = new_token(TK_SYMBOL, last_token_ptr);
-                last_token_ptr -> symbol = target;
+                last_token_ptr -> str = *endptr;
+                last_token_ptr -> len = target_len;
+                (*endptr) += target_len;
                 is_symbol = true;
                 break;
             }
@@ -49,9 +67,12 @@ struct Token* tokenize(char* s) {
         }
 
         if (isdigit(**endptr)) {
+            char* prev_endptr = *endptr;
             long num = strtol(*endptr, endptr, 10);
             last_token_ptr = new_token(TK_NUM, last_token_ptr);
             last_token_ptr -> val = num;
+            last_token_ptr -> len = *endptr - prev_endptr;
+            last_token_ptr -> str = prev_endptr;
             continue;
         }
 
@@ -64,16 +85,18 @@ struct Token* tokenize(char* s) {
 
 struct Token* token = NULL;
 
-bool consume(char symbol) {
-    if (token -> kind == TK_SYMBOL && token -> symbol == symbol) {
+bool consume(char* symbol) {
+    int len = strlen(symbol);
+    if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
         token = token -> next;
         return true;
     }
     return false;
 }
 
-void expect(char symbol) {
-    if (token -> kind == TK_SYMBOL && token -> symbol == symbol) {
+void expect(char* symbol) {
+    int len = strlen(symbol);
+    if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
         token = token -> next;
         return;
     }
@@ -98,7 +121,7 @@ bool at_eof() {
     return false;
 }
 
-typedef enum {ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM} NodeKind;
+typedef enum {ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_NUM, ND_EQ, ND_NE, ND_LT, ND_LE} NodeKind;
 
 typedef struct Node Node;
 struct Node {
@@ -126,9 +149,9 @@ Node* create_number_node(long num) {
 Node* expr();
 
 Node* primary() {
-    if (consume('(')) {
+    if (consume("(")) {
         Node* node = expr();
-        expect(')');
+        expect(")");
         return node;
     } else {
         long num = expect_number();
@@ -138,9 +161,9 @@ Node* primary() {
 }
 
 Node* unary() {
-    if (consume('+')) {
+    if (consume("+")) {
         return primary();
-    } else if (consume('-')) {
+    } else if (consume("-")) {
         Node* node = create_binary_operation_node(ND_SUB, create_number_node(0), primary());
         return node;
     }
@@ -150,9 +173,9 @@ Node* unary() {
 Node* mul() {
     Node* node = unary();
     while (true) {
-        if (consume('*')) {
+        if (consume("*")) {
             node = create_binary_operation_node(ND_MUL, node, unary());
-        } else if (consume('/')) {
+        } else if (consume("/")) {
             node = create_binary_operation_node(ND_DIV, node, unary());
         } else {
             break;
@@ -161,18 +184,54 @@ Node* mul() {
     return node;
 }
 
-Node* expr() {
+Node* add() {
     Node* node = mul();
     while (true) {
-        if (consume('+')) {
+        if (consume("+")) {
             node = create_binary_operation_node(ND_ADD, node, mul());
-        } else if (consume('-')) {
+        } else if (consume("-")) {
             node = create_binary_operation_node(ND_SUB, node, mul());
         } else {
             break;
         }
     }
     return node;
+}
+
+Node* relational() {
+    Node* node = add();
+    while (true) {
+        if (consume("<=")) {
+            node = create_binary_operation_node(ND_LE, node, add());
+        } else if (consume(">=")) {
+            node = create_binary_operation_node(ND_LE, add(), node);
+        } else if (consume("<")) {
+            node = create_binary_operation_node(ND_LT, node, add());
+        } else if (consume(">")) {
+            node = create_binary_operation_node(ND_LT, add(), node);
+        } else {
+            break;
+        }
+    }
+    return node;
+}
+
+Node* equality() {
+    Node* node = relational();
+    while (true) {
+        if (consume("==")) {
+            node = create_binary_operation_node(ND_EQ, node, relational());
+        } else if (consume("!=")) {
+            node = create_binary_operation_node(ND_NE, node, relational());
+        } else {
+            break;
+        }
+    }
+    return node;
+}
+
+Node* expr() {
+    return equality();
 }
 
 void gen(Node* node) {
@@ -193,6 +252,22 @@ void gen(Node* node) {
     } else if (node -> kind == ND_DIV) {
         printf("  cqo\n");
         printf("  idiv rdi\n");
+    } else if (node -> kind == ND_EQ) {
+        printf("  cmp rax, rdi\n");
+        printf("  sete al\n");
+        printf("  movzb rax, al\n");
+    } else if (node -> kind == ND_NE) {
+        printf("  cmp rax, rdi\n");
+        printf("  setne al\n");
+        printf("  movzb rax, al\n");
+    } else if (node -> kind == ND_LT) {
+        printf("  cmp rax, rdi\n");
+        printf("  setl al\n");
+        printf("  movzb rax, al\n");
+    } else if (node -> kind == ND_LE) {
+        printf("  cmp rax, rdi\n");
+        printf("  setle al\n");
+        printf("  movzb rax, al\n");
     }
     printf("  push rax\n");
 }
