@@ -49,7 +49,7 @@ bool at_eof() {
 }
 
 Node* create_binary_operation_node(NodeKind kind, Node* left_child, Node* right_child) {
-    struct Node* new_node_ptr = calloc(1, sizeof(struct Node));
+    Node* new_node_ptr = calloc(1, sizeof(Node));
     new_node_ptr -> kind = kind;
     new_node_ptr -> left_child = left_child;
     new_node_ptr -> right_child = right_child;
@@ -57,7 +57,7 @@ Node* create_binary_operation_node(NodeKind kind, Node* left_child, Node* right_
 }
 
 Node* create_number_node(long num) {
-    struct Node* num_node_ptr = calloc(1, sizeof(struct Node));
+    Node* num_node_ptr = calloc(1, sizeof(Node));
     num_node_ptr -> kind = ND_NUM;
     num_node_ptr -> val = num;
     return num_node_ptr;
@@ -85,6 +85,12 @@ Node* create_ident_node(Token* tok) {
         locals = lvar;
     }
     return ident_node_ptr;
+}
+
+Node* create_return_node() {
+    Node* return_node = calloc(1, sizeof(Node));
+    return_node -> kind = ND_RETURN;
+    return return_node;
 }
 
 Node* primary() {
@@ -186,7 +192,14 @@ Node* expr() {
 }
 
 Node* stmt() {
-    Node* node = expr();
+    Node* node;
+    if (token -> kind == TK_RETURN) {
+        token = token -> next;
+        node = create_return_node();
+        node -> left_child = expr();
+    } else {
+        node = expr();
+    }
     expect(";");
     return node;
 }
