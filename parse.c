@@ -64,9 +64,26 @@ Node* create_number_node(long num) {
 }
 
 Node* create_ident_node(Token* tok) {
+    LVar* var = find_lvar(tok);
     Node* ident_node_ptr = calloc(1, sizeof(Node));
     ident_node_ptr -> kind = ND_LVAR;
-    ident_node_ptr -> offset = (tok -> str[0] - 'a' + 1) * 8;
+    if (var) {
+        ident_node_ptr -> offset = var -> offset;
+    } else {
+        LVar* lvar = calloc(1, sizeof(LVar));
+        lvar -> name = tok -> str;
+        lvar -> len = tok -> len;
+        int offset;
+        if (locals) {
+            offset = locals -> offset + 8;
+        } else {
+            offset = 8;
+        }
+        lvar -> offset = offset;
+        ident_node_ptr -> offset = offset;
+        lvar -> next = locals;
+        locals = lvar;
+    }
     return ident_node_ptr;
 }
 
