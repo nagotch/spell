@@ -46,5 +46,6 @@ Node* equality();
 Node* assign();
 Node* expr();
 Node* stmt();
-void gen(Node* node);
 void program();
+void gen(Node* node);
+void gen_lval(Node* node);

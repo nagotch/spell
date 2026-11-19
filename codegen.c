@@ -1,6 +1,13 @@
 #include "spell.h"
 
 void gen(Node* node) {
+    if (node -> kind == ND_LVAR) {
+        gen_lval(node);
+        printf("  pop rax\n");
+        printf("  mov rax\n");
+        printf("  [rax] -> push rax\n");
+    }
+
     if (node -> kind == ND_NUM) {
         printf("  push %ld\n", node -> val);
         return;
@@ -38,3 +45,13 @@ void gen(Node* node) {
     printf("  push rax\n");
 }
 
+void gen_lval(Node* node) {
+    if (node -> kind == ND_LVAR) {
+        fprintf(stderr, "  不明な代入");
+        exit(1);
+    }
+
+    printf("  mov rax, rbp\n");
+    printf("  sub rax, %d\n", node -> offset);
+    printf("  push rax\n");
+}
