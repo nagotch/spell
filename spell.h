@@ -27,6 +27,7 @@ struct Node {
 };
 
 extern Token* token;
+extern Node* code[100];
 
 Token* new_token(TokenKind token_kind, Token* pre_token_ptr);
 Token* tokenize(char* s);
@@ -36,11 +37,14 @@ long expect_number();
 bool at_eof();
 Node* create_binary_operation_node(NodeKind kind, Node* left_child, Node* right_child);
 Node* create_number_node(long num);
-Node* expr();
 Node* primary();
 Node* unary();
 Node* mul();
 Node* add();
 Node* relational();
 Node* equality();
+Node* assign();
+Node* expr();
+Node* stmt();
 void gen(Node* node);
+void program();
