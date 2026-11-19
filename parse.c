@@ -175,7 +175,7 @@ Node* stmt() {
 
 void program() {
     int i = 0;
-    while (at_eof()) {
+    while (!at_eof()) {
         code[i] = stmt();
         i++;
     }
