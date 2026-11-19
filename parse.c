@@ -9,6 +9,15 @@ bool consume(char* symbol) {
     return false;
 }
 
+Token* consume_ident() {
+    if (token -> kind == TK_IDENT) {
+        Token* pre_token = token;
+        token = token -> next;
+        return pre_token;
+    }
+    return NULL;
+}
+
 void expect(char* symbol) {
     int len = strlen(symbol);
     if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
@@ -51,8 +60,19 @@ Node* create_number_node(long num) {
     return num_node_ptr;
 }
 
+Node* create_ident_node(Token* tok) {
+    Node* ident_node_ptr = calloc(1, sizeof(Node));
+    ident_node_ptr -> kind = ND_NUM;
+    ident_node_ptr -> offset = (tok -> str[0] - 'a' + 1) * 8;
+    return ident_node_ptr;
+}
+
 Node* primary() {
-    if (consume("(")) {
+    Token* ident_token = consume_ident();
+    if (ident_token != NULL) {
+        Node* node = create_ident_node(ident_token);
+        return node;
+    } else if (consume("(")) {
         Node* node = expr();
         expect(")");
         return node;
