@@ -7,15 +7,22 @@ int main(int argc, char **argv) {
     }
 
     token = tokenize(argv[1]);
-    Node* tree = expr();
+    program();
 
     printf(".intel_syntax noprefix\n");
     printf(".global main\n");
     printf("main:\n");
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    printf("  sub rsp, 208\n"); // 26文字 * 8bytes = 208
 
-    gen(tree);
-    printf("  pop rax\n");
-    
+    for (int i = 0; code[i] != NULL; i++) {
+        gen(code[i]);
+        printf("  pop rax\n");
+    }
+
+    printf("  mov rsp, rbp\n");
+    printf("  pop rbp\n");
     printf("  ret\n");
     printf(".section .note.GNU-stack,\"\",@progbits\n");
 
