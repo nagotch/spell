@@ -9,7 +9,11 @@ Token* new_token(TokenKind token_kind, struct Token* pre_token_ptr) {
     return next_token_ptr;
 }
 
-struct Token* tokenize(char* s) {
+bool can_use_variables(char c) {
+    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_';
+}
+
+Token* tokenize(char* s) {
     struct Token first_token;
     first_token.next = NULL;
     struct Token* last_token_ptr = &first_token;
@@ -65,11 +69,14 @@ struct Token* tokenize(char* s) {
             continue;
         }
 
-        if ('a' <= **endptr && **endptr <= 'z') {
+        if (can_use_variables(**endptr)) {
             last_token_ptr = new_token(TK_IDENT, last_token_ptr);
             last_token_ptr -> str = *endptr;
-            last_token_ptr -> len = 1;
-            (*endptr)++;
+            last_token_ptr -> len = 0;
+            while (can_use_variables(**endptr)) {
+                last_token_ptr -> len++;
+                (*endptr)++;
+            }
             continue;
         }
 
