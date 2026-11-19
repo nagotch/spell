@@ -1,5 +1,7 @@
 #include "spell.h"
 
+Node* code[100];
+
 bool consume(char* symbol) {
     int len = strlen(symbol);
     if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
@@ -153,6 +155,29 @@ Node* equality() {
     return node;
 }
 
+Node* assign() {
+    Node* node = equality();
+    if (consume("=")) {
+        node = create_binary_operation_node(ND_ASSIGN, node, assign());
+    }
+    return node;
+}
+
 Node* expr() {
-    return equality();
+    return assign();
+}
+
+Node* stmt() {
+    Node* node = expr();
+    expect(";");
+    return node;
+}
+
+void program() {
+    int i = 0;
+    while (at_eof()) {
+        code[i] = stmt();
+        i++;
+    }
+    code[i] = NULL;
 }
