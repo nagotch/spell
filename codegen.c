@@ -1,5 +1,7 @@
 #include "spell.h"
 
+int max_label = 0;
+
 void gen(Node* node) {
     if (node -> kind == ND_LVAR) {
         gen_lval(node);
@@ -28,6 +30,64 @@ void gen(Node* node) {
         printf("  mov rsp, rbp\n");
         printf("  pop rbp\n");
         printf("  ret\n");
+        return;
+    }
+
+    int label = max_label;
+    max_label++;
+
+    if (node -> kind == ND_IF && node -> els == NULL) {
+        gen(node -> cond);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je .Lend%d\n", label);
+        gen(node -> then);
+        printf(".Lend%d:\n", label);
+        return;
+    }
+
+    if (node -> kind == ND_IF) {
+        gen(node -> cond);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je .Lelse%d\n", label);
+        gen(node -> then);
+        printf("  jmp .Lend%d\n", label);
+        printf(".Lelse%d:\n", label);
+        gen(node -> els);
+        printf(".Lend%d:\n", label);
+        return;
+    }
+
+    if (node -> kind == ND_WHILE) {
+        printf(".Lbegin%d:\n", label);
+        gen(node -> cond);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je .Lend%d\n", label);
+        gen(node -> then);
+        printf("  jmp .Lbegin%d\n", label);
+        printf(".Lend%d:\n", label);
+        return;
+    }
+
+    if (node -> kind == ND_FOR) {
+        if (node -> init) {
+            gen(node -> init);
+        }
+        printf(".Lbegin%d:\n", label);
+        if (node -> cond) {
+            gen(node -> cond);
+            printf("  pop rax\n");
+            printf("  cmp rax, 0\n");
+            printf("  je .Lend%d\n", label);
+        }
+        gen(node -> then);
+        if (node -> inc) {
+            gen(node -> inc);
+        }
+        printf("  jmp .Lbegin%d\n", label);
+        printf(".Lend%d:\n", label);
         return;
     }
 

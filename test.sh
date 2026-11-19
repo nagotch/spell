@@ -50,6 +50,16 @@ tests=(
     "a=3; b=5*6-8; return a+b/2;|14"
     "returnx=3; returnx;|3"
     "return1=7; return1;|7"
+    "if (0) return 1; return 2;|2"
+    "if (1) return 1; return 2;|1"
+    "if (0) return 1; else return 2;|2"
+    "if (1) return 1; else return 2;|1"
+    "a=0; if (1) a=1; return a;|1"
+    "a=0; if (0) a=1; return a;|0"
+    "a=0; while (a<10) a=a+1; return a;|10"
+    "s=0; for (i=0; i<10; i=i+1) s=s+i; return s;|45"
+    "for (;;) return 3;|3"
+    "a=0; for (; a<3;) a=a+1; return a;|3"
 )
 
 one_test() {
