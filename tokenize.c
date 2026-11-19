@@ -73,6 +73,14 @@ Token* tokenize(char* s) {
             continue;
         }
 
+        if (!strncmp(*endptr, "return", 6) && !can_use_variables((*endptr)[6])) {
+            last_token_ptr = new_token(TK_RETURN, last_token_ptr);
+            last_token_ptr -> len = 6;
+            last_token_ptr -> str = *endptr;
+            *endptr += 6;
+            continue;
+        }
+
         if (can_use_variables_first(**endptr)) {
             last_token_ptr = new_token(TK_IDENT, last_token_ptr);
             last_token_ptr -> str = *endptr;

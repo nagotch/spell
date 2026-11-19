@@ -22,6 +22,15 @@ void gen(Node* node) {
         return;
     }
 
+    if (node -> kind == ND_RETURN) {
+        gen(node -> left_child);
+        printf("  pop rax\n");
+        printf("  mov rsp, rbp\n");
+        printf("  pop rbp\n");
+        printf("  ret\n");
+        return;
+    }
+
     gen(node -> left_child);
     gen(node -> right_child);
     printf("  pop rdi\n");

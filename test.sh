@@ -45,6 +45,11 @@ tests=(
     "foo=3; bar=5; foo+bar;|8"
     "fo=1; foo=2; fo+foo;|3"
     "foo1=5; foo1;|5"
+    "return 42;|42"
+    "return 5; return 8;|5"
+    "a=3; b=5*6-8; return a+b/2;|14"
+    "returnx=3; returnx;|3"
+    "return1=7; return1;|7"
 )
 
 one_test() {
