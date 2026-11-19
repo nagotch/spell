@@ -1,5 +1,4 @@
 #!/bin/bash
-cc -o spell *.c
 
 tests=(
     "0|0"
