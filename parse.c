@@ -56,25 +56,28 @@ bool at_eof() {
     return false;
 }
 
+Node* create_node(NodeKind kind) {
+    Node* node = calloc(1, sizeof(Node));
+    node -> kind = kind;
+    return node;
+}
+
 Node* create_binary_operation_node(NodeKind kind, Node* left_child, Node* right_child) {
-    Node* new_node_ptr = calloc(1, sizeof(Node));
-    new_node_ptr -> kind = kind;
+    Node* new_node_ptr = create_node(kind);
     new_node_ptr -> left_child = left_child;
     new_node_ptr -> right_child = right_child;
     return new_node_ptr;
 }
 
 Node* create_number_node(long num) {
-    Node* num_node_ptr = calloc(1, sizeof(Node));
-    num_node_ptr -> kind = ND_NUM;
+    Node* num_node_ptr = create_node(ND_NUM);
     num_node_ptr -> val = num;
     return num_node_ptr;
 }
 
 Node* create_ident_node(Token* tok) {
     LVar* var = find_lvar(tok);
-    Node* ident_node_ptr = calloc(1, sizeof(Node));
-    ident_node_ptr -> kind = ND_LVAR;
+    Node* ident_node_ptr = create_node(ND_LVAR);
     if (var) {
         ident_node_ptr -> offset = var -> offset;
     } else {
@@ -195,13 +198,22 @@ Node* expr() {
 
 Node* stmt() {
     Node* node;
-    if (consume_keyword(TK_RETURN)) {
-        node = calloc(1, sizeof(Node));
-        node -> kind = ND_RETURN;
+    if (consume("{")) {
+        node = create_node(ND_BLOCK);
+        Node head;
+        head.next = NULL;
+        Node* cur = &head;
+        while (!consume("}")) {
+            cur -> next = stmt();
+            cur = cur -> next;
+        }
+        node -> body = head.next;
+        return node;
+    } else if (consume_keyword(TK_RETURN)) {
+        node = create_node(ND_RETURN);
         node -> left_child = expr();
     } else if (consume_keyword(TK_IF)) {
-        node = calloc(1, sizeof(Node));
-        node -> kind = ND_IF;
+        node = create_node(ND_IF);
         expect("(");
         node -> cond = expr();
         expect(")");
@@ -211,16 +223,14 @@ Node* stmt() {
         }
         return node;
     } else if (consume_keyword(TK_WHILE)) {
-        node = calloc(1, sizeof(Node));
-        node -> kind = ND_WHILE;
+        node = create_node(ND_WHILE);
         expect("(");
         node -> cond = expr();
         expect(")");
         node -> then = stmt();
         return node;
     } else if (consume_keyword(TK_FOR)) {
-        node = calloc(1, sizeof(Node));
-        node -> kind = ND_FOR;
+        node = create_node(ND_FOR);
         expect("(");
         if (!consume(";")) {
             node -> init = expr();
