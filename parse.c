@@ -270,26 +270,24 @@ Node* stmt() {
 Function* function() {
     locals = NULL;
     Token* tok = consume_ident();
-    char* name = tok -> str;
-    int len = tok -> len;
     if (!tok) {
         fprintf(stderr, "関数名を定義してください\n");
         exit(1);
     }
+    char* name = tok -> str;
+    int len = tok -> len;
     if (!consume("(")) {
         fprintf(stderr, "\"(\"が必要です");
         exit(1);
     }
     if (!consume(")")) {
-        Node* node = create_ident_node(token);
+        int nparams = 0;
+        do {
+            resist_lvar(token);
+            nparams++;
+        } while (consume(","));
         expect(")");
     }
-    int nparams = 0;
-    do {
-        resist_lvar(tok);
-        nparams++;
-    } while (consume(","));
-    expect(")");
     expect("{");
     Node head;
     head.next = NULL;
