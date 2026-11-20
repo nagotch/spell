@@ -67,13 +67,24 @@ tests=(
     "s=0; for (i=0; i<3; i=i+1) { s=s+i; s=s+1; } return s;|6"
     "a=0; { a=1; { a=2; } } return a;|2"
     "a=5; {} return a;|5"
+    "return ret3();|3"
+    "return add(3, 5);|8"
+    "return sub(5, 3);|2"
+    "return add6(1, 2, 3, 4, 5, 6);|21"
+    "return sub6(100, 1, 2, 3, 4, 5);|85"
+    "return add6(1, 2, add6(3,4,5,6,7,8),9,10,11);|66"
+    "return add6(1,2,add6(3,add6(4,5,6,7,8,9),10,11,12,13),14,15,16);|136"
+    "a=3; return add(a,4);|7"
+    "return ret3() + ret3();|6"
 )
+
+cc -c -o funcs.o funcs.c
 
 one_test() {
     IFS='|' read -r input expected <<< "${tests[$1]}"
     i=$(printf '%02d' $1)
     ./spell "$input" > tmp$1.s
-    cc -o tmp$1 tmp$1.s
+    cc -o tmp$1 tmp$1.s funcs.o
     ./tmp$1
     exit_code=$?
     if [ "$exit_code" != "$expected" ]; then
