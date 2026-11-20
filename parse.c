@@ -204,7 +204,7 @@ Node* stmt() {
         head.next = NULL;
         Node* cur = &head;
         while (!consume("}")) {
-            cur -> body = stmt();
+            cur -> next = stmt();
             cur = cur -> next;
         }
         node -> body = head.next;
