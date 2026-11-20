@@ -1,6 +1,6 @@
 CFLAGS=-std=c11 -g
 
-SRCS=$(wildcard *.c)
+SRCS=$(filter-out funcs.c,$(wildcard *.c))
 OBJS=$(SRCS:.c=.o)
 
 spell: $(OBJS)
