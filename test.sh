@@ -85,6 +85,10 @@ tests=(
     "main() { x=3; return *&x; }|3"
     "main() { a=3; b=4; p=&a; q=&b; return *p + *q; }|7"
     "main() { x=42; p=&x; q=&p; return **q; }|42"
+    "main() { x=3; y=&x; *y=5; return x; }|5"
+    "main() { x=3; y=&x; *y=*y+2; return x; }|5"
+    "main() { x=7; y=&x; z=&y; **z=9; return x; }|9"
+    "main() { x=3; y=&x; *y=8; return *y; }|8"
 )
 
 cc -c -o funcs.o funcs.c
