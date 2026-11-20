@@ -134,6 +134,14 @@ Node* unary() {
     } else if (consume("-")) {
         Node* node = create_binary_operation_node(ND_SUB, create_number_node(0), primary());
         return node;
+    } else if (consume("*")) {
+        Node* node = create_node(ND_DEREF);
+        node -> left_child = unary();
+        return node;
+    } else if (consume("&")) {
+        Node* node = create_node(ND_ADDR);
+        node -> left_child = unary();
+        return node;
     }
     return primary();
 }
