@@ -81,6 +81,10 @@ tests=(
     "f(x) { y = x * 2; return y; } main() { return f(21); }|42"
     "sum6(a, b, c, d, e, f) { return a + b + c + d + e + f; } main() { return sum6(1, 2, 3, 4, 5, 6); }|21"
     "fib(x) { if (x <= 1) return 1; return fib(x - 1) + fib(x - 2); } main() { return fib(9); }|55"
+    "main() { x=3; y=&x; return *y; }|3"
+    "main() { x=3; return *&x; }|3"
+    "main() { a=3; b=4; p=&a; q=&b; return *p + *q; }|7"
+    "main() { x=42; p=&x; q=&p; return **q; }|42"
 )
 
 cc -c -o funcs.o funcs.c
