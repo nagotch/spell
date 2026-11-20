@@ -114,14 +114,14 @@ void gen(Node* node) {
             exit(1);
         }
         char* resister[] = {
-            "r9",
-            "r8",
-            "rcx",
-            "rdx",
-            "rsi",
             "rdi",
+            "rsi",
+            "rdx",
+            "rcx",
+            "r8",
+            "r9",
         };
-        for (int i = 0; i < args_cnt; i++) {
+        for (int i = args_cnt - 1; i >= 0; i--) {
             printf("  pop %s\n", resister[i]);
         }
         printf("  mov rax, rsp\n");
