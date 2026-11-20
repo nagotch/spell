@@ -46,6 +46,8 @@ typedef enum {
     ND_FUNCALL,
     ND_ADDR,
     ND_DEREF,
+    ND_ARRAY,
+    ND_INDEX,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
@@ -64,6 +66,7 @@ struct Node {
     char* name;
     int len;
     Node* args;
+    int array_len;
 };
 
 typedef struct Function Function;
@@ -82,6 +85,7 @@ struct LVar {
     int len;
     int offset;
     LVar* next;
+    int array_len;
 };
 
 extern Token* token;
