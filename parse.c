@@ -112,9 +112,9 @@ Node* primary() {
                 cur -> next = expr();
                 cur = cur -> next;
             } while (consume(","));
-            node = &head;
+            node -> args = head.next;
+            expect(")");
         }
-        expect(")");
         return node;
     } else if (ident_token) {
         Node* node = create_ident_node(ident_token);
