@@ -64,6 +64,15 @@ struct Node {
     Node* args;
 };
 
+typedef struct Function Function;
+struct Function {
+    Function* next;
+    char* name;
+    Node* body;
+    int nparams;
+    int stack_size;
+};
+
 typedef struct LVar LVar;
 struct LVar {
     char* name;
@@ -73,7 +82,6 @@ struct LVar {
 };
 
 extern Token* token;
-extern Node* code[100];
 extern LVar* locals;
 
 Token* new_token(TokenKind token_kind, Token* pre_token_ptr);
@@ -93,7 +101,7 @@ Node* equality();
 Node* assign();
 Node* expr();
 Node* stmt();
-void program();
+Function* program();
 void gen(Node* node);
 void gen_lval(Node* node);
 LVar* find_lvar(Token* tok);
