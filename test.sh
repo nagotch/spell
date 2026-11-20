@@ -60,6 +60,13 @@ tests=(
     "s=0; for (i=0; i<10; i=i+1) s=s+i; return s;|45"
     "for (;;) return 3;|3"
     "a=0; for (; a<3;) a=a+1; return a;|3"
+    "a=0; { a=1; a=2; } return a;|2"
+    "a=0; if (1) { a=1; a=2; } return a;|2"
+    "a=0; if (0) { a=1; } else { a=2; } return a;|2"
+    "a=0; while (a<3) { a=a+1; a=a+1; } return a;|4"
+    "s=0; for (i=0; i<3; i=i+1) { s=s+i; s=s+1; } return s;|6"
+    "a=0; { a=1; { a=2; } } return a;|2"
+    "a=5; {} return a;|5"
 )
 
 one_test() {
