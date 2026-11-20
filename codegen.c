@@ -189,8 +189,8 @@ void gen_lval(Node* node) {
         printf("  push rax\n");
         return;
     }
-    if (node -> kind != ND_DEREF) {
-        gen(node);
+    if (node -> kind == ND_DEREF) {
+        gen(node -> left_child);
         return;
     }
     fprintf(stderr, "  不明な代入");
