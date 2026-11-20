@@ -280,10 +280,10 @@ Function* function() {
         fprintf(stderr, "\"(\"が必要です");
         exit(1);
     }
+    int nparams = 0;
     if (!consume(")")) {
-        int nparams = 0;
         do {
-            resist_lvar(token);
+            resist_lvar(consume_ident());
             nparams++;
         } while (consume(","));
         expect(")");
