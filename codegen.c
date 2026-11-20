@@ -183,14 +183,18 @@ void gen(Node* node) {
 }
 
 void gen_lval(Node* node) {
-    if (node -> kind != ND_LVAR) {
-        fprintf(stderr, "  不明な代入");
-        exit(1);
+    if (node -> kind == ND_LVAR) {
+        printf("  mov rax, rbp\n");
+        printf("  sub rax, %d\n", node -> offset);
+        printf("  push rax\n");
+        return;
     }
-
-    printf("  mov rax, rbp\n");
-    printf("  sub rax, %d\n", node -> offset);
-    printf("  push rax\n");
+    if (node -> kind != ND_DEREF) {
+        gen(node);
+        return;
+    }
+    fprintf(stderr, "  不明な代入");
+    exit(1);
 }
 
 void codegen(Function* prog) {
