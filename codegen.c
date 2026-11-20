@@ -21,7 +21,7 @@ void gen(Node* node) {
         gen(node -> left_child);
         printf("  pop rax\n");
         printf("  mov rax, [rax]\n");
-        printf("  push rax");
+        printf("  push rax\n");
         return;
     }
 
