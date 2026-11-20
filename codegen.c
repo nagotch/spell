@@ -107,6 +107,7 @@ void gen(Node* node) {
             block_head = block_head -> next;
             printf("  pop rax\n");
         }
+        printf("  push rax\n");
         return;
     }
 
