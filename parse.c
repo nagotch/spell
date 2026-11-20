@@ -75,25 +75,23 @@ Node* create_number_node(long num) {
     return num_node_ptr;
 }
 
+void resist_lvar(Token* tok) {
+    LVar* lvar = calloc(1, sizeof(LVar));
+    lvar -> name = tok -> str;
+    lvar -> len = tok -> len;
+    lvar -> offset = locals ? locals -> offset + 8 : 8;
+    lvar -> next = locals;
+    locals = lvar;
+}
+
 Node* create_ident_node(Token* tok) {
     LVar* var = find_lvar(tok);
     Node* ident_node_ptr = create_node(ND_LVAR);
     if (var) {
         ident_node_ptr -> offset = var -> offset;
     } else {
-        LVar* lvar = calloc(1, sizeof(LVar));
-        lvar -> name = tok -> str;
-        lvar -> len = tok -> len;
-        int offset;
-        if (locals) {
-            offset = locals -> offset + 8;
-        } else {
-            offset = 8;
-        }
-        lvar -> offset = offset;
-        ident_node_ptr -> offset = offset;
-        lvar -> next = locals;
-        locals = lvar;
+        resist_lvar(tok);
+        ident_node_ptr -> offset = locals -> offset;
     }
     return ident_node_ptr;
 }
@@ -269,13 +267,55 @@ Node* stmt() {
     return node;
 }
 
-void program() {
-    int i = 0;
-    while (!at_eof()) {
-        code[i] = stmt();
-        i++;
+Function* function() {
+    locals = NULL;
+    Token* tok = consume_ident();
+    char* name = tok -> str;
+    int len = tok -> len;
+    if (!tok) {
+        fprintf(stderr, "関数名を定義してください\n");
+        exit(1);
     }
-    code[i] = NULL;
+    if (!consume("(")) {
+        fprintf(stderr, "\"(\"が必要です");
+        exit(1);
+    }
+    if (!consume(")")) {
+        Node* node = create_ident_node(token);
+        expect(")");
+    }
+    int nparams = 0;
+    do {
+        resist_lvar(tok);
+        nparams++;
+    } while (consume(","));
+    expect(")");
+    expect("{");
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    while (!consume("}")) {
+        cur -> next = stmt();
+        cur = cur -> next;
+    }
+    Function* func = calloc(1, sizeof(Function));
+    func -> name = name;
+    func -> len = len;
+    func -> body = head.next;
+    func -> nparams = nparams;
+    func -> stack_size = locals ? (locals -> offset + 15) / 16 * 16 : 0;
+    return func;
+}
+
+Function* program() {
+    Function head;
+    head.next = NULL;
+    Function* cur = &head;
+    while (!at_eof()) {
+        cur -> next = function();
+        cur = cur -> next;
+    }
+    return head.next;
 }
 
 LVar* find_lvar(Token* tok) {
