@@ -200,13 +200,14 @@ Node* stmt() {
     Node* node;
     if (consume("{")) {
         node = create_node(ND_BLOCK);
-        node -> body = stmt();
-        Node* prev_node = node;
+        Node head;
+        head.next = NULL;
+        Node* cur = &head;
         while (!consume("}")) {
-            Node* next_node = stmt();
-            prev_node -> next = next_node;
-            prev_node = next_node;
+            cur -> body = stmt();
+            cur = cur -> next;
         }
+        node -> body = head.next;
         return node;
     } else if (consume_keyword(TK_RETURN)) {
         node = create_node(ND_RETURN);
