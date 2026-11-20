@@ -101,6 +101,45 @@ void gen(Node* node) {
         return;
     }
 
+    if (node -> kind == ND_FUNCALL) {
+        Node* head = node -> args;
+        int args_cnt = 0;
+        while (head) {
+            gen(head);
+            head = head -> next;
+            args_cnt++;
+        }
+        if (args_cnt > 6) {
+            fprintf(stderr, "関数の引数が6より多い");
+            exit(1);
+        }
+        char* resister[] = {
+            "r9",
+            "r8",
+            "rcx",
+            "rdx",
+            "rsi",
+            "rdi",
+        };
+        for (int i = 0; i < args_cnt; i++) {
+            printf("  pop %s\n", resister[i]);
+        }
+        printf("  mov rax, rsp\n");
+        printf("  and rax, 15\n");
+        printf("  jnz .Lcall%d\n", label);
+        printf("  mov rax, 0\n");
+        printf("  call %.*s\n", node -> len, node -> name);
+        printf("  jmp .Lend%d\n", label);
+        printf(".Lcall%d:\n", label);
+        printf("  sub rsp, 8\n");
+        printf("  mov rax, 0\n");
+        printf("  call %.*s\n", node -> len, node -> name);
+        printf("  add rsp, 8\n");
+        printf(".Lend%d:\n", label);
+        printf("  push rax\n");
+        return;
+    }
+
     gen(node -> left_child);
     gen(node -> right_child);
     printf("  pop rdi\n");
