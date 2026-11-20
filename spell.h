@@ -103,6 +103,7 @@ Node* assign();
 Node* expr();
 Node* stmt();
 Function* program();
+void codegen(Function* prog);
 void gen(Node* node);
 void gen_lval(Node* node);
 LVar* find_lvar(Token* tok);
