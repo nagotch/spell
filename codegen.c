@@ -12,6 +12,19 @@ char* resister[] = {
 };
 
 void gen(Node* node) {
+    if (node -> kind == ND_ADDR) {
+        gen_lval(node -> left_child);
+        return;
+    }
+
+    if (node -> kind == ND_DEREF) {
+        gen(node -> left_child);
+        printf("  pop rax\n");
+        printf("  mov rax, [rax]\n");
+        printf("  push rax\n");
+        return;
+    }
+
     if (node -> kind == ND_LVAR) {
         gen_lval(node);
         printf("  pop rax\n");
@@ -32,7 +45,6 @@ void gen(Node* node) {
         printf("  push %ld\n", node -> val);
         return;
     }
-
     if (node -> kind == ND_RETURN) {
         gen(node -> left_child);
         printf("  pop rax\n");
@@ -54,7 +66,6 @@ void gen(Node* node) {
         printf(".Lend%d:\n", label);
         return;
     }
-
     if (node -> kind == ND_IF) {
         gen(node -> cond);
         printf("  pop rax\n");
@@ -67,7 +78,6 @@ void gen(Node* node) {
         printf(".Lend%d:\n", label);
         return;
     }
-
     if (node -> kind == ND_WHILE) {
         printf(".Lbegin%d:\n", label);
         gen(node -> cond);
@@ -79,7 +89,6 @@ void gen(Node* node) {
         printf(".Lend%d:\n", label);
         return;
     }
-
     if (node -> kind == ND_FOR) {
         if (node -> init) {
             gen(node -> init);
@@ -99,7 +108,6 @@ void gen(Node* node) {
         printf(".Lend%d:\n", label);
         return;
     }
-
     if (node -> kind == ND_BLOCK) {
         Node* block_head = node -> body;
         while (block_head) {
@@ -110,7 +118,6 @@ void gen(Node* node) {
         printf("  push rax\n");
         return;
     }
-
     if (node -> kind == ND_FUNCALL) {
         Node* head = node -> args;
         int args_cnt = 0;
