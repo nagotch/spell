@@ -200,6 +200,7 @@ Node* stmt() {
     Node* node;
     if (consume("{")) {
         node = create_node(ND_BLOCK);
+        node -> body = stmt();
         Node* prev_node = node;
         while (!consume("}")) {
             Node* next_node = stmt();
