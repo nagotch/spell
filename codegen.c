@@ -186,19 +186,24 @@ void gen_lval(Node* node) {
 }
 
 void codegen(Function* prog) {
-    printf(".global %.*s\n", prog -> len, prog -> name);
-    printf("%.*s:\n", prog -> len, prog -> name);
-    printf("  push rbp\n");
-    printf("  mov rbp, rsp\n");
-    printf("  sub rsp, %d\n", prog -> stack_size);
-    for (int i = 0; i < prog -> nparams; i++) {
-        printf("  mov [rbp-%d], %s\n", (i+1)*8, resister[i]);
+    while (prog) {
+        printf(".global %.*s\n", prog -> len, prog -> name);
+        printf("%.*s:\n", prog -> len, prog -> name);
+        printf("  push rbp\n");
+        printf("  mov rbp, rsp\n");
+        printf("  sub rsp, %d\n", prog -> stack_size);
+        for (int i = 0; i < prog -> nparams; i++) {
+            printf("  mov [rbp-%d], %s\n", (i+1)*8, resister[i]);
+        }
+        Node* tail = prog -> body;
+        while (tail) {
+            gen(tail);
+            tail = tail -> next;
+            printf("  pop rax\n");
+        }
+        printf("  mov rsp, rbp\n");
+        printf("  pop rbp\n");
+        printf("  ret\n");
+        prog = prog -> next;
     }
-    Node* tail = prog -> body;
-    while (tail) {
-        gen(tail -> body);
-        printf("  pop rax\n");
-    }
-    printf("  mov rsp, rbp\n");
-    printf("  pop rbp\n");
 }
