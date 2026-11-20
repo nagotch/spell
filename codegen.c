@@ -91,6 +91,15 @@ void gen(Node* node) {
         return;
     }
 
+    if (node -> kind == ND_BLOCK) {
+        Node* block_head = node -> body;
+        while (block_head -> next) {
+            gen(block_head -> next);
+            block_head = block_head -> next;
+            printf("  pop rax\n");
+        }
+    }
+
     gen(node -> left_child);
     gen(node -> right_child);
     printf("  pop rdi\n");
