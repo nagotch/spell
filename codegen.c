@@ -2,6 +2,15 @@
 
 int max_label = 0;
 
+char* resister[] = {
+    "rdi",
+    "rsi",
+    "rdx",
+    "rcx",
+    "r8",
+    "r9",
+};
+
 void gen(Node* node) {
     if (node -> kind == ND_LVAR) {
         gen_lval(node);
@@ -98,6 +107,7 @@ void gen(Node* node) {
             block_head = block_head -> next;
             printf("  pop rax\n");
         }
+        printf("  push rax\n");
         return;
     }
 
@@ -113,14 +123,6 @@ void gen(Node* node) {
             fprintf(stderr, "関数の引数が6より多い");
             exit(1);
         }
-        char* resister[] = {
-            "rdi",
-            "rsi",
-            "rdx",
-            "rcx",
-            "r8",
-            "r9",
-        };
         for (int i = args_cnt - 1; i >= 0; i--) {
             printf("  pop %s\n", resister[i]);
         }
@@ -182,4 +184,27 @@ void gen_lval(Node* node) {
     printf("  mov rax, rbp\n");
     printf("  sub rax, %d\n", node -> offset);
     printf("  push rax\n");
+}
+
+void codegen(Function* prog) {
+    while (prog) {
+        printf(".global %.*s\n", prog -> len, prog -> name);
+        printf("%.*s:\n", prog -> len, prog -> name);
+        printf("  push rbp\n");
+        printf("  mov rbp, rsp\n");
+        printf("  sub rsp, %d\n", prog -> stack_size);
+        for (int i = 0; i < prog -> nparams; i++) {
+            printf("  mov [rbp-%d], %s\n", (i+1)*8, resister[i]);
+        }
+        Node* tail = prog -> body;
+        while (tail) {
+            gen(tail);
+            tail = tail -> next;
+            printf("  pop rax\n");
+        }
+        printf("  mov rsp, rbp\n");
+        printf("  pop rbp\n");
+        printf("  ret\n");
+        prog = prog -> next;
+    }
 }
