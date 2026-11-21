@@ -51,10 +51,12 @@ typedef enum {
     ND_INDEX,
     ND_LEN,
     ND_NEWARRAY,
+    ND_BINOP,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
     NodeKind kind;
+    NodeKind op;
     Node* left_child;
     Node* right_child;
     long val;
