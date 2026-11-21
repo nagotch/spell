@@ -106,7 +106,23 @@ Node* create_ident_node(Token* tok) {
 
 Node* primary() {
     Token* ident_token = consume_ident();
-    if (ident_token && consume("(")) {
+    if (consume("[")) {
+        Node head0;
+        Node* cur0 = &head0;
+        do {
+            Node head;
+            Node* cur = &head;
+            do {
+                cur -> next = expr();
+                cur = cur -> next;
+            } while (consume(","));
+            expect("]");
+            Node* node = create_node(ND_INDEX);
+            cur0 -> next = head.next;
+            cur0 = cur0 -> next;
+        } while (consume("["));
+        return head0.next;
+    } else if (ident_token && consume("(")) {
         Node* node = create_node(ND_FUNCALL);
         node -> name = ident_token -> str;
         node -> len = ident_token -> len;
