@@ -53,6 +53,34 @@ void gen(Node* node) {
         printf("  ret\n");
         return;
     }
+    if (node -> kind == ND_ARRAY) {
+        printf("  mov rax, %d\n", node -> array_len);
+        printf("  mov [rbp-%d], rax\n", node -> offset);
+        Node* tail;
+        tail = node -> body;
+        int i = 0;
+        for (int i = 0; tail; i++) {
+            gen(tail);
+            printf("  pop rax\n");
+            printf("  mov [rbp-%d], rax\n", node -> offset + 8 * (node -> array_len - i - 1));
+            tail = tail -> next;
+        }
+        printf("  mov rax, rbp\n");
+        printf("  sub rax, %d\n", node -> offset + 8 * (node -> array_len - 1));
+        printf("  push rax\n");
+        return;
+    }
+    if (node -> kind == ND_INDEX) {
+        gen(node -> left_child);
+        gen(node -> right_child);
+        printf("  pop rdi\n");
+        printf("  pop rax\n");
+        printf("  imul rdi, 8\n");
+        printf("  add rax, rdi\n");
+        printf("  mov rax, [rax]\n");
+        printf("  push rax\n");
+        return;
+    }
 
     int label = max_label;
     max_label++;
@@ -191,6 +219,16 @@ void gen_lval(Node* node) {
     }
     if (node -> kind == ND_DEREF) {
         gen(node -> left_child);
+        return;
+    }
+    if (node -> kind == ND_INDEX) {
+        gen(node -> left_child);
+        gen(node -> right_child);
+        printf("  pop rdi\n");
+        printf("  pop rax\n");
+        printf("  imul rdi, 8\n");
+        printf("  add rax, rdi\n");
+        printf("  push rax\n");
         return;
     }
     fprintf(stderr, "  不明な代入");

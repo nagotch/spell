@@ -79,7 +79,15 @@ void resist_lvar(Token* tok) {
     LVar* lvar = calloc(1, sizeof(LVar));
     lvar -> name = tok -> str;
     lvar -> len = tok -> len;
-    lvar -> offset = locals ? locals -> offset + 8 : 8;
+    lvar -> offset = locals ? locals -> offset + 8 * (locals -> array_len + 1): 8;
+    lvar -> next = locals;
+    locals = lvar;
+}
+
+void resist_array(int array_len) {
+    LVar* lvar = calloc(1, sizeof(LVar));
+    lvar -> offset = locals ? locals -> offset + 8 * (locals -> array_len + 1): 8;
+    lvar -> array_len = array_len;
     lvar -> next = locals;
     locals = lvar;
 }
@@ -98,8 +106,24 @@ Node* create_ident_node(Token* tok) {
 
 Node* primary() {
     Token* ident_token = consume_ident();
-    if (ident_token && consume("(")) {
-        Node* node = create_node(ND_FUNCALL);
+    Node* node;
+    if (!ident_token && consume("[")) {
+        node = create_node(ND_ARRAY);
+        int array_len = 0;
+        Node body;
+        Node* cur = &body;
+        do {
+            cur -> next = expr();
+            cur = cur -> next;
+            array_len++;
+        } while (consume(","));
+        expect("]");
+        resist_array(array_len);
+        node -> array_len = array_len;
+        node -> body = body.next;
+        node -> offset = locals -> offset;
+    } else if (ident_token && consume("(")) {
+        node = create_node(ND_FUNCALL);
         node -> name = ident_token -> str;
         node -> len = ident_token -> len;
         if (!consume(")")) {
@@ -113,19 +137,24 @@ Node* primary() {
             node -> args = head.next;
             expect(")");
         }
-        return node;
     } else if (ident_token) {
-        Node* node = create_ident_node(ident_token);
-        return node;
+        node = create_ident_node(ident_token);
     } else if (consume("(")) {
-        Node* node = expr();
+        node = expr();
         expect(")");
-        return node;
     } else {
         long num = expect_number();
-        Node* node = create_number_node(num);
-        return node;
+        node = create_number_node(num);
     }
+    while (consume("[")) {
+        Node* right_child = expr();
+        expect("]");
+        Node* new_node = create_node(ND_INDEX);
+        new_node -> left_child = node;
+        new_node -> right_child = right_child;
+        node = new_node;
+    }
+    return node;
 }
 
 Node* unary() {
@@ -309,7 +338,17 @@ Function* function() {
     func -> len = len;
     func -> body = head.next;
     func -> nparams = nparams;
-    func -> stack_size = locals ? (locals -> offset + 15) / 16 * 16 : 0;
+    LVar* head_lvar = locals;
+    LVar* cur_lvar = head_lvar;
+    int max_offset = 0;
+    while (cur_lvar) {
+        int offset = cur_lvar -> offset + 8 * (cur_lvar -> array_len);
+        if (max_offset < offset) {
+            max_offset = offset;
+        }
+        cur_lvar = cur_lvar -> next;
+    }
+    func -> stack_size = (max_offset + 15) / 16 * 16;
     return func;
 }
 
