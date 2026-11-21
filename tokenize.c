@@ -17,6 +17,8 @@ bool can_use_variables(char c) {
     return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_' || ('0' <= c && c <= '9');
 }
 
+Token* tokenize_str_literal(char** endptr, Token* last_token_ptr);
+
 Token* tokenize(char* s) {
     Token first_token;
     first_token.next = NULL;
@@ -114,43 +116,7 @@ Token* tokenize(char* s) {
         }
 
         if (**endptr == '\"') {
-            last_token_ptr = new_token(TK_STR, last_token_ptr);
-            int len = 0;
-            (*endptr)++;
-            char* buf = malloc(strlen(*endptr) + 1);
-            while (**endptr != '\"') {
-                if (**endptr == '\0' || **endptr == '\n') {
-                    fprintf(stderr, "\"で閉じられていない");
-                    exit(1);
-                }
-                if (**endptr == '\\') {
-                    if ((*endptr)[1] == 'n') {
-                        buf[len] = 10;
-                    } else if ((*endptr)[1] == 't') {
-                        buf[len] = 9;
-                    } else if ((*endptr)[1] == '\\') {
-                        buf[len] = 92;
-                    } else if ((*endptr)[1] == '\"') {
-                        buf[len] = 34;
-                    } else if ((*endptr)[1] == '0') {
-                        buf[len] = 0;
-                    } else {
-                        buf[len] = (*endptr)[1];
-                    }
-                    (*endptr)++;
-                } else {
-                    buf[len] = **endptr;
-                }
-                (*endptr)++;
-                len++;
-            }
-            if (**endptr != '\"') {
-                fprintf(stderr, "\"で閉じられていない");
-                exit(1);
-            }
-            (*endptr)++;
-            last_token_ptr -> str = buf;
-            last_token_ptr -> len = len;
+            last_token_ptr = tokenize_str_literal(endptr, last_token_ptr);
             continue;
         }
 
@@ -170,4 +136,45 @@ Token* tokenize(char* s) {
     }
     last_token_ptr = new_token(TK_EOF, last_token_ptr);
     return first_token.next;
+}
+
+Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
+    last_token_ptr = new_token(TK_STR, last_token_ptr);
+    int len = 0;
+    (*endptr)++;
+    char* buf = malloc(strlen(*endptr) + 1);
+    while (**endptr != '\"') {
+        if (**endptr == '\0' || **endptr == '\n') {
+            fprintf(stderr, "\"で閉じられていない");
+            exit(1);
+        }
+        if (**endptr == '\\') {
+            if ((*endptr)[1] == 'n') {
+                buf[len] = 10;
+            } else if ((*endptr)[1] == 't') {
+                buf[len] = 9;
+            } else if ((*endptr)[1] == '\\') {
+                buf[len] = 92;
+            } else if ((*endptr)[1] == '\"') {
+                buf[len] = 34;
+            } else if ((*endptr)[1] == '0') {
+                buf[len] = 0;
+            } else {
+                buf[len] = (*endptr)[1];
+            }
+            (*endptr)++;
+        } else {
+            buf[len] = **endptr;
+        }
+        (*endptr)++;
+        len++;
+    }
+    if (**endptr != '\"') {
+        fprintf(stderr, "\"で閉じられていない");
+        exit(1);
+    }
+    (*endptr)++;
+    last_token_ptr -> str = buf;
+    last_token_ptr -> len = len;
+    return last_token_ptr;
 }
