@@ -8,12 +8,15 @@ int main(int argc, char **argv) {
         if (strlen(argv[i]) == 2 && !memcmp(argv[i], "-S", 2)) {
             only_assembly = true;
         } else if (strlen(argv[i]) == 2 && !memcmp(argv[i], "-o", 2)) {
-            (argv[i])++;
-            output_name = argv[i];
+            output_name = argv[++i];
         } else {
             input_name = argv[i];
         }
-        (argv[i])++;
+    }
+
+    if (!input_name) {
+        fprintf(stderr, "ファイルを指定してください");
+        exit(1);
     }
 
     FILE *fp = fopen(input_name, "r");
@@ -42,6 +45,8 @@ int main(int argc, char **argv) {
     codegen(prog);
 
     printf(".section .note.GNU-stack,\"\",@progbits\n");
+
+    fflush(stdout);
 
     char command[256];
     snprintf(command, 256, "cc -o \"%s\" \"%s\"", output_name, assembly_output_name);
