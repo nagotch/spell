@@ -105,7 +105,8 @@ Node* create_ident_node(Token* tok) {
     return ident_node_ptr;
 }
 
-void char_array(Node* node) {
+Node* char_array() {
+    Node* node;
     Token* str_token = token;
     token = token -> next;
     node = create_node(ND_ARRAY);
@@ -119,9 +120,11 @@ void char_array(Node* node) {
     node -> array_len = str_token -> len;
     node -> body = body.next;
     node -> offset = locals -> offset;
+    return node;
 }
 
-void array_literal(Node* node) {
+Node* array_literal() {
+    Node* node;
     Node* first_expr = expr();
     if (consume(";")) {
         Node* len_expr = expr();
@@ -146,15 +149,16 @@ void array_literal(Node* node) {
         node -> offset = locals -> offset;
     }
     expect("]");
+    return node;
 }
 
 Node* primary() {
     Node* node;
     Token* ident_token = consume_ident();
     if (token -> kind == TK_STR) {
-        char_array(node);
+        node = char_array();
     } else if (!ident_token && consume("[")) {
-        array_literal(node);
+        node = array_literal();
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
         node -> name = ident_token -> str;
