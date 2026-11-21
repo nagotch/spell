@@ -6,9 +6,8 @@ read_int() {
         is_negative = 1;
         char = getchar();
     }
-    for (i = 0; char != -1; i = i + 1) {
-        ret = ret + char - 48;
-        ret=ret*10;
+    for (i = 0; (48 <= char) * (char <= 57); i = i + 1) {
+        ret = ret * 10 + char - 48;
         char = getchar();
     }
     if (is_negative) {
@@ -35,9 +34,9 @@ read_str() {
 
 print_int(n) {
     is_negative = n<0;
-    if (n=0) {
+    if (n==0) {
         putchar(48);
-        return;
+        return 0;
     }
     if (is_negative) n = -n;
     out = [0; 20];
