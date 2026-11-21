@@ -107,7 +107,7 @@ Node* create_ident_node(Token* tok) {
 Node* primary() {
     Token* ident_token = consume_ident();
     Node* node;
-    if (consume("[")) {
+    if (!ident_token && consume("[")) {
         node = create_node(ND_ARRAY);
         int array_len = 0;
         Node body;

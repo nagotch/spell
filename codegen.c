@@ -62,11 +62,11 @@ void gen(Node* node) {
         for (int i = 0; tail; i++) {
             gen(tail);
             printf("  pop rax\n");
-            printf("  mov [rbp-%d], rax\n", node -> offset + 8 * (i + 1));
+            printf("  mov [rbp-%d], rax\n", node -> offset + 8 * (node -> array_len - i - 1));
             tail = tail -> next;
         }
         printf("  mov rax, rbp\n");
-        printf("  sub rax, %d\n", node -> offset + 8);
+        printf("  sub rax, %d\n", node -> offset + 8 * (node -> array_len - 1));
         printf("  push rax\n");
         return;
     }
