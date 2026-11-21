@@ -92,7 +92,7 @@ tests=(
     "main() { a = [10, 20, 30]; return a[0] + a[1] + a[2]; }|60"
     "main() { a = [1, 2, 3]; a[1] = 42; return a[1]; }|42"
     "main() { a = [5, 6, 7]; i = 2; return a[i]; }|7"
-    "main() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < 4 i = i+ 1) s = s + a[i]; return s; }|10"
+    "main() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < 4; i = i+ 1) s = s + a[i]; return s; }|10"
     "main() { x = 3; a = [x, x * 2]; return a[1]; }|6"
 )
 
