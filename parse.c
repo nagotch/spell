@@ -105,9 +105,23 @@ Node* create_ident_node(Token* tok) {
 }
 
 Node* primary() {
-    Token* ident_token = consume_ident();
     Node* node;
-    if (!ident_token && consume("[")) {
+    Token* ident_token = consume_ident();
+    if (token -> kind == TK_STR) {
+        Token* str_token = token;
+        token = token -> next;
+        node = create_node(ND_ARRAY);
+        Node body;
+        Node* cur = &body;
+        for (int i = 0; i < str_token -> len; i++) {
+            cur -> next = create_number_node(str_token -> str[i]);
+            cur = cur -> next;
+        }
+        resist_array(str_token -> len);
+        node -> array_len = str_token -> len;
+        node -> body = body.next;
+        node -> offset = locals -> offset;
+    } else if (!ident_token && consume("[")) {
         Node* first_expr = expr();
         if (consume(";")) {
             Node* len_expr = expr();
