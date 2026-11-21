@@ -128,7 +128,7 @@ Token* tokenize(char* s) {
                         **endptr = 92;
                     } else if ((*endptr)[1] == '\"') {
                         **endptr = 34;
-                    } else if ((*endptr)[1] == '\0') {
+                    } else if ((*endptr)[1] == '0') {
                         **endptr = 0;
                     }
                     (*endptr)++;
