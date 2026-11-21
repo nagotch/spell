@@ -280,8 +280,8 @@ Node* assign() {
     Node* node = equality();
     if (consume("=")) {
         Node* assign_node = create_node(ND_ASSIGN);
-        node -> left_child = node;
-        node -> right_child = assign();
+        assign_node -> left_child = node;
+        assign_node -> right_child = assign();
         node = assign_node;
     }
     return node;
