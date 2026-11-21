@@ -115,17 +115,18 @@ cc -c -o funcs.o funcs.c
 
 one_test() {
     IFS='|' read -r input expected <<< "${tests[$1]}"
-    i=$(printf '%02d' $1)
-    ./spell "$input" > tmp$1.s
-    cc -o tmp$1 tmp$1.s funcs.o
-    ./tmp$1 > /dev/null
+    i=$(printf '%03d' $1)
+    printf '%s' "$input" > tmp$i.sp
+    ./spell -S -o tmp$i tmp$i.sp
+    cc -o tmp$i tmp$i.s funcs.o
+    ./tmp$i > /dev/null
     exit_code=$?
     if [ "$exit_code" != "$expected" ]; then
-        echo $i test failed, input $input, expected $expected, result $exit_code. > result$1
+        echo $i test failed, input $input, expected $expected, result $exit_code. > result$i
     else
-        echo $i test passed. > result$1
+        echo $i test passed. > result$i
     fi
-    rm tmp$1 tmp$1.s
+    rm tmp$i tmp$i.s tmp$i.sp
 }
 
 n=${#tests[@]}
@@ -137,6 +138,7 @@ wait
 
 fail_count=0
 for i in "${!tests[@]}"; do
+    i=$(printf '%03d' $i)
     if grep -q failed result$i; then
         fail_count=$((fail_count+1))
         cat result$i
