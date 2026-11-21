@@ -28,15 +28,26 @@ struct Token {
 };
 
 typedef enum {
-    ND_ADD,
-    ND_SUB,
-    ND_MUL,
-    ND_DIV,
+    OP_ADD,
+    OP_SUB,
+    OP_MUL,
+    OP_DIV,
+    OP_EQ,
+    OP_NE,
+    OP_LT,
+    OP_LE,
+} BinOp;
+typedef enum {
+    OP_ADDR,
+    OP_DEREF,
+} UnaryOp;
+typedef union {
+    BinOp binop;
+    UnaryOp unop;
+} Op;
+
+typedef enum {
     ND_NUM,
-    ND_EQ,
-    ND_NE,
-    ND_LT,
-    ND_LE,
     ND_ASSIGN, 
     ND_LVAR,
     ND_RETURN,
@@ -45,16 +56,17 @@ typedef enum {
     ND_FOR,
     ND_BLOCK,
     ND_FUNCALL,
-    ND_ADDR,
-    ND_DEREF,
     ND_ARRAY,
     ND_INDEX,
     ND_LEN,
     ND_NEWARRAY,
+    ND_BINOP,
+    ND_UNARY,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
     NodeKind kind;
+    Op op;
     Node* left_child;
     Node* right_child;
     long val;
@@ -100,8 +112,6 @@ bool consume(char* symbol);
 void expect(char* symbol);
 long expect_number();
 bool at_eof();
-Node* create_binary_operation_node(NodeKind kind, Node* left_child, Node* right_child);
-Node* create_number_node(long num);
 Node* primary();
 Node* unary();
 Node* mul();

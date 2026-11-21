@@ -28,7 +28,10 @@ int main(int argc, char **argv) {
     long size = ftell(fp);
     rewind(fp);
     char* src = malloc(size + 1);
-    fread(src, 1, size, fp);
+    if (fread(src, 1, size, fp) != size) {
+        fprintf(stderr, "sizeが違う");
+        exit(1);
+    }
     src[size] = '\0';
     fclose(fp);
 
@@ -38,7 +41,10 @@ int main(int argc, char **argv) {
 
     char assembly_output_name[256];
     snprintf(assembly_output_name, 256, "%s.s", output_name);
-    freopen(assembly_output_name, "w", stdout);
+    if (!freopen(assembly_output_name, "w", stdout)) {
+        fprintf(stderr, "freopenが失敗");
+        exit(1);
+    }
 
     printf(".intel_syntax noprefix\n");
 
@@ -48,8 +54,8 @@ int main(int argc, char **argv) {
 
     fflush(stdout);
 
-    char command[256];
-    snprintf(command, 256, "cc -o \"%s\" \"%s\"", output_name, assembly_output_name);
+    char command[512];
+    snprintf(command, 512, "cc -o \"%s\" \"%s\"", output_name, assembly_output_name);
     if (!only_assembly) {
         if (system(command)) {
             fprintf(stderr, "アセンブリからバイナリに変換するのを失敗");
