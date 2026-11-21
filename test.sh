@@ -103,6 +103,12 @@ tests=(
     "main() { a = [5; 0]; return a.len; }|0"
     "main() { n = 5; a = [0; n]; for (i = 0; i < a.len; i = i + 1) a[i] = i * 2; s = 0; for (i = 0; i < a.len; i = i + 1) s = s + a[i]; return s; }|20"
     "make(n) { return [9; n]; } main() { a = make(3); return a[2] + a.len; }|12"
+    "main() { s = \"hello\"; return s.len; }|5"
+    "main() { s = \"hello\"; return s[0]; }|104"
+    "main() { s = \"A\\n\"; return s[1]; }|10"
+    "main() { s = \"abc\"; s[1] = 120; return s[1]; }|120"
+    "main() { s = \"hello\"; c = 0; for (i = 0; i < s.len; i = i + 1) if (s[i] == 108) c = c + 1; return c;}|2"
+    "main() { s = \"hi\"; putchar(s[0]); putchar(s[1]); return 0; }|0"
 )
 
 cc -c -o funcs.o funcs.c
@@ -112,7 +118,7 @@ one_test() {
     i=$(printf '%02d' $1)
     ./spell "$input" > tmp$1.s
     cc -o tmp$1 tmp$1.s funcs.o
-    ./tmp$1
+    ./tmp$1 > /dev/null
     exit_code=$?
     if [ "$exit_code" != "$expected" ]; then
         echo $i test failed, input $input, expected $expected, result $exit_code. > result$1
