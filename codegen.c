@@ -270,6 +270,10 @@ void gen(Node* node) {
                 printf("  setle al\n");
                 printf("  movzb rax, al\n");
                 break;
+            default:
+                fprintf(stderr, "無効な2項演算子\n");
+                exit(1);
+                break;
         }
         printf("  push rax\n");
     }
