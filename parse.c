@@ -79,9 +79,14 @@ void resist_lvar(Token* tok) {
     LVar* lvar = calloc(1, sizeof(LVar));
     lvar -> name = tok -> str;
     lvar -> len = tok -> len;
-    lvar -> offset = locals ? locals -> offset + 8 : 8;
+    lvar -> offset = locals ? locals -> offset : 0 + 8 * (locals -> array_len + 1);
     lvar -> next = locals;
     locals = lvar;
+}
+
+void resist_array(int array_len) {
+    LVar* lvar = calloc(1, sizeof(LVar));
+    lvar -> array_len = array_len;
 }
 
 Node* create_ident_node(Token* tok) {
@@ -309,7 +314,17 @@ Function* function() {
     func -> len = len;
     func -> body = head.next;
     func -> nparams = nparams;
-    func -> stack_size = locals ? (locals -> offset + 15) / 16 * 16 : 0;
+    LVar head_lvar;
+    head.next = NULL;
+    LVar* cur_lvar = &head_lvar;
+    int max_offset = 0;
+    while (cur_lvar) {
+        int offset = cur_lvar -> offset + 8 * (cur_lvar -> array_len - 1);
+        if (max_offset < offset) {
+            max_offset = offset;
+        }
+    }
+    func -> stack_size = max_offset;
     return func;
 }
 
