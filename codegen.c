@@ -251,7 +251,7 @@ void gen_while(Node* node) {
     printf("  je .Lend%d\n", label);
     gen(node -> then);
     printf("  jmp .Lbegin%d\n", label);
-    printf(".lend%d:\n", label);
+    printf(".Lend%d:\n", label);
 }
 
 void gen_for(Node* node) {
