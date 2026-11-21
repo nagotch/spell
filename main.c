@@ -1,5 +1,7 @@
 #include "spell.h"
 
+char* read_file(char* input_name);
+
 int main(int argc, char **argv) {
     bool only_assembly = false;
     char* output_name = "a.out";
@@ -19,21 +21,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    FILE *fp = fopen(input_name, "r");
-    if (!fp) {
-        fprintf(stderr, "ファイルが開けません: %s", input_name);
-        exit(1);
-    }
-    fseek(fp, 0, SEEK_END);
-    long size = ftell(fp);
-    rewind(fp);
-    char* src = malloc(size + 1);
-    if (fread(src, 1, size, fp) != size) {
-        fprintf(stderr, "sizeが違う");
-        exit(1);
-    }
-    src[size] = '\0';
-    fclose(fp);
+    char* src = read_file(input_name);
 
     token = tokenize(src);
 
@@ -64,4 +52,23 @@ int main(int argc, char **argv) {
     }
 
     return 0;
+}
+
+char* read_file(char* input_name) {
+    FILE *fp = fopen(input_name, "r");
+    if (!fp) {
+        fprintf(stderr, "ファイルが開けません: %s", input_name);
+        exit(1);
+    }
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    rewind(fp);
+    char* src = malloc(size + 1);
+    if (fread(src, 1, size, fp) != size) {
+        fprintf(stderr, "sizeが違う");
+        exit(1);
+    }
+    src[size] = '\0';
+    fclose(fp);
+    return src;
 }
