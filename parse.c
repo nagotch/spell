@@ -109,19 +109,29 @@ Node* primary() {
     Node* node;
     if (!ident_token && consume("[")) {
         node = create_node(ND_ARRAY);
-        int array_len = 0;
-        Node body;
-        Node* cur = &body;
-        do {
-            cur -> next = expr();
+        Node* first_expr = expr();
+        if (consume(";")) {
+            Node* len_expr = expr();
+            node = create_node(ND_NEWARRAY);
+            node -> left_child = first_expr;
+            node -> right_child = len_expr;
+        } else {
+            int array_len = 1;
+            Node body;
+            Node* cur = &body;
+            cur -> next = first_expr;
             cur = cur -> next;
-            array_len++;
-        } while (consume(","));
+            while (consume(",")) {
+                cur -> next = expr();
+                cur = cur -> next;
+                array_len++;
+            }
+            resist_array(array_len);
+            node -> array_len = array_len;
+            node -> body = body.next;
+            node -> offset = locals -> offset;
+        }
         expect("]");
-        resist_array(array_len);
-        node -> array_len = array_len;
-        node -> body = body.next;
-        node -> offset = locals -> offset;
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
         node -> name = ident_token -> str;
