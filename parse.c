@@ -118,8 +118,10 @@ Node* primary() {
             array_len++;
         } while (consume(","));
         expect("]");
+        resist_array(array_len);
         node -> array_len = array_len;
         node -> body = body.next;
+        node -> offset = locals -> offset;
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
         node -> name = ident_token -> str;
@@ -144,12 +146,13 @@ Node* primary() {
         long num = expect_number();
         node = create_number_node(num);
     }
-    Node head;
-    Node* cur = &head;
     while (consume("[")) {
-        cur -> next = expr();
-        cur = cur -> next;
+        Node* right_child = expr();
         expect("]");
+        Node* new_node = create_node(ND_INDEX);
+        new_node -> left_child = node;
+        new_node -> right_child = right_child;
+        node = new_node;
     }
     return node;
 }
