@@ -12,16 +12,21 @@ char* resister[] = {
 };
 
 void gen(Node* node) {
-    if (node -> kind == ND_ADDR) {
-        gen_lval(node -> left_child);
-        return;
-    }
-
-    if (node -> kind == ND_DEREF) {
-        gen(node -> left_child);
-        printf("  pop rax\n");
-        printf("  mov rax, [rax]\n");
-        printf("  push rax\n");
+    if (node -> kind == ND_UNARY) {
+        switch (node -> op) {
+            case ND_ADDR:
+                gen_lval(node -> left_child);
+                break;
+            case ND_DEREF:
+                gen(node -> left_child);
+                printf("  pop rax\n");
+                printf("  mov rax, [rax]\n");
+                printf("  push rax\n");
+                break;
+            default:
+                fprintf(stderr, "不明な単項演算子\n");
+                exit(1);
+        }
         return;
     }
 
@@ -286,7 +291,7 @@ void gen_lval(Node* node) {
         printf("  push rax\n");
         return;
     }
-    if (node -> kind == ND_DEREF) {
+    if (node -> kind == ND_UNARY && node -> op == ND_DEREF) {
         gen(node -> left_child);
         return;
     }
