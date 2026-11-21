@@ -117,35 +117,39 @@ Token* tokenize(char* s) {
             last_token_ptr = new_token(TK_STR, last_token_ptr);
             int len = 0;
             (*endptr)++;
-            char* str = "";
+            char* buf = malloc(strlen(*endptr) + 1);
             while (**endptr != '\"') {
-                char* next_char;
+                if (**endptr == '\0' || **endptr == '\n') {
+                    fprintf(stderr, "\"で閉じられていない");
+                    exit(1);
+                }
                 if (**endptr == '\\') {
                     if ((*endptr)[1] == 'n') {
-                        *next_char = 10;
+                        buf[len] = 10;
                     } else if ((*endptr)[1] == 't') {
-                        *next_char = 9;
+                        buf[len] = 9;
                     } else if ((*endptr)[1] == '\\') {
-                        *next_char = 92;
+                        buf[len] = 92;
                     } else if ((*endptr)[1] == '\"') {
-                        *next_char = 34;
+                        buf[len] = 34;
                     } else if ((*endptr)[1] == '0') {
-                        *next_char = 0;
+                        buf[len] = 0;
+                    } else {
+                        buf[len] = (*endptr)[1];
                     }
                     (*endptr)++;
                 } else {
-                    *next_char = **endptr;
+                    buf[len] = **endptr;
                 }
                 (*endptr)++;
                 len++;
-                strncat(str, next_char, 1);
             }
             if (**endptr != '\"') {
                 fprintf(stderr, "\"で閉じられていない");
                 exit(1);
             }
             (*endptr)++;
-            last_token_ptr -> str = str;
+            last_token_ptr -> str = buf;
             last_token_ptr -> len = len;
             continue;
         }
