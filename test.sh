@@ -94,6 +94,10 @@ tests=(
     "main() { a = [5, 6, 7]; i = 2; return a[i]; }|7"
     "main() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < 4; i = i+ 1) s = s + a[i]; return s; }|10"
     "main() { x = 3; a = [x, x * 2]; return a[1]; }|6"
+    "main() { a = [10, 20, 30]; return a.len; }|3"
+    "main() { a = [7]; return a.len; }|1"
+    "main() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < a.len; i = i + 1) s = s + a[i]; return s;}|10"
+    "count(a) { return a.len; } main() { x = [1, 2, 3, 4, 5]; return count(x); }|5"
 )
 
 cc -c -o funcs.o funcs.c
