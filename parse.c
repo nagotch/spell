@@ -63,7 +63,8 @@ Node* create_node(NodeKind kind) {
 }
 
 Node* create_binary_operation_node(NodeKind kind, Node* left_child, Node* right_child) {
-    Node* new_node_ptr = create_node(kind);
+    Node* new_node_ptr = create_node(ND_BINOP);
+    new_node_ptr -> op = kind;
     new_node_ptr -> left_child = left_child;
     new_node_ptr -> right_child = right_child;
     return new_node_ptr;
