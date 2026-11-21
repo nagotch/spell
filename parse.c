@@ -279,9 +279,10 @@ Node* equality() {
 Node* assign() {
     Node* node = equality();
     if (consume("=")) {
-        node = create_node(ND_ASSIGN);
+        Node* assign_node = create_node(ND_ASSIGN);
         node -> left_child = node;
         node -> right_child = assign();
+        node = assign_node;
     }
     return node;
 }
