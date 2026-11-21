@@ -106,9 +106,10 @@ Node* create_ident_node(Token* tok) {
 
 Node* primary() {
     Token* ident_token = consume_ident();
+    Node* node;
     if (consume("[")) {
-        Node* node = create_node(ND_ARRAY);
-        int array_len;
+        node = create_node(ND_ARRAY);
+        int array_len = 0;
         Node body;
         Node* cur = &body;
         do {
@@ -116,18 +117,11 @@ Node* primary() {
             cur = cur -> next;
             array_len++;
         } while (consume(","));
+        expect("]");
         node -> array_len = array_len;
         node -> body = body.next;
-        Node head;
-        cur = &head;
-        while (consume("[")) {
-            cur -> next = expr();
-            cur = cur -> next;
-            expect("]");
-        }
-        return node;
     } else if (ident_token && consume("(")) {
-        Node* node = create_node(ND_FUNCALL);
+        node = create_node(ND_FUNCALL);
         node -> name = ident_token -> str;
         node -> len = ident_token -> len;
         if (!consume(")")) {
@@ -141,19 +135,23 @@ Node* primary() {
             node -> args = head.next;
             expect(")");
         }
-        return node;
     } else if (ident_token) {
-        Node* node = create_ident_node(ident_token);
-        return node;
+        node = create_ident_node(ident_token);
     } else if (consume("(")) {
-        Node* node = expr();
+        node = expr();
         expect(")");
-        return node;
     } else {
         long num = expect_number();
-        Node* node = create_number_node(num);
-        return node;
+        node = create_number_node(num);
     }
+    Node head;
+    Node* cur = &head;
+    while (consume("[")) {
+        cur -> next = expr();
+        cur = cur -> next;
+        expect("]");
+    }
+    return node;
 }
 
 Node* unary() {
