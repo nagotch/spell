@@ -36,9 +36,15 @@ typedef enum {
     OP_NE,
     OP_LT,
     OP_LE,
+} BinOp;
+typedef enum {
     OP_ADDR,
     OP_DEREF,
-} OpKind;
+} UnaryOp;
+typedef union {
+    BinOp binop;
+    UnaryOp unop;
+} Op;
 
 typedef enum {
     ND_NUM,
@@ -60,7 +66,7 @@ typedef enum {
 typedef struct Node Node;
 struct Node {
     NodeKind kind;
-    OpKind op;
+    Op op;
     Node* left_child;
     Node* right_child;
     long val;

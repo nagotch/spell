@@ -13,7 +13,7 @@ char* resister[] = {
 
 void gen(Node* node) {
     if (node -> kind == ND_UNARY) {
-        switch (node -> op) {
+        switch (node -> op.unop) {
             case OP_ADDR:
                 gen_lval(node -> left_child);
                 break;
@@ -241,7 +241,7 @@ void gen(Node* node) {
         gen(node -> right_child);
         printf("  pop rdi\n");
         printf("  pop rax\n");
-        switch (node -> op) {
+        switch (node -> op.binop) {
             case OP_ADD:
                 printf("  add rax, rdi\n");
                 break;
@@ -291,7 +291,7 @@ void gen_lval(Node* node) {
         printf("  push rax\n");
         return;
     }
-    if (node -> kind == ND_UNARY && node -> op == OP_DEREF) {
+    if (node -> kind == ND_UNARY && node -> op.unop == OP_DEREF) {
         gen(node -> left_child);
         return;
     }
