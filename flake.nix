@@ -14,6 +14,7 @@
           gcc
           gnumake
           clang-tools
+          python3
         ];
 
         shellHook = ''
