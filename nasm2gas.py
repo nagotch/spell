@@ -1,5 +1,17 @@
 import re, sys
 
+header = ["; Original spell source: https://github.com/nagotch/spell"]
+for path in sys.argv[1:]:
+    try:
+        with open(path) as f:
+            lines = f.read().splitlines()
+    except OSError:
+        print(f"cannot read {path}", file=sys.stderr)
+        sys.exit(1)
+    header.append(f"; --- {path} ---")
+    for line in lines:
+        header.append("; " + line);
+
 src = sys.stdin.read()
 defined = set(re.findall(r'^([A-Za-z_][\w]*):', src, re.M))
 called = set(re.findall(r'call\s+([A-Za-z_][\w]*)', src))
@@ -15,4 +27,4 @@ for line in src.splitlines():
     if m and m.group(2) in externs:
         line = f'{m.group(1)}{m.group(2)} wrt ..plt'
     out.append(line)
-print('\n'.join(out))
+print('\n'.join(header + out))
