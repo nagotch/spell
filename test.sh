@@ -98,6 +98,11 @@ tests=(
     "main() { a = [7]; return a.len; }|1"
     "main() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < a.len; i = i + 1) s = s + a[i]; return s;}|10"
     "count(a) { return a.len; } main() { x = [1, 2, 3, 4, 5]; return count(x); }|5"
+    "main() { n = 3; a = [0; n]; a[0] = 10; a[2] = 30; return a[0] + a[1] + a[2] + a.len; }|43"
+    "main() { a = [7; 4]; return a[0] + a[3]; }|14"
+    "main() { a = [5; 0]; return a.len; }|0"
+    "main() { n = 5; a = [0; n]; for (i = 0; i < a.len; i = i + 1) a[i] = i * 2; s = 0; for (i = 0; i < a.len; i = i + 1) s = s + a[i]; return s; }|20"
+    "make(n) { return [9; n]; } main() { a = make(3); return a[2] + a.len; }|12"
 )
 
 cc -c -o funcs.o funcs.c
