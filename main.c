@@ -1,14 +1,26 @@
 #include "spell.h"
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        fprintf(stderr, "1つの引数を指定してください\n");
-        return 1;
+    char** tail = argv;
+    (*tail)++;
+    bool only_assembly = false;
+    char* output_name = "a.out";
+    char* input_name = NULL;
+    while (tail) {
+        if (strlen(*tail) == 2 && !memcmp(*tail, "-S", 2)) {
+            only_assembly = true;
+        } else if (strlen(*tail) == 2 && !memcmp(*tail, "-o", 2)) {
+            (*tail)++;
+            output_name = *tail;
+        } else {
+            input_name = *tail;
+        }
+        (*tail)++;
     }
 
-    FILE *fp = fopen(argv[1], "r");
+    FILE *fp = fopen(input_name, "r");
     if (!fp) {
-        fprintf(stderr, "ファイルが開けません: %s", argv[1]);
+        fprintf(stderr, "ファイルが開けません: %s", input_name);
         exit(1);
     }
     fseek(fp, 0, SEEK_END);
@@ -23,11 +35,24 @@ int main(int argc, char **argv) {
 
     Function* prog = program();
 
+    char* assembly_output_name;
+    snprintf(assembly_output_name, 100, "%s.s", output_name);
+    freopen(assembly_output_name, "w", stdout);
+
     printf(".intel_syntax noprefix\n");
 
     codegen(prog);
 
     printf(".section .note.GNU-stack,\"\",@progbits\n");
+
+    char* command;
+    snprintf(command, 100, "cc -o \"%s\" \"%s\"", output_name, assembly_output_name);
+    if (!only_assembly) {
+        if (system(command)) {
+            fprintf(stderr, "アセンブリからバイナリに変換するのを失敗");
+            exit(1);
+        }
+    }
 
     return 0;
 }
