@@ -115,29 +115,38 @@ Token* tokenize(char* s) {
 
         if (**endptr == '\"') {
             last_token_ptr = new_token(TK_STR, last_token_ptr);
-            last_token_ptr -> str = *endptr;
             int len = 0;
             (*endptr)++;
+            char* str = "";
             while (**endptr != '\"') {
+                char* next_char;
                 if (**endptr == '\\') {
                     if ((*endptr)[1] == 'n') {
-                        **endptr = 10;
+                        *next_char = 10;
                     } else if ((*endptr)[1] == 't') {
-                        **endptr = 9;
+                        *next_char = 9;
                     } else if ((*endptr)[1] == '\\') {
-                        **endptr = 92;
+                        *next_char = 92;
                     } else if ((*endptr)[1] == '\"') {
-                        **endptr = 34;
+                        *next_char = 34;
                     } else if ((*endptr)[1] == '0') {
-                        **endptr = 0;
+                        *next_char = 0;
                     }
                     (*endptr)++;
+                } else {
+                    *next_char = **endptr;
                 }
                 (*endptr)++;
                 len++;
+                strncat(str, next_char, 1);
             }
+            if (**endptr != '\"') {
+                fprintf(stderr, "\"で閉じられていない");
+                exit(1);
+            }
+            (*endptr)++;
+            last_token_ptr -> str = str;
             last_token_ptr -> len = len;
-            expect("\"");
             continue;
         }
 
