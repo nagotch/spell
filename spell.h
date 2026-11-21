@@ -49,6 +49,7 @@ typedef enum {
     ND_ARRAY,
     ND_INDEX,
     ND_LEN,
+    ND_NEWARRAY,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
