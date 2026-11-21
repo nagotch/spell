@@ -3,3 +3,7 @@ tmp
 tmp.s
 *.o
 .direnv
+main.s
+main.sp
+main
+main.asm
