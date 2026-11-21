@@ -263,9 +263,9 @@ void gen(Node* node) {
                     fprintf(stderr, "無効な2項演算子\n");
                     exit(1);
                     break;
-                    printf("  push rax\n");
-                    break;
             }
+            printf("  push rax\n");
+            break;
     }
 }
 
