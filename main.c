@@ -1,21 +1,19 @@
 #include "spell.h"
 
 int main(int argc, char **argv) {
-    char** tail = argv;
-    (*tail)++;
     bool only_assembly = false;
     char* output_name = "a.out";
     char* input_name = NULL;
-    while (tail) {
-        if (strlen(*tail) == 2 && !memcmp(*tail, "-S", 2)) {
+    for (int i=1; i<argc; i++) {
+        if (strlen(argv[i]) == 2 && !memcmp(argv[i], "-S", 2)) {
             only_assembly = true;
-        } else if (strlen(*tail) == 2 && !memcmp(*tail, "-o", 2)) {
-            (*tail)++;
-            output_name = *tail;
+        } else if (strlen(argv[i]) == 2 && !memcmp(argv[i], "-o", 2)) {
+            (argv[i])++;
+            output_name = argv[i];
         } else {
-            input_name = *tail;
+            input_name = argv[i];
         }
-        (*tail)++;
+        (argv[i])++;
     }
 
     FILE *fp = fopen(input_name, "r");
@@ -35,8 +33,8 @@ int main(int argc, char **argv) {
 
     Function* prog = program();
 
-    char* assembly_output_name;
-    snprintf(assembly_output_name, 100, "%s.s", output_name);
+    char assembly_output_name[256];
+    snprintf(assembly_output_name, 256, "%s.s", output_name);
     freopen(assembly_output_name, "w", stdout);
 
     printf(".intel_syntax noprefix\n");
@@ -45,8 +43,8 @@ int main(int argc, char **argv) {
 
     printf(".section .note.GNU-stack,\"\",@progbits\n");
 
-    char* command;
-    snprintf(command, 100, "cc -o \"%s\" \"%s\"", output_name, assembly_output_name);
+    char command[256];
+    snprintf(command, 256, "cc -o \"%s\" \"%s\"", output_name, assembly_output_name);
     if (!only_assembly) {
         if (system(command)) {
             fprintf(stderr, "アセンブリからバイナリに変換するのを失敗");
