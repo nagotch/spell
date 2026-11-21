@@ -55,7 +55,7 @@ void gen(Node* node) {
     }
     if (node -> kind == ND_ARRAY) {
         printf("  mov rax, %d\n", node -> array_len);
-        printf("  mov [rbp-%d], rax\n", node -> offset);
+        printf("  mov [rbp-%d], rax\n", node -> offset + 8 * node -> array_len);
         Node* tail;
         tail = node -> body;
         int i = 0;
@@ -78,6 +78,13 @@ void gen(Node* node) {
         printf("  imul rdi, 8\n");
         printf("  add rax, rdi\n");
         printf("  mov rax, [rax]\n");
+        printf("  push rax\n");
+        return;
+    }
+    if (node -> kind == ND_LEN) {
+        gen(node -> left_child);
+        printf("  pop rax\n");
+        printf("  mov rax, [rax-8]\n");
         printf("  push rax\n");
         return;
     }
