@@ -156,7 +156,7 @@ Node* primary() {
             node = new_node;
         } else if (consume(".")) {
             ident_token = consume_ident();
-            if (!memcmp(ident_token -> str, "len", 3)) {
+            if (ident_token -> len == 3 && !memcmp(ident_token -> str, "len", 3)) {
                 Node* new_node = create_node(ND_LEN);
                 new_node -> left_child = node;
                 node = new_node;
