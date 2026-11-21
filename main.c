@@ -6,7 +6,20 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    token = tokenize(argv[1]);
+    FILE *fp = fopen(argv[1], "r");
+    if (!fp) {
+        fprintf(stderr, "ファイルが開けません: %s", argv[1]);
+        exit(1);
+    }
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    rewind(fp);
+    char* src = malloc(size + 1);
+    fread(src, 1, size, fp);
+    src[size] = '\0';
+    fclose(fp);
+
+    token = tokenize(src);
 
     Function* prog = program();
 
