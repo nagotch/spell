@@ -88,14 +88,16 @@ void gen(Node* node) {
         printf("  push rax\n");
         return;
     }
-    if (node -> kind == ND_LEN) {
+    if (node -> kind == ND_NEWARRAY) {
         int label = max_label;
         max_label++;
         gen(node -> left_child);
         gen(node -> right_child);
         printf("  pop rax\n");
         printf("  push rax\n");
-        printf("  mov rax, %d\n", (node -> array_len + 1) * 8);
+        printf("  add rax, 1\n");
+        printf("  imul rax, 8\n");
+        printf("  mov rdi, rax\n");
         printf("  mov rdi, rax\n");
         printf("  mov rax, rsp\n");
         printf("  and rax, 15\n");
@@ -109,8 +111,6 @@ void gen(Node* node) {
         printf("  call malloc\n");
         printf("  add rsp, 8\n");
         printf(".Lend%d:\n", label);
-        printf("  mov rax, 0\n");
-        printf("  call malloc\n");
         printf("  pop rcx\n");
         printf("  mov [rax], rcx\n");
         printf("  pop rsi\n");
