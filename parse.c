@@ -105,48 +105,56 @@ Node* create_ident_node(Token* tok) {
     return ident_node_ptr;
 }
 
+void char_array(Node* node) {
+    Token* str_token = token;
+    token = token -> next;
+    node = create_node(ND_ARRAY);
+    Node body;
+    Node* cur = &body;
+    for (int i = 0; i < str_token -> len; i++) {
+        cur -> next = create_number_node(str_token -> str[i]);
+        cur = cur -> next;
+    }
+    resist_array(str_token -> len);
+    node -> array_len = str_token -> len;
+    node -> body = body.next;
+    node -> offset = locals -> offset;
+}
+
+void array_literal(Node* node) {
+    Node* first_expr = expr();
+    if (consume(";")) {
+        Node* len_expr = expr();
+        node = create_node(ND_NEWARRAY);
+        node -> left_child = first_expr;
+        node -> right_child = len_expr;
+    } else {
+        node = create_node(ND_ARRAY);
+        int array_len = 1;
+        Node body;
+        Node* cur = &body;
+        cur -> next = first_expr;
+        cur = cur -> next;
+        while (consume(",")) {
+            cur -> next = expr();
+            cur = cur -> next;
+            array_len++;
+        }
+        resist_array(array_len);
+        node -> array_len = array_len;
+        node -> body = body.next;
+        node -> offset = locals -> offset;
+    }
+    expect("]");
+}
+
 Node* primary() {
     Node* node;
     Token* ident_token = consume_ident();
     if (token -> kind == TK_STR) {
-        Token* str_token = token;
-        token = token -> next;
-        node = create_node(ND_ARRAY);
-        Node body;
-        Node* cur = &body;
-        for (int i = 0; i < str_token -> len; i++) {
-            cur -> next = create_number_node(str_token -> str[i]);
-            cur = cur -> next;
-        }
-        resist_array(str_token -> len);
-        node -> array_len = str_token -> len;
-        node -> body = body.next;
-        node -> offset = locals -> offset;
+        char_array(node);
     } else if (!ident_token && consume("[")) {
-        Node* first_expr = expr();
-        if (consume(";")) {
-            Node* len_expr = expr();
-            node = create_node(ND_NEWARRAY);
-            node -> left_child = first_expr;
-            node -> right_child = len_expr;
-        } else {
-            node = create_node(ND_ARRAY);
-            int array_len = 1;
-            Node body;
-            Node* cur = &body;
-            cur -> next = first_expr;
-            cur = cur -> next;
-            while (consume(",")) {
-                cur -> next = expr();
-                cur = cur -> next;
-                array_len++;
-            }
-            resist_array(array_len);
-            node -> array_len = array_len;
-            node -> body = body.next;
-            node -> offset = locals -> offset;
-        }
-        expect("]");
+        array_literal(node);
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
         node -> name = ident_token -> str;
