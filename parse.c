@@ -303,60 +303,92 @@ Node* expr() {
     return assign();
 }
 
+Node* stmt_block();
+Node* stmt_return();
+Node* stmt_if();
+Node* stmt_while();
+Node* stmt_for();
+
 Node* stmt() {
-    Node* node;
     if (consume("{")) {
-        node = create_node(ND_BLOCK);
-        Node head;
-        head.next = NULL;
-        Node* cur = &head;
-        while (!consume("}")) {
-            cur -> next = stmt();
-            cur = cur -> next;
-        }
-        node -> body = head.next;
-        return node;
+        return stmt_block();
     } else if (consume_keyword(TK_RETURN)) {
-        node = create_node(ND_RETURN);
-        node -> left_child = expr();
+        return stmt_return();
     } else if (consume_keyword(TK_IF)) {
-        node = create_node(ND_IF);
-        expect("(");
-        node -> cond = expr();
-        expect(")");
-        node -> then = stmt();
-        if (consume_keyword(TK_ELSE)) {
-            node -> els = stmt();
-        }
-        return node;
+        return stmt_if();
     } else if (consume_keyword(TK_WHILE)) {
-        node = create_node(ND_WHILE);
-        expect("(");
-        node -> cond = expr();
-        expect(")");
-        node -> then = stmt();
-        return node;
+        return stmt_while();
     } else if (consume_keyword(TK_FOR)) {
-        node = create_node(ND_FOR);
-        expect("(");
-        if (!consume(";")) {
-            node -> init = expr();
-            expect(";");
-        }
-        if (!consume(";")) {
-            node -> cond = expr();
-            expect(";");
-        }
-        if (!consume(")")) {
-            node -> inc = expr();
-            expect(")");
-        }
-        node -> then = stmt();
-        return node;
+        return stmt_for();
     } else {
-        node = expr();
+        Node* node = expr();
+        expect(";");
+        return node;
     }
+}
+
+Node* stmt_block() {
+    Node* node;
+    node = create_node(ND_BLOCK);
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    while (!consume("}")) {
+        cur -> next = stmt();
+        cur = cur -> next;
+    }
+    node -> body = head.next;
+    return node;
+}
+
+Node* stmt_return() {
+    Node* node;
+    node = create_node(ND_RETURN);
+    node -> left_child = expr();
     expect(";");
+    return node;
+}
+
+Node* stmt_if() {
+    Node* node;
+    node = create_node(ND_IF);
+    expect("(");
+    node -> cond = expr();
+    expect(")");
+    node -> then = stmt();
+    if (consume_keyword(TK_ELSE)) {
+        node -> els = stmt();
+    }
+    return node;
+}
+
+Node* stmt_while() {
+    Node* node;
+    node = create_node(ND_WHILE);
+    expect("(");
+    node -> cond = expr();
+    expect(")");
+    node -> then = stmt();
+    return node;
+}
+
+Node* stmt_for() {
+    Node* node;
+    node = create_node(ND_FOR);
+    expect("(");
+    if (!consume(";")) {
+        node -> init = expr();
+        expect(";");
+    }
+    if (!consume(";")) {
+        node -> cond = expr();
+        expect(";");
+    }
+    if (!consume(")")) {
+        node -> inc = expr();
+        expect(")");
+    }
+    node -> then = stmt();
     return node;
 }
 
