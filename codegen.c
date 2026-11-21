@@ -55,7 +55,7 @@ void gen(Node* node) {
     }
     if (node -> kind == ND_ARRAY) {
         printf("  mov rax, %d\n", node -> array_len);
-        printf("  mov [rbp-%d], rax\n", node -> offset);
+        printf("  mov [rbp-%d], rax\n", node -> offset + 8 * node -> array_len);
         Node* tail;
         tail = node -> body;
         int i = 0;
