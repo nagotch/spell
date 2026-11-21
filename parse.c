@@ -146,13 +146,27 @@ Node* primary() {
         long num = expect_number();
         node = create_number_node(num);
     }
-    while (consume("[")) {
-        Node* right_child = expr();
-        expect("]");
-        Node* new_node = create_node(ND_INDEX);
-        new_node -> left_child = node;
-        new_node -> right_child = right_child;
-        node = new_node;
+    while (true) {
+        if (consume("[")) {
+            Node* right_child = expr();
+            expect("]");
+            Node* new_node = create_node(ND_INDEX);
+            new_node -> left_child = node;
+            new_node -> right_child = right_child;
+            node = new_node;
+        } else if (consume(".")) {
+            ident_token = consume_ident();
+            if (ident_token -> len == 3 && !memcmp(ident_token -> str, "len", 3)) {
+                Node* new_node = create_node(ND_LEN);
+                new_node -> left_child = node;
+                node = new_node;
+            } else {
+                fprintf(stderr, "不明なメンバ");
+                exit(1);
+            }
+        } else {
+            break;
+        }
     }
     return node;
 }
