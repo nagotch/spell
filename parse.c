@@ -62,8 +62,9 @@ Node* create_node(NodeKind kind) {
     return node;
 }
 
-Node* create_binary_operation_node(NodeKind kind, Node* left_child, Node* right_child) {
-    Node* new_node_ptr = create_node(kind);
+Node* create_binary_operation_node(BinOp kind, Node* left_child, Node* right_child) {
+    Node* new_node_ptr = create_node(ND_BINOP);
+    new_node_ptr -> op.binop = kind;
     new_node_ptr -> left_child = left_child;
     new_node_ptr -> right_child = right_child;
     return new_node_ptr;
@@ -199,14 +200,16 @@ Node* unary() {
     if (consume("+")) {
         return primary();
     } else if (consume("-")) {
-        Node* node = create_binary_operation_node(ND_SUB, create_number_node(0), primary());
+        Node* node = create_binary_operation_node(OP_SUB, create_number_node(0), primary());
         return node;
     } else if (consume("*")) {
-        Node* node = create_node(ND_DEREF);
+        Node* node = create_node(ND_UNARY);
+        node -> op.unop = OP_DEREF;
         node -> left_child = unary();
         return node;
     } else if (consume("&")) {
-        Node* node = create_node(ND_ADDR);
+        Node* node = create_node(ND_UNARY);
+        node -> op.unop = OP_ADDR;
         node -> left_child = unary();
         return node;
     }
@@ -217,9 +220,9 @@ Node* mul() {
     Node* node = unary();
     while (true) {
         if (consume("*")) {
-            node = create_binary_operation_node(ND_MUL, node, unary());
+            node = create_binary_operation_node(OP_MUL, node, unary());
         } else if (consume("/")) {
-            node = create_binary_operation_node(ND_DIV, node, unary());
+            node = create_binary_operation_node(OP_DIV, node, unary());
         } else {
             break;
         }
@@ -231,9 +234,9 @@ Node* add() {
     Node* node = mul();
     while (true) {
         if (consume("+")) {
-            node = create_binary_operation_node(ND_ADD, node, mul());
+            node = create_binary_operation_node(OP_ADD, node, mul());
         } else if (consume("-")) {
-            node = create_binary_operation_node(ND_SUB, node, mul());
+            node = create_binary_operation_node(OP_SUB, node, mul());
         } else {
             break;
         }
@@ -245,13 +248,13 @@ Node* relational() {
     Node* node = add();
     while (true) {
         if (consume("<=")) {
-            node = create_binary_operation_node(ND_LE, node, add());
+            node = create_binary_operation_node(OP_LE, node, add());
         } else if (consume(">=")) {
-            node = create_binary_operation_node(ND_LE, add(), node);
+            node = create_binary_operation_node(OP_LE, add(), node);
         } else if (consume("<")) {
-            node = create_binary_operation_node(ND_LT, node, add());
+            node = create_binary_operation_node(OP_LT, node, add());
         } else if (consume(">")) {
-            node = create_binary_operation_node(ND_LT, add(), node);
+            node = create_binary_operation_node(OP_LT, add(), node);
         } else {
             break;
         }
@@ -263,9 +266,9 @@ Node* equality() {
     Node* node = relational();
     while (true) {
         if (consume("==")) {
-            node = create_binary_operation_node(ND_EQ, node, relational());
+            node = create_binary_operation_node(OP_EQ, node, relational());
         } else if (consume("!=")) {
-            node = create_binary_operation_node(ND_NE, node, relational());
+            node = create_binary_operation_node(OP_NE, node, relational());
         } else {
             break;
         }
@@ -276,7 +279,10 @@ Node* equality() {
 Node* assign() {
     Node* node = equality();
     if (consume("=")) {
-        node = create_binary_operation_node(ND_ASSIGN, node, assign());
+        Node* assign_node = create_node(ND_ASSIGN);
+        assign_node -> left_child = node;
+        assign_node -> right_child = assign();
+        node = assign_node;
     }
     return node;
 }
