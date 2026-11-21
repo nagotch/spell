@@ -14,10 +14,10 @@ char* resister[] = {
 void gen(Node* node) {
     if (node -> kind == ND_UNARY) {
         switch (node -> op) {
-            case ND_ADDR:
+            case OP_ADDR:
                 gen_lval(node -> left_child);
                 break;
-            case ND_DEREF:
+            case OP_DEREF:
                 gen(node -> left_child);
                 printf("  pop rax\n");
                 printf("  mov rax, [rax]\n");
@@ -242,35 +242,35 @@ void gen(Node* node) {
         printf("  pop rdi\n");
         printf("  pop rax\n");
         switch (node -> op) {
-            case ND_ADD:
+            case OP_ADD:
                 printf("  add rax, rdi\n");
                 break;
-            case ND_SUB:
+            case OP_SUB:
                 printf("  sub rax, rdi\n");
                 break;
-            case ND_MUL:
+            case OP_MUL:
                 printf("  imul rax, rdi\n");
                 break;
-            case ND_DIV:
+            case OP_DIV:
                 printf("  cqo\n");
                 printf("  idiv rdi\n");
                 break;
-            case ND_EQ:
+            case OP_EQ:
                 printf("  cmp rax, rdi\n");
                 printf("  sete al\n");
                 printf("  movzb rax, al\n");
                 break;
-            case ND_NE:
+            case OP_NE:
                 printf("  cmp rax, rdi\n");
                 printf("  setne al\n");
                 printf("  movzb rax, al\n");
                 break;
-            case ND_LT:
+            case OP_LT:
                 printf("  cmp rax, rdi\n");
                 printf("  setl al\n");
                 printf("  movzb rax, al\n");
                 break;
-            case ND_LE:
+            case OP_LE:
                 printf("  cmp rax, rdi\n");
                 printf("  setle al\n");
                 printf("  movzb rax, al\n");
@@ -291,7 +291,7 @@ void gen_lval(Node* node) {
         printf("  push rax\n");
         return;
     }
-    if (node -> kind == ND_UNARY && node -> op == ND_DEREF) {
+    if (node -> kind == ND_UNARY && node -> op == OP_DEREF) {
         gen(node -> left_child);
         return;
     }
