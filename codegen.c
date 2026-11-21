@@ -81,6 +81,13 @@ void gen(Node* node) {
         printf("  push rax\n");
         return;
     }
+    if (node -> kind == ND_LEN) {
+        gen(node -> left_child);
+        printf("  pop rax\n");
+        printf("  mov rax, [rax-8]\n");
+        printf("  push rax\n");
+        return;
+    }
 
     int label = max_label;
     max_label++;
