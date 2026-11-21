@@ -113,6 +113,34 @@ Token* tokenize(char* s) {
             continue;
         }
 
+        if (**endptr == '\"') {
+            last_token_ptr = new_token(TK_STR, last_token_ptr);
+            last_token_ptr -> str = *endptr;
+            int len = 0;
+            (*endptr)++;
+            while (**endptr != '\"') {
+                if (**endptr == '\\') {
+                    if ((*endptr)[1] == 'n') {
+                        **endptr = 10;
+                    } else if ((*endptr)[1] == 't') {
+                        **endptr = 9;
+                    } else if ((*endptr)[1] == '\\') {
+                        **endptr = 92;
+                    } else if ((*endptr)[1] == '\"') {
+                        **endptr = 34;
+                    } else if ((*endptr)[1] == '\0') {
+                        **endptr = 0;
+                    }
+                    (*endptr)++;
+                }
+                (*endptr)++;
+                len++;
+            }
+            last_token_ptr -> len = len;
+            expect("\"");
+            continue;
+        }
+
         if (can_use_variables_first(**endptr)) {
             last_token_ptr = new_token(TK_IDENT, last_token_ptr);
             last_token_ptr -> str = *endptr;
