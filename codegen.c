@@ -88,11 +88,51 @@ void gen(Node* node) {
         printf("  push rax\n");
         return;
     }
-
-    int label = max_label;
-    max_label++;
+    if (node -> kind == ND_NEWARRAY) {
+        int label = max_label;
+        max_label++;
+        gen(node -> left_child);
+        gen(node -> right_child);
+        printf("  pop rax\n");
+        printf("  push rax\n");
+        printf("  add rax, 1\n");
+        printf("  imul rax, 8\n");
+        printf("  mov rdi, rax\n");
+        printf("  mov rdi, rax\n");
+        printf("  mov rax, rsp\n");
+        printf("  and rax, 15\n");
+        printf("  jnz .Lcall%d\n", label);
+        printf("  mov rax, 0\n");
+        printf("  call malloc\n");
+        printf("  jmp .Lend%d\n", label);
+        printf(".Lcall%d:\n", label);
+        printf("  sub rsp, 8\n");
+        printf("  mov rax, 0\n");
+        printf("  call malloc\n");
+        printf("  add rsp, 8\n");
+        printf(".Lend%d:\n", label);
+        printf("  pop rcx\n");
+        printf("  mov [rax], rcx\n");
+        printf("  pop rsi\n");
+        printf("  add rax, 8\n");
+        printf("  push rax\n");
+        label = max_label;
+        max_label++;
+        printf("  mov rdx, rax\n");
+        printf(".Lbegin%d:\n", label);
+        printf("  cmp rcx, 0\n");
+        printf("  je .Lend%d\n", label);
+        printf("  mov [rdx], rsi\n");
+        printf("  add rdx, 8\n");
+        printf("  sub rcx, 1\n");
+        printf("  jmp .Lbegin%d\n", label);
+        printf(".Lend%d:\n", label);
+        return;
+    }
 
     if (node -> kind == ND_IF && node -> els == NULL) {
+        int label = max_label;
+        max_label++;
         gen(node -> cond);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
@@ -102,6 +142,8 @@ void gen(Node* node) {
         return;
     }
     if (node -> kind == ND_IF) {
+        int label = max_label;
+        max_label++;
         gen(node -> cond);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
@@ -114,6 +156,8 @@ void gen(Node* node) {
         return;
     }
     if (node -> kind == ND_WHILE) {
+        int label = max_label;
+        max_label++;
         printf(".Lbegin%d:\n", label);
         gen(node -> cond);
         printf("  pop rax\n");
@@ -125,6 +169,8 @@ void gen(Node* node) {
         return;
     }
     if (node -> kind == ND_FOR) {
+        int label = max_label;
+        max_label++;
         if (node -> init) {
             gen(node -> init);
         }
@@ -154,6 +200,8 @@ void gen(Node* node) {
         return;
     }
     if (node -> kind == ND_FUNCALL) {
+        int label = max_label;
+        max_label++;
         Node* head = node -> args;
         int args_cnt = 0;
         while (head) {
