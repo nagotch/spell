@@ -108,7 +108,6 @@ Node* primary() {
     Token* ident_token = consume_ident();
     Node* node;
     if (!ident_token && consume("[")) {
-        node = create_node(ND_ARRAY);
         Node* first_expr = expr();
         if (consume(";")) {
             Node* len_expr = expr();
@@ -116,6 +115,7 @@ Node* primary() {
             node -> left_child = first_expr;
             node -> right_child = len_expr;
         } else {
+            node = create_node(ND_ARRAY);
             int array_len = 1;
             Node body;
             Node* cur = &body;
