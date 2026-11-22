@@ -32,13 +32,10 @@ static bool consume_keyword(TokenKind kind) {
 }
 
 static void expect(char* symbol) {
-    int len = strlen(symbol);
-    if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
-        token = token -> next;
-        return;
+    if (!consume(symbol)) {
+        fprintf(stderr, "予期されないToken\n");
+        exit(1);
     }
-    fprintf(stderr, "予期されないToken\n");
-    exit(1);
 }
 
 static long expect_number() {
