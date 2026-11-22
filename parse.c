@@ -111,6 +111,7 @@ static Node* char_array() {
     token = token -> next;
     node = create_node(ND_ARRAY);
     Node body;
+    body.next = NULL;
     Node* cur = &body;
     for (int i = 0; i < str_token -> len; i++) {
         cur -> next = create_number_node(str_token -> str[i]);
