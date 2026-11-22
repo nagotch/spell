@@ -171,10 +171,6 @@ for i in "${!tests[@]}"; do
 done
 wait
 
-for i in "${!error_tests[@]}"; do
-    one_error_test $i
-done
-
 fail_count=0
 for i in "${!tests[@]}"; do
     i=$(printf '%03d' $i)
@@ -184,6 +180,12 @@ for i in "${!tests[@]}"; do
     fi
     rm result$i
 done
+
+for i in "${!error_tests[@]}"; do
+    one_error_test $i
+done
+
+run_suite test_expr.sp
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
