@@ -112,6 +112,10 @@ tests=(
     "main() { s = \"\"; return s.len; }|0"
 )
 
+error_tests=(
+    "main() { a = [1,2,3]; return a.5; }|不明なメンバ"
+)
+
 cc -c -o funcs.o funcs.c
 
 one_test() {
@@ -130,12 +134,31 @@ one_test() {
     rm tmp$i tmp$i.s tmp$i.sp
 }
 
+one_error_test() {
+    IFS='|' read -r input expected <<< "${error_tests[$1]}"
+    printf '%s' "$input" > etmp.sp
+    ./spell -S -o etmp etmp.sp 2> etmp.err
+    exit_code=$?
+    if [ "$exit_code" = "1" ] && grep -q "$expected" etmp.err; then
+        echo "error test passed, input $input"
+    else
+        echo "erorr test failed, input $input, exit $exit_code."
+        fail_count=$((fail_count+1))
+    fi
+    n=$((n+1))
+    rm -rf -f etmp.sp etmp.err etmp.s
+}
+
 n=${#tests[@]}
 
 for i in "${!tests[@]}"; do
     one_test $i &
 done
 wait
+
+for i in "${!error_tests[@]}"; do
+    one_error_test $i
+done
 
 fail_count=0
 for i in "${!tests[@]}"; do
