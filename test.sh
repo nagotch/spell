@@ -109,6 +109,7 @@ tests=(
     "main() { s = \"abc\"; s[1] = 120; return s[1]; }|120"
     "main() { s = \"hello\"; c = 0; for (i = 0; i < s.len; i = i + 1) if (s[i] == 108) c = c + 1; return c;}|2"
     "main() { s = \"hi\"; putchar(s[0]); putchar(s[1]); return 0; }|0"
+    "main() { s = \"\"; return s.len; }|0"
 )
 
 cc -c -o funcs.o funcs.c
