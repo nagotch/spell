@@ -1,6 +1,6 @@
 #include "spell.h"
 
-char* read_file(char* input_name);
+static char* read_file(char* input_name);
 
 int main(int argc, char **argv) {
     bool only_assembly = false;
@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-char* read_file(char* input_name) {
+static char* read_file(char* input_name) {
     FILE *fp = fopen(input_name, "r");
     if (!fp) {
         fprintf(stderr, "ファイルが開けません: %s", input_name);
