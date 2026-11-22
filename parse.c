@@ -76,21 +76,21 @@ Node* create_number_node(long num) {
     return num_node_ptr;
 }
 
-void resister_any() {
+void register_any() {
     LVar* lvar = calloc(1, sizeof(LVar));
     lvar -> offset = locals ? locals -> offset + 8 * (locals -> array_len + 1): 8;
     lvar -> next = locals;
     locals = lvar;
 }
 
-void resister_lvar(Token* tok) {
-    resister_any();
+void register_lvar(Token* tok) {
+    register_any();
     locals -> name = tok -> str;
     locals -> len = tok -> len;
 }
 
-void resister_array(int array_len) {
-    resister_any();
+void register_array(int array_len) {
+    register_any();
     locals -> array_len = array_len;
 }
 
@@ -100,7 +100,7 @@ Node* create_ident_node(Token* tok) {
     if (var) {
         ident_node_ptr -> offset = var -> offset;
     } else {
-        resister_lvar(tok);
+        register_lvar(tok);
         ident_node_ptr -> offset = locals -> offset;
     }
     return ident_node_ptr;
@@ -117,7 +117,7 @@ Node* char_array() {
         cur -> next = create_number_node(str_token -> str[i]);
         cur = cur -> next;
     }
-    resister_array(str_token -> len);
+    register_array(str_token -> len);
     node -> array_len = str_token -> len;
     node -> body = body.next;
     node -> offset = locals -> offset;
@@ -144,7 +144,7 @@ Node* array_literal() {
             cur = cur -> next;
             array_len++;
         }
-        resister_array(array_len);
+        register_array(array_len);
         node -> array_len = array_len;
         node -> body = body.next;
         node -> offset = locals -> offset;
@@ -409,7 +409,7 @@ Function* function() {
     int nparams = 0;
     if (!consume(")")) {
         do {
-            resister_lvar(consume_ident());
+            register_lvar(consume_ident());
             nparams++;
         } while (consume(","));
         expect(")");
