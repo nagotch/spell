@@ -175,6 +175,21 @@ void gen_len(Node* node) {
     printf("  push rax\n");
 }
 
+void call(int label, int len, char* name) {
+    printf("  mov rax, rsp\n");
+    printf("  and rax, 15\n");
+    printf("  jnz .Lcall%d\n", label);
+    printf("  mov rax, 0\n");
+    printf("  call %.*s\n", len, name);
+    printf("  jmp .Lend%d\n", label);
+    printf(".Lcall%d:\n", label);
+    printf("  sub rsp, 8\n");
+    printf("  mov rax, 0\n");
+    printf("  call %.*s\n", len, name);
+    printf("  add rsp, 8\n");
+    printf(".Lend%d:\n", label);
+}
+
 void gen_newarray(Node* node) {
     int label = max_label;
     max_label++;
@@ -186,18 +201,7 @@ void gen_newarray(Node* node) {
     printf("  imul rax, 8\n");
     printf("  mov rdi, rax\n");
     printf("  mov rdi, rax\n");
-    printf("  mov rax, rsp\n");
-    printf("  and rax, 15\n");
-    printf("  jnz .Lcall%d\n", label);
-    printf("  mov rax, 0\n");
-    printf("  call malloc\n");
-    printf("  jmp .Lend%d\n", label);
-    printf(".Lcall%d:\n", label);
-    printf("  sub rsp, 8\n");
-    printf("  mov rax, 0\n");
-    printf("  call malloc\n");
-    printf("  add rsp, 8\n");
-    printf(".Lend%d:\n", label);
+    call(label, 6, "malloc");
     printf("  pop rcx\n");
     printf("  mov [rax], rcx\n");
     printf("  pop rsi\n");
@@ -302,18 +306,7 @@ void gen_funcall(Node* node) {
     for (int i = args_cnt - 1; i >= 0; i--) {
         printf("  pop %s\n", resister[i]);
     }
-    printf("  mov rax, rsp\n");
-    printf("  and rax, 15\n");
-    printf("  jnz .Lcall%d\n", label);
-    printf("  mov rax, 0\n");
-    printf("  call %.*s\n", node -> len, node -> name);
-    printf("  jmp .Lend%d\n", label);
-    printf(".Lcall%d:\n", label);
-    printf("  sub rsp, 8\n");
-    printf("  mov rax, 0\n");
-    printf("  call %.*s\n", node -> len, node -> name);
-    printf("  add rsp, 8\n");
-    printf(".Lend%d:\n", label);
+    call(label, node -> len, node -> name);
     printf("  push rax\n");
 }
 
