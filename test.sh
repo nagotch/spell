@@ -149,6 +149,21 @@ one_error_test() {
     rm -rf -f etmp.sp etmp.err etmp.s
 }
 
+run_suite() {
+    cat io.sp $1 > suite_all.sp
+    ./spell -S -o suite suite_all.sp
+    cc -o suite suite.s funcs.o
+    ./suite > suite.out
+    exit_code=$?
+    if [ "$exit_code" != "0" ] || ! grep -q done suite.out; then
+        echo "suite $1 failed"
+        cat suite.out
+        fail_count=$((fail_count+1))
+    fi
+    n=$((n+1))
+    rm -f suite_all.sp suite suite.s suite.out
+}
+
 n=${#tests[@]}
 
 for i in "${!tests[@]}"; do
