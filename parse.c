@@ -105,48 +105,60 @@ Node* create_ident_node(Token* tok) {
     return ident_node_ptr;
 }
 
+Node* char_array() {
+    Node* node;
+    Token* str_token = token;
+    token = token -> next;
+    node = create_node(ND_ARRAY);
+    Node body;
+    Node* cur = &body;
+    for (int i = 0; i < str_token -> len; i++) {
+        cur -> next = create_number_node(str_token -> str[i]);
+        cur = cur -> next;
+    }
+    resist_array(str_token -> len);
+    node -> array_len = str_token -> len;
+    node -> body = body.next;
+    node -> offset = locals -> offset;
+    return node;
+}
+
+Node* array_literal() {
+    Node* node;
+    Node* first_expr = expr();
+    if (consume(";")) {
+        Node* len_expr = expr();
+        node = create_node(ND_NEWARRAY);
+        node -> left_child = first_expr;
+        node -> right_child = len_expr;
+    } else {
+        node = create_node(ND_ARRAY);
+        int array_len = 1;
+        Node body;
+        Node* cur = &body;
+        cur -> next = first_expr;
+        cur = cur -> next;
+        while (consume(",")) {
+            cur -> next = expr();
+            cur = cur -> next;
+            array_len++;
+        }
+        resist_array(array_len);
+        node -> array_len = array_len;
+        node -> body = body.next;
+        node -> offset = locals -> offset;
+    }
+    expect("]");
+    return node;
+}
+
 Node* primary() {
     Node* node;
     Token* ident_token = consume_ident();
     if (token -> kind == TK_STR) {
-        Token* str_token = token;
-        token = token -> next;
-        node = create_node(ND_ARRAY);
-        Node body;
-        Node* cur = &body;
-        for (int i = 0; i < str_token -> len; i++) {
-            cur -> next = create_number_node(str_token -> str[i]);
-            cur = cur -> next;
-        }
-        resist_array(str_token -> len);
-        node -> array_len = str_token -> len;
-        node -> body = body.next;
-        node -> offset = locals -> offset;
+        node = char_array();
     } else if (!ident_token && consume("[")) {
-        Node* first_expr = expr();
-        if (consume(";")) {
-            Node* len_expr = expr();
-            node = create_node(ND_NEWARRAY);
-            node -> left_child = first_expr;
-            node -> right_child = len_expr;
-        } else {
-            node = create_node(ND_ARRAY);
-            int array_len = 1;
-            Node body;
-            Node* cur = &body;
-            cur -> next = first_expr;
-            cur = cur -> next;
-            while (consume(",")) {
-                cur -> next = expr();
-                cur = cur -> next;
-                array_len++;
-            }
-            resist_array(array_len);
-            node -> array_len = array_len;
-            node -> body = body.next;
-            node -> offset = locals -> offset;
-        }
-        expect("]");
+        node = array_literal();
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
         node -> name = ident_token -> str;
@@ -291,60 +303,92 @@ Node* expr() {
     return assign();
 }
 
+Node* stmt_block();
+Node* stmt_return();
+Node* stmt_if();
+Node* stmt_while();
+Node* stmt_for();
+
 Node* stmt() {
-    Node* node;
     if (consume("{")) {
-        node = create_node(ND_BLOCK);
-        Node head;
-        head.next = NULL;
-        Node* cur = &head;
-        while (!consume("}")) {
-            cur -> next = stmt();
-            cur = cur -> next;
-        }
-        node -> body = head.next;
-        return node;
+        return stmt_block();
     } else if (consume_keyword(TK_RETURN)) {
-        node = create_node(ND_RETURN);
-        node -> left_child = expr();
+        return stmt_return();
     } else if (consume_keyword(TK_IF)) {
-        node = create_node(ND_IF);
-        expect("(");
-        node -> cond = expr();
-        expect(")");
-        node -> then = stmt();
-        if (consume_keyword(TK_ELSE)) {
-            node -> els = stmt();
-        }
-        return node;
+        return stmt_if();
     } else if (consume_keyword(TK_WHILE)) {
-        node = create_node(ND_WHILE);
-        expect("(");
-        node -> cond = expr();
-        expect(")");
-        node -> then = stmt();
-        return node;
+        return stmt_while();
     } else if (consume_keyword(TK_FOR)) {
-        node = create_node(ND_FOR);
-        expect("(");
-        if (!consume(";")) {
-            node -> init = expr();
-            expect(";");
-        }
-        if (!consume(";")) {
-            node -> cond = expr();
-            expect(";");
-        }
-        if (!consume(")")) {
-            node -> inc = expr();
-            expect(")");
-        }
-        node -> then = stmt();
-        return node;
+        return stmt_for();
     } else {
-        node = expr();
+        Node* node = expr();
+        expect(";");
+        return node;
     }
+}
+
+Node* stmt_block() {
+    Node* node;
+    node = create_node(ND_BLOCK);
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    while (!consume("}")) {
+        cur -> next = stmt();
+        cur = cur -> next;
+    }
+    node -> body = head.next;
+    return node;
+}
+
+Node* stmt_return() {
+    Node* node;
+    node = create_node(ND_RETURN);
+    node -> left_child = expr();
     expect(";");
+    return node;
+}
+
+Node* stmt_if() {
+    Node* node;
+    node = create_node(ND_IF);
+    expect("(");
+    node -> cond = expr();
+    expect(")");
+    node -> then = stmt();
+    if (consume_keyword(TK_ELSE)) {
+        node -> els = stmt();
+    }
+    return node;
+}
+
+Node* stmt_while() {
+    Node* node;
+    node = create_node(ND_WHILE);
+    expect("(");
+    node -> cond = expr();
+    expect(")");
+    node -> then = stmt();
+    return node;
+}
+
+Node* stmt_for() {
+    Node* node;
+    node = create_node(ND_FOR);
+    expect("(");
+    if (!consume(";")) {
+        node -> init = expr();
+        expect(";");
+    }
+    if (!consume(";")) {
+        node -> cond = expr();
+        expect(";");
+    }
+    if (!consume(")")) {
+        node -> inc = expr();
+        expect(")");
+    }
+    node -> then = stmt();
     return node;
 }
 
