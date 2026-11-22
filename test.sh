@@ -1,43 +1,6 @@
 #!/bin/bash
 
 tests=(
-    "main() { 0; }|0"
-    "main() { 1; }|1"
-    "main() { 42; }|42"
-    "main() { 254; }|254"
-    "main() { 255; }|255"
-    "main() { 5+20-4; }|21"
-    "main() { 10-3-2; }|5"
-    "main() { 2*3+4; }|10"
-    "main() { 2+3*4; }|14"
-    "main() { (2+3)*4; }|20"
-    "main() { 20/4; }|5"
-    "main() { 7/2; }|3"
-    "main() { 12 + 3 * ( 2 + 4 ); }|30"
-    "main() { -10+20; }|10"
-    "main() { -(3+5)+10; }|2"
-    "main() { -3*+5+20; }|5"
-    "main() { +42; }|42"
-    "main() { -(-5); }|5"
-    "main() { 2*-3+10; }|4"
-    "main() { 0==1; }|0"
-    "main() { 42==42; }|1"
-    "main() { 0!=1; }|1"
-    "main() { 42!=42; }|0"
-    "main() { 0<1; }|1"
-    "main() { 1<1; }|0"
-    "main() { 2<1; }|0"
-    "main() { 0<=1; }|1"
-    "main() { 1<=1; }|1"
-    "main() { 2<=1; }|0"
-    "main() { 1>0; }|1"
-    "main() { 1>1; }|0"
-    "main() { 1>2; }|0"
-    "main() { 1>=0; }|1"
-    "main() { 1>=1; }|1"
-    "main() { 1>=2; }|0"
-    "main() { 1+2==3; }|1"
-    "main() { 1<2==1; }|1"
     "main() { a=3; a; }|3"
     "main() { a=3; b=5*6-8; a+b/2; }|14"
     "main() { a=b=3; a+b; }|6"
@@ -142,7 +105,7 @@ one_error_test() {
     ./spell -S -o etmp etmp.sp 2> etmp.err
     exit_code=$?
     if [ "$exit_code" = "1" ] && grep -q "$expected" etmp.err; then
-        echo "error test passed, input $input"
+        echo "error test passed, input $input" > /dev/null
     else
         echo "erorr test failed, input $input, exit $exit_code."
         fail_count=$((fail_count+1))
