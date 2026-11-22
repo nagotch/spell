@@ -47,6 +47,15 @@ void gen(Node* node) {
     }
 }
 
+void gen_index_addr(Node* node) {
+    gen(node -> left_child);
+    gen(node -> right_child);
+    printf("  pop rdi\n");
+    printf("  pop rax\n");
+    printf("  imul rdi, 8\n");
+    printf("  add rax, rdi\n");
+}
+
 void gen_lval(Node* node) {
     if (node -> kind == ND_LVAR) {
         printf("  mov rax, rbp\n");
@@ -59,12 +68,7 @@ void gen_lval(Node* node) {
         return;
     }
     if (node -> kind == ND_INDEX) {
-        gen(node -> left_child);
-        gen(node -> right_child);
-        printf("  pop rdi\n");
-        printf("  pop rax\n");
-        printf("  imul rdi, 8\n");
-        printf("  add rax, rdi\n");
+        gen_index_addr(node);
         printf("  push rax\n");
         return;
     }
@@ -157,13 +161,17 @@ void gen_array(Node* node) {
     printf("  push rax\n");
 }
 
-void gen_index(Node* node) {
+void gen_index_addr(Node* node) {
     gen(node -> left_child);
     gen(node -> right_child);
     printf("  pop rdi\n");
     printf("  pop rax\n");
     printf("  imul rdi, 8\n");
     printf("  add rax, rdi\n");
+}
+
+void gen_index(Node* node) {
+    gen_index_addr(node);
     printf("  mov rax, [rax]\n");
     printf("  push rax\n");
 }
