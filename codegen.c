@@ -226,7 +226,7 @@ static void gen_if(Node* node) {
         gen(node -> cond);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
-        printf("  je .Lend%d\n", label);
+        printf("  je .Lelse%d\n", label);
         gen(node -> then);
         printf("  jmp .Lend%d\n", label);
         printf(".Lelse%d:\n", label);
