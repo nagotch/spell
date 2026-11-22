@@ -166,6 +166,21 @@ run_suite() {
     rm -f suite_all.sp suite suite.s suite.out
 }
 
+run_selfcheck() {
+    cat io.sp test_selfcheck.sp > suite_all.sp
+    ./spell -S -o suite suite_all.sp
+    cc -o suite suite.s funcs.o
+    ./suite > suite.out
+    exit_code=$?
+    if [ "$exit_code" != "1" ]; then
+        echo "selfchek failed"
+        cat suite.out
+        fail_count=$((fail_count+1))
+    fi
+    n=$((n+1))
+    rm -f suite_all.sp suite suite.s suite.out
+}
+
 n=${#tests[@]}
 
 for i in "${!tests[@]}"; do
@@ -188,6 +203,7 @@ for i in "${!error_tests[@]}"; do
 done
 
 run_suite test_expr.sp
+run_selfcheck
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
