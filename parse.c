@@ -1,9 +1,11 @@
 #include "spell.h"
 
-Node* code[100];
 LVar* locals = NULL;
 
-bool consume(char* symbol) {
+static LVar* find_lvar(Token* tok);
+static Node* expr();
+
+static bool consume(char* symbol) {
     int len = strlen(symbol);
     if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
         token = token -> next;
@@ -12,7 +14,7 @@ bool consume(char* symbol) {
     return false;
 }
 
-Token* consume_ident() {
+static Token* consume_ident() {
     if (token -> kind == TK_IDENT) {
         Token* pre_token = token;
         token = token -> next;
@@ -21,7 +23,7 @@ Token* consume_ident() {
     return NULL;
 }
 
-bool consume_keyword(TokenKind kind) {
+static bool consume_keyword(TokenKind kind) {
     if (token -> kind == kind) {
         token = token -> next;
         return true;
@@ -29,7 +31,7 @@ bool consume_keyword(TokenKind kind) {
     return false;
 }
 
-void expect(char* symbol) {
+static void expect(char* symbol) {
     int len = strlen(symbol);
     if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
         token = token -> next;
@@ -39,7 +41,7 @@ void expect(char* symbol) {
     exit(1);
 }
 
-long expect_number() {
+static long expect_number() {
     if (token -> kind == TK_NUM) {
         long num = token -> val;
         token = token -> next;
@@ -49,20 +51,20 @@ long expect_number() {
     exit(1);
 }
 
-bool at_eof() {
+static bool at_eof() {
     if (token -> kind == TK_EOF) {
         return true;
     }
     return false;
 }
 
-Node* create_node(NodeKind kind) {
+static Node* create_node(NodeKind kind) {
     Node* node = calloc(1, sizeof(Node));
     node -> kind = kind;
     return node;
 }
 
-Node* create_binary_operation_node(BinOp kind, Node* left_child, Node* right_child) {
+static Node* create_binary_operation_node(BinOp kind, Node* left_child, Node* right_child) {
     Node* new_node_ptr = create_node(ND_BINOP);
     new_node_ptr -> op.binop = kind;
     new_node_ptr -> left_child = left_child;
@@ -70,31 +72,31 @@ Node* create_binary_operation_node(BinOp kind, Node* left_child, Node* right_chi
     return new_node_ptr;
 }
 
-Node* create_number_node(long num) {
+static Node* create_number_node(long num) {
     Node* num_node_ptr = create_node(ND_NUM);
     num_node_ptr -> val = num;
     return num_node_ptr;
 }
 
-void register_any() {
+static void register_any() {
     LVar* lvar = calloc(1, sizeof(LVar));
     lvar -> offset = locals ? locals -> offset + 8 * (locals -> array_len + 1): 8;
     lvar -> next = locals;
     locals = lvar;
 }
 
-void register_lvar(Token* tok) {
+static void register_lvar(Token* tok) {
     register_any();
     locals -> name = tok -> str;
     locals -> len = tok -> len;
 }
 
-void register_array(int array_len) {
+static void register_array(int array_len) {
     register_any();
     locals -> array_len = array_len;
 }
 
-Node* create_ident_node(Token* tok) {
+static Node* create_ident_node(Token* tok) {
     LVar* var = find_lvar(tok);
     Node* ident_node_ptr = create_node(ND_LVAR);
     if (var) {
@@ -106,7 +108,7 @@ Node* create_ident_node(Token* tok) {
     return ident_node_ptr;
 }
 
-Node* char_array() {
+static Node* char_array() {
     Node* node;
     Token* str_token = token;
     token = token -> next;
@@ -124,7 +126,7 @@ Node* char_array() {
     return node;
 }
 
-Node* array_literal() {
+static Node* array_literal() {
     Node* node;
     Node* first_expr = expr();
     if (consume(";")) {
@@ -153,7 +155,7 @@ Node* array_literal() {
     return node;
 }
 
-Node* primary() {
+static Node* primary() {
     Node* node;
     Token* ident_token = consume_ident();
     if (token -> kind == TK_STR) {
@@ -209,7 +211,7 @@ Node* primary() {
     return node;
 }
 
-Node* unary() {
+static Node* unary() {
     if (consume("+")) {
         return primary();
     } else if (consume("-")) {
@@ -229,7 +231,7 @@ Node* unary() {
     return primary();
 }
 
-Node* mul() {
+static Node* mul() {
     Node* node = unary();
     while (true) {
         if (consume("*")) {
@@ -243,7 +245,7 @@ Node* mul() {
     return node;
 }
 
-Node* add() {
+static Node* add() {
     Node* node = mul();
     while (true) {
         if (consume("+")) {
@@ -257,7 +259,7 @@ Node* add() {
     return node;
 }
 
-Node* relational() {
+static Node* relational() {
     Node* node = add();
     while (true) {
         if (consume("<=")) {
@@ -275,7 +277,7 @@ Node* relational() {
     return node;
 }
 
-Node* equality() {
+static Node* equality() {
     Node* node = relational();
     while (true) {
         if (consume("==")) {
@@ -289,7 +291,7 @@ Node* equality() {
     return node;
 }
 
-Node* assign() {
+static Node* assign() {
     Node* node = equality();
     if (consume("=")) {
         Node* assign_node = create_node(ND_ASSIGN);
@@ -300,17 +302,17 @@ Node* assign() {
     return node;
 }
 
-Node* expr() {
+static Node* expr() {
     return assign();
 }
 
-Node* stmt_block();
-Node* stmt_return();
-Node* stmt_if();
-Node* stmt_while();
-Node* stmt_for();
+static Node* stmt_block();
+static Node* stmt_return();
+static Node* stmt_if();
+static Node* stmt_while();
+static Node* stmt_for();
 
-Node* stmt() {
+static Node* stmt() {
     if (consume("{")) {
         return stmt_block();
     } else if (consume_keyword(TK_RETURN)) {
@@ -328,7 +330,7 @@ Node* stmt() {
     }
 }
 
-Node* stmt_block() {
+static Node* stmt_block() {
     Node* node;
     node = create_node(ND_BLOCK);
     Node head;
@@ -342,7 +344,7 @@ Node* stmt_block() {
     return node;
 }
 
-Node* stmt_return() {
+static Node* stmt_return() {
     Node* node;
     node = create_node(ND_RETURN);
     node -> left_child = expr();
@@ -350,7 +352,7 @@ Node* stmt_return() {
     return node;
 }
 
-Node* stmt_if() {
+static Node* stmt_if() {
     Node* node;
     node = create_node(ND_IF);
     expect("(");
@@ -363,7 +365,7 @@ Node* stmt_if() {
     return node;
 }
 
-Node* stmt_while() {
+static Node* stmt_while() {
     Node* node;
     node = create_node(ND_WHILE);
     expect("(");
@@ -373,7 +375,7 @@ Node* stmt_while() {
     return node;
 }
 
-Node* stmt_for() {
+static Node* stmt_for() {
     Node* node;
     node = create_node(ND_FOR);
     expect("(");
@@ -393,7 +395,7 @@ Node* stmt_for() {
     return node;
 }
 
-Function* function() {
+static Function* function() {
     locals = NULL;
     Token* tok = consume_ident();
     if (!tok) {
@@ -452,7 +454,7 @@ Function* program() {
     return head.next;
 }
 
-LVar* find_lvar(Token* tok) {
+static LVar* find_lvar(Token* tok) {
     for (LVar* var = locals; var; var = var -> next) {
         if (var -> len == tok -> len && !memcmp(var -> name, tok -> str, tok -> len)) {
             return var;
