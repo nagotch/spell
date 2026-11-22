@@ -267,6 +267,7 @@ static void gen_for(Node* node) {
     max_label++;
     if (node -> init) {
         gen(node -> init);
+        printf("  pop rax\n");
     }
     printf(".Lbegin%d:\n", label);
     if (node -> cond) {
@@ -276,11 +277,14 @@ static void gen_for(Node* node) {
         printf("  je .Lend%d\n", label);
     }
     gen(node -> then);
+    printf("  pop rax\n");
     if (node -> inc) {
         gen(node -> inc);
+        printf("  pop rax\n");
     }
     printf("  jmp .Lbegin%d\n", label);
     printf(".Lend%d:\n", label);
+    printf("  push 0\n");
 }
 
 static void gen_block(Node* node) {
