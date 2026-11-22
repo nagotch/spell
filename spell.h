@@ -106,23 +106,6 @@ struct LVar {
 extern Token* token;
 extern LVar* locals;
 
-Token* new_token(TokenKind token_kind, Token* pre_token_ptr);
 Token* tokenize(char* s);
-bool consume(char* symbol);
-void expect(char* symbol);
-long expect_number();
-bool at_eof();
-Node* primary();
-Node* unary();
-Node* mul();
-Node* add();
-Node* relational();
-Node* equality();
-Node* assign();
-Node* expr();
-Node* stmt();
 Function* program();
 void codegen(Function* prog);
-void gen(Node* node);
-void gen_lval(Node* node);
-LVar* find_lvar(Token* tok);

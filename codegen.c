@@ -1,24 +1,24 @@
 #include "spell.h"
 
-void gen_unary(Node* node);
-void gen_lvar(Node* node);
-void gen_assign(Node* node);
-void gen_num(Node* node);
-void gen_return(Node* node);
-void gen_array(Node* node);
-void gen_index(Node* node);
-void gen_len(Node* node);
-void gen_newarray(Node* node);
-void gen_if(Node* node);
-void gen_while(Node* node);
-void gen_for(Node* node);
-void gen_block(Node* node);
-void gen_funcall(Node* node);
-void gen_binop(Node* node);
+static void gen_unary(Node* node);
+static void gen_lvar(Node* node);
+static void gen_assign(Node* node);
+static void gen_num(Node* node);
+static void gen_return(Node* node);
+static void gen_array(Node* node);
+static void gen_index(Node* node);
+static void gen_len(Node* node);
+static void gen_newarray(Node* node);
+static void gen_if(Node* node);
+static void gen_while(Node* node);
+static void gen_for(Node* node);
+static void gen_block(Node* node);
+static void gen_funcall(Node* node);
+static void gen_binop(Node* node);
 
-int max_label = 0;
+static int max_label = 0;
 
-char* resister[] = {
+static char* resister[] = {
     "rdi",
     "rsi",
     "rdx",
@@ -27,7 +27,7 @@ char* resister[] = {
     "r9",
 };
 
-void gen(Node* node) {
+static void gen(Node* node) {
     switch (node -> kind) {
         case ND_UNARY: gen_unary(node); break;
         case ND_LVAR: gen_lvar(node); break;
@@ -47,7 +47,16 @@ void gen(Node* node) {
     }
 }
 
-void gen_lval(Node* node) {
+static void gen_index_addr(Node* node) {
+    gen(node -> left_child);
+    gen(node -> right_child);
+    printf("  pop rdi\n");
+    printf("  pop rax\n");
+    printf("  imul rdi, 8\n");
+    printf("  add rax, rdi\n");
+}
+
+static void gen_lval(Node* node) {
     if (node -> kind == ND_LVAR) {
         printf("  mov rax, rbp\n");
         printf("  sub rax, %d\n", node -> offset);
@@ -59,12 +68,7 @@ void gen_lval(Node* node) {
         return;
     }
     if (node -> kind == ND_INDEX) {
-        gen(node -> left_child);
-        gen(node -> right_child);
-        printf("  pop rdi\n");
-        printf("  pop rax\n");
-        printf("  imul rdi, 8\n");
-        printf("  add rax, rdi\n");
+        gen_index_addr(node);
         printf("  push rax\n");
         return;
     }
@@ -95,7 +99,7 @@ void codegen(Function* prog) {
     }
 }
 
-void gen_unary(Node* node) {
+static void gen_unary(Node* node) {
     switch (node -> op.unop) {
         case OP_ADDR:
             gen_lval(node -> left_child);
@@ -112,14 +116,14 @@ void gen_unary(Node* node) {
     }
 }
 
-void gen_lvar(Node* node) {
+static void gen_lvar(Node* node) {
     gen_lval(node);
     printf("  pop rax\n");
     printf("  mov rax, [rax]\n");
     printf("  push rax\n");
 }
 
-void gen_assign(Node* node) {
+static void gen_assign(Node* node) {
     gen_lval(node -> left_child);
     gen(node -> right_child);
     printf("  pop rdi\n");
@@ -128,11 +132,11 @@ void gen_assign(Node* node) {
     printf("  push rdi\n");
 }
 
-void gen_num(Node* node) {
+static void gen_num(Node* node) {
     printf("  push %ld\n", node -> val);
 }
 
-void gen_return(Node* node) {
+static void gen_return(Node* node) {
     gen(node -> left_child);
     printf("  pop rax\n");
     printf("  mov rsp, rbp\n");
@@ -140,7 +144,7 @@ void gen_return(Node* node) {
     printf("  ret\n");
 }
 
-void gen_array(Node* node) {
+static void gen_array(Node* node) {
     printf("  mov rax, %d\n", node -> array_len);
     printf("  mov [rbp-%d], rax\n", node -> offset + 8 * node -> array_len);
     Node* tail;
@@ -157,25 +161,20 @@ void gen_array(Node* node) {
     printf("  push rax\n");
 }
 
-void gen_index(Node* node) {
-    gen(node -> left_child);
-    gen(node -> right_child);
-    printf("  pop rdi\n");
-    printf("  pop rax\n");
-    printf("  imul rdi, 8\n");
-    printf("  add rax, rdi\n");
+static void gen_index(Node* node) {
+    gen_index_addr(node);
     printf("  mov rax, [rax]\n");
     printf("  push rax\n");
 }
 
-void gen_len(Node* node) {
+static void gen_len(Node* node) {
     gen(node -> left_child);
     printf("  pop rax\n");
     printf("  mov rax, [rax-8]\n");
     printf("  push rax\n");
 }
 
-void call(int label, int len, char* name) {
+static void call(int label, int len, char* name) {
     printf("  mov rax, rsp\n");
     printf("  and rax, 15\n");
     printf("  jnz .Lcall%d\n", label);
@@ -190,7 +189,7 @@ void call(int label, int len, char* name) {
     printf(".Lend%d:\n", label);
 }
 
-void gen_newarray(Node* node) {
+static void gen_newarray(Node* node) {
     int label = max_label;
     max_label++;
     gen(node -> left_child);
@@ -220,7 +219,7 @@ void gen_newarray(Node* node) {
     printf(".Lend%d:\n", label);
 }
 
-void gen_if(Node* node) {
+static void gen_if(Node* node) {
     if (node -> els == NULL) {
         int label = max_label;
         max_label++;
@@ -245,7 +244,7 @@ void gen_if(Node* node) {
     }
 }
 
-void gen_while(Node* node) {
+static void gen_while(Node* node) {
     int label = max_label;
     max_label++;
     printf(".Lbegin%d:\n", label);
@@ -258,7 +257,7 @@ void gen_while(Node* node) {
     printf(".Lend%d:\n", label);
 }
 
-void gen_for(Node* node) {
+static void gen_for(Node* node) {
     int label = max_label;
     max_label++;
     if (node -> init) {
@@ -279,7 +278,7 @@ void gen_for(Node* node) {
     printf(".Lend%d:\n", label);
 }
 
-void gen_block(Node* node) {
+static void gen_block(Node* node) {
     Node* block_head = node -> body;
     while (block_head) {
         gen(block_head);
@@ -289,7 +288,7 @@ void gen_block(Node* node) {
     printf("  push rax\n");
 }
 
-void gen_funcall(Node* node) {
+static void gen_funcall(Node* node) {
     int label = max_label;
     max_label++;
     Node* head = node -> args;
@@ -310,7 +309,7 @@ void gen_funcall(Node* node) {
     printf("  push rax\n");
 }
 
-void gen_binop(Node* node) {
+static void gen_binop(Node* node) {
     gen(node -> left_child);
     gen(node -> right_child);
     printf("  pop rdi\n");

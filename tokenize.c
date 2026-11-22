@@ -2,22 +2,22 @@
 
 Token* token = NULL;
 
-Token* new_token(TokenKind token_kind, Token* pre_token_ptr) {
+static Token* new_token(TokenKind token_kind, Token* pre_token_ptr) {
     Token* next_token_ptr = calloc(1, sizeof(Token));
     pre_token_ptr -> next = next_token_ptr;
     next_token_ptr -> kind = token_kind;
     return next_token_ptr;
 }
 
-bool can_use_variables_first(char c) {
+static bool can_use_variables_first(char c) {
     return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_';
 }
 
-bool can_use_variables(char c) {
+static bool can_use_variables(char c) {
     return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_' || ('0' <= c && c <= '9');
 }
 
-Token* tokenize_str_literal(char** endptr, Token* last_token_ptr);
+static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr);
 
 Token* tokenize(char* s) {
     Token first_token;
@@ -138,7 +138,7 @@ Token* tokenize(char* s) {
     return first_token.next;
 }
 
-Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
+static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
     last_token_ptr = new_token(TK_STR, last_token_ptr);
     int len = 0;
     (*endptr)++;
