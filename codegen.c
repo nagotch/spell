@@ -256,8 +256,10 @@ static void gen_while(Node* node) {
     printf("  cmp rax, 0\n");
     printf("  je .Lend%d\n", label);
     gen(node -> then);
+    printf("  pop rax\n");
     printf("  jmp .Lbegin%d\n", label);
     printf(".Lend%d:\n", label);
+    printf("push 0\n");
 }
 
 static void gen_for(Node* node) {
