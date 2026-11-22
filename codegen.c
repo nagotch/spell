@@ -228,6 +228,9 @@ static void gen_if(Node* node) {
         printf("  cmp rax, 0\n");
         printf("  je .Lend%d\n", label);
         gen(node -> then);
+        printf("  jmp .Lend%d\n", label);
+        printf(".Lelse%d:\n", label);
+        printf("  push 0\n");
         printf(".Lend%d:\n", label);
     } else {
         int label = max_label;
