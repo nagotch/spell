@@ -161,15 +161,6 @@ void gen_array(Node* node) {
     printf("  push rax\n");
 }
 
-void gen_index_addr(Node* node) {
-    gen(node -> left_child);
-    gen(node -> right_child);
-    printf("  pop rdi\n");
-    printf("  pop rax\n");
-    printf("  imul rdi, 8\n");
-    printf("  add rax, rdi\n");
-}
-
 void gen_index(Node* node) {
     gen_index_addr(node);
     printf("  mov rax, [rax]\n");
