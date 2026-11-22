@@ -10,9 +10,9 @@ main() {
 
     print_int(2); putchar(10); fflush(0);
 
-    if (t001() != -42) { print_str("NG"); print_int(2); putchar(10); fails=fails+1; }
+    if (t002() != -42) { print_str("NG"); print_int(2); putchar(10); fails=fails+1; }
     print_int(3); putchar(10); fflush(0);
-    if (t001() != 300) { print_str("NG"); print_int(3); putchar(10); fails=fails+1; }
+    if (t003() != 300) { print_str("NG"); print_int(3); putchar(10); fails=fails+1; }
 
     print_str("done"); putchar(10);
     return fails > 0;
