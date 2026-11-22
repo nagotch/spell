@@ -226,8 +226,11 @@ static void gen_if(Node* node) {
         gen(node -> cond);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
-        printf("  je .Lend%d\n", label);
+        printf("  je .Lelse%d\n", label);
         gen(node -> then);
+        printf("  jmp .Lend%d\n", label);
+        printf(".Lelse%d:\n", label);
+        printf("  push 0\n");
         printf(".Lend%d:\n", label);
     } else {
         int label = max_label;
@@ -253,8 +256,10 @@ static void gen_while(Node* node) {
     printf("  cmp rax, 0\n");
     printf("  je .Lend%d\n", label);
     gen(node -> then);
+    printf("  pop rax\n");
     printf("  jmp .Lbegin%d\n", label);
     printf(".Lend%d:\n", label);
+    printf("  push 0\n");
 }
 
 static void gen_for(Node* node) {
@@ -262,6 +267,7 @@ static void gen_for(Node* node) {
     max_label++;
     if (node -> init) {
         gen(node -> init);
+        printf("  pop rax\n");
     }
     printf(".Lbegin%d:\n", label);
     if (node -> cond) {
@@ -271,11 +277,14 @@ static void gen_for(Node* node) {
         printf("  je .Lend%d\n", label);
     }
     gen(node -> then);
+    printf("  pop rax\n");
     if (node -> inc) {
         gen(node -> inc);
+        printf("  pop rax\n");
     }
     printf("  jmp .Lbegin%d\n", label);
     printf(".Lend%d:\n", label);
+    printf("  push 0\n");
 }
 
 static void gen_block(Node* node) {
