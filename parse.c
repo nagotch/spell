@@ -111,6 +111,7 @@ static Node* char_array() {
     token = token -> next;
     node = create_node(ND_ARRAY);
     Node body;
+    body.next = NULL;
     Node* cur = &body;
     for (int i = 0; i < str_token -> len; i++) {
         cur -> next = create_number_node(str_token -> str[i]);
@@ -193,7 +194,7 @@ static Node* primary() {
             node = new_node;
         } else if (consume(".")) {
             ident_token = consume_ident();
-            if (ident_token -> len == 3 && !memcmp(ident_token -> str, "len", 3)) {
+            if (ident_token && ident_token -> len == 3 && !memcmp(ident_token -> str, "len", 3)) {
                 Node* new_node = create_node(ND_LEN);
                 new_node -> left_child = node;
                 node = new_node;
