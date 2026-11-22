@@ -110,6 +110,8 @@ tests=(
     "main() { s = \"hello\"; c = 0; for (i = 0; i < s.len; i = i + 1) if (s[i] == 108) c = c + 1; return c;}|2"
     "main() { s = \"hi\"; putchar(s[0]); putchar(s[1]); return 0; }|0"
     "main() { s = \"\"; return s.len; }|0"
+    "main() { i = 0; while (i < 1000000) i = i + 1; return 0; }|0"
+    "main() { s = 0; for (i = 0; i < 1000000; i = i + 1) s = s + 1; return 0; }|0"
 )
 
 cc -c -o funcs.o funcs.c
