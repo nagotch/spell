@@ -72,6 +72,21 @@ run_selfcheck() {
     rm -f suite_all.sp suite suite.s suite.out
 }
 
+one_io_test() {
+    cat io.sp > io_all.sp
+    echo "$1" >> io_all.sp
+    ./spell -S -o io_prog io_all.sp
+    cc -o io_prog io_prog.s funcs.o
+    printf '%b' "$2" | ./io_prog > io_out.txt
+    printf '%b' "$3" > io_expected.txt
+    if ! cmp -s io_expected.txt io_out.txt; then
+        echo "io test failed: $1"
+        fail_count=$((fail_count+1))
+    fi
+    n=$((n+1))
+    rm -rf io_all.sp io_prog io_prog.s io_out.txt io_expected.txt
+}
+
 n=${#tests[@]}
 
 for i in "${!tests[@]}"; do
@@ -98,6 +113,9 @@ run_suite test_stmt.sp
 run_suite test_func.sp
 run_suite test_array.sp
 run_selfcheck
+one_io_test "main() { print_int(42); putchar(10); return 0; }" "" "42\n"
+one_io_test "main() { print_int(0 - 42); putchar(10); return 0; }" "" "-42\n"
+one_io_test "main() { b = read_int(); r = read_int(); print_int((30 - b) * (30 - r)); putchar(10); return 0; }" "10 20\n" "200\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
