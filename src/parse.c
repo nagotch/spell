@@ -215,7 +215,7 @@ static Node* primary() {
                 if (actual) {
                     error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、名前%sが指定されています", actual);
                 } else {
-                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、ファイルの末尾に達しました", ident_token->len, ident_token->str);
+                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、ファイルの末尾に達しました");
                 }
             }
         } else {
