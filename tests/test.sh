@@ -1,5 +1,10 @@
 #!/bin/bash
 
+cd "$(dirname "$0")"
+
+make -C ../src
+SPELL=../src/spell
+
 tests=(
     "main() { i = 0; while (i < 1000000) i = i + 1; return 0; }|0"
     "main() { s = 0; for (i = 0; i < 1000000; i = i + 1) s = s + 1; return 0; }|0"
@@ -15,7 +20,7 @@ one_test() {
     IFS='|' read -r input expected <<< "${tests[$1]}"
     i=$(printf '%03d' $1)
     printf '%s' "$input" > tmp$i.sp
-    ./spell -S -o tmp$i tmp$i.sp
+    "$SPELL" -S -o tmp$i tmp$i.sp
     cc -o tmp$i tmp$i.s funcs.o
     ./tmp$i > /dev/null
     exit_code=$?
@@ -30,7 +35,7 @@ one_test() {
 one_error_test() {
     IFS='|' read -r input expected <<< "${error_tests[$1]}"
     printf '%s' "$input" > etmp.sp
-    ./spell -S -o etmp etmp.sp 2> etmp.err
+    "$SPELL" -S -o etmp etmp.sp 2> etmp.err
     exit_code=$?
     if [ "$exit_code" = "1" ] && grep -q "$expected" etmp.err; then
         echo "error test passed, input $input" > /dev/null
@@ -44,7 +49,7 @@ one_error_test() {
 
 run_suite() {
     cat io.sp $1 > suite_all.sp
-    ./spell -S -o suite suite_all.sp
+    "$SPELL" -S -o suite suite_all.sp
     cc -o suite suite.s funcs.o
     ./suite > suite.out
     exit_code=$?
@@ -59,7 +64,7 @@ run_suite() {
 
 run_selfcheck() {
     cat io.sp test_selfcheck.sp > suite_all.sp
-    ./spell -S -o suite suite_all.sp
+    "$SPELL" -S -o suite suite_all.sp
     cc -o suite suite.s funcs.o
     ./suite > suite.out
     exit_code=$?
@@ -75,7 +80,7 @@ run_selfcheck() {
 one_io_test() {
     cat io.sp > io_all.sp
     echo "$1" >> io_all.sp
-    ./spell -S -o io_prog io_all.sp
+    "$SPELL" -S -o io_prog io_all.sp
     cc -o io_prog io_prog.s funcs.o
     printf '%b' "$2" | ./io_prog > io_out.txt
     printf '%b' "$3" > io_expected.txt
