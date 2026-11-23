@@ -33,7 +33,12 @@ static bool consume_keyword(TokenKind kind) {
 
 static void expect(char* symbol) {
     if (!consume(symbol)) {
-        error_at(token_start(token), token_end(token), "\"%s\"が必要です", symbol);
+        char* actual = token_text(token);
+        if (actual) {
+            error_at(token_start(token), token_end(token), "\"%s\"が必要ですが、%sが見つかりました", symbol, actual);
+        } else {
+            error_at(token_start(token), token_end(token), "\"%s\"が必要ですが、ファイルの末尾に達しました", symbol);
+        }
     }
 }
 
@@ -43,7 +48,12 @@ static long expect_number() {
         token = token -> next;
         return num;
     }
-    error_at(token_start(token), token_end(token), "数値が必要です");
+    char* actual = token_text(token);
+    if (actual) {
+        error_at(token_start(token), token_end(token), "数値が必要ですが、%sが見つかりました", actual);
+    } else {
+        error_at(token_start(token), token_end(token), "数値が必要ですが、ファイルの末尾に達しました");
+    }
     return 0;
 }
 
@@ -198,7 +208,12 @@ static Node* primary() {
                 new_node -> left_child = node;
                 node = new_node;
             } else {
-                error_at(token_start(token), token_end(token), "不明なメンバ");
+                char* actual = token_text(token);
+                if (actual) {
+                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、名前%sが指定されています", actual);
+                } else {
+                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、名前%.*sが指定されています", ident_token->len, ident_token->str);
+                }
             }
         } else {
             break;
@@ -418,12 +433,12 @@ static Function* function() {
     locals = NULL;
     Token* tok = consume_ident();
     if (!tok) {
-        error_at(token_start(token), token_end(token), "関数名を定義してください");
+        error_at(token_start(token), token_end(token), "関数名が必要ですが、%sが見つかりました", token_text(token));
     }
     char* name = tok -> str;
     int len = tok -> len;
     if (!consume("(")) {
-        error_at(token_start(token), token_end(token), "\"(\"が必要です");
+        expect("(");
     }
     int nparams = 0;
     if (!consume(")")) {
