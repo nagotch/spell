@@ -12,6 +12,16 @@ plus(x, y) { return x + y; } t011() { return plus(3, 5); }
 f(x) { y = x * 2; return y; } t012() { return f(21); }
 sum6(a, b, c, d, e, f) { return a + b + c + d + e + f; } t013() { return sum6(1, 2, 3, 4, 5, 6); }
 fib(x) { if (x <= 1) return 1; return fib(x - 1) + fib(x - 2); } t014() { return fib(9); }
+t015() {
+    // 1を返す
+    return 1;
+}
+t016() {
+    /*
+    1を返す
+    */
+    return 1;
+}
 
 mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -40,6 +50,8 @@ main() {
     mark(12); fails=fails+check(t012(), 42);
     mark(13); fails=fails+check(t013(), 21);
     mark(14); fails=fails+check(t014(), 55);
+    mark(15); fails=fails+check(t015(), 1);
+    mark(16); fails=fails+check(t016(), 1);
 
     print_str("done"); putchar(10);
     return fails > 0;

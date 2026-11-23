@@ -12,6 +12,7 @@ tests=(
 
 error_tests=(
     "main() { a = [1,2,3]; return a.5; }|不明なメンバ"
+    "main() { return 1; } /*|/*が閉じていない"
 )
 
 cc -c -o funcs.o funcs.c

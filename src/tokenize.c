@@ -31,6 +31,23 @@ Token* tokenize(char* s) {
             continue;
         }
 
+        if ((*endptr)[1] != '\0' && !memcmp(*endptr, "//", 2)) {
+            while (**endptr != '\n' && **endptr != '\0') {
+                (*endptr)++;
+            }
+            continue;
+        }
+
+        if (!memcmp(*endptr, "/*", 2)) {
+            char* q = strstr(*endptr + 2, "*/");
+            if (!q) {
+                fprintf(stderr, "/*が閉じていない");
+                exit(1);
+            }
+            *endptr = q + 2;
+            continue;
+        }
+
         bool is_symbol = false;
         char* targets[] = {
             "==",
