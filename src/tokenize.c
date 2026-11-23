@@ -154,6 +154,7 @@ Token* tokenize(char* s) {
         error_at(*endptr - src, *endptr - src + 1, "不明な文字");
     }
     last_token_ptr = new_token(TK_EOF, last_token_ptr);
+    last_token_ptr -> str = *endptr;
     return first_token.next;
 }
 

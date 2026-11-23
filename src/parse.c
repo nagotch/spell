@@ -33,8 +33,7 @@ static bool consume_keyword(TokenKind kind) {
 
 static void expect(char* symbol) {
     if (!consume(symbol)) {
-        error_at(token_start(token), token_end(token), "予期されないToken\n");
-        exit(1);
+        error_at(token_start(token), token_end(token), "\"%s\"が必要です");
     }
 }
 
@@ -44,8 +43,7 @@ static long expect_number() {
         token = token -> next;
         return num;
     }
-    error_at(token_start(token), token_end(token), "予期されない数値\n");
-    exit(1);
+    error_at(token_start(token), token_end(token), "数値が必要です");
 }
 
 static bool at_eof() {
@@ -200,7 +198,6 @@ static Node* primary() {
                 node = new_node;
             } else {
                 error_at(token_start(token), token_end(token), "不明なメンバ");
-                exit(1);
             }
         } else {
             break;
@@ -420,14 +417,12 @@ static Function* function() {
     locals = NULL;
     Token* tok = consume_ident();
     if (!tok) {
-        error_at(token_start(token), token_end(token), "関数名を定義してください\n");
-        exit(1);
+        error_at(token_start(token), token_end(token), "関数名を定義してください");
     }
     char* name = tok -> str;
     int len = tok -> len;
     if (!consume("(")) {
         error_at(token_start(token), token_end(token), "\"(\"が必要です");
-        exit(1);
     }
     int nparams = 0;
     if (!consume(")")) {
