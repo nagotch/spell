@@ -206,3 +206,41 @@ long token_start(Token* tok) {
 long token_end(Token* tok) {
     return token_start(tok) + tok -> len;
 }
+
+char* token_text(Token* tok) {
+    char* buf;
+    int buf_size = 256;
+    switch (tok -> kind) {
+        case TK_NUM:
+            snprintf(buf, buf_size, "数値`%ld`", tok -> val);
+            break;
+        case TK_SYMBOL:
+            snprintf(buf, buf_size, "`%.*s`", tok -> len, tok -> str);
+            break;
+        case TK_EOF:
+            return NULL;
+            break;
+        case TK_IDENT:
+            snprintf(buf, buf_size, "名前`%.*s`", tok -> len, tok -> str);
+            break;
+        case TK_RETURN:
+            snprintf(buf, buf_size, "`%.*s`", tok -> len, tok -> str);
+            break; 
+        case TK_IF:
+            snprintf(buf, buf_size, "`%.*s`", tok -> len, tok -> str);
+            break;
+        case TK_ELSE:
+            snprintf(buf, buf_size, "`%.*s`", tok -> len, tok -> str);
+            break;
+        case TK_WHILE:
+            snprintf(buf, buf_size, "`%.*s`", tok -> len, tok -> str);
+            break;
+        case TK_FOR:
+            snprintf(buf, buf_size, "`%.*s`", tok -> len, tok -> str);
+            break;
+        case TK_STR:
+            snprintf(buf, buf_size, "文字列");
+            break;
+    }
+    return buf;
+}
