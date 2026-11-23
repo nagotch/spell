@@ -341,6 +341,30 @@ static Node* assign() {
         assign_node->left_child = node;
         assign_node->right_child = assign();
         node = assign_node;
+    } else if (consume("-=")) {
+        Node* assign_node = create_node(ND_OPASSIGN);
+        assign_node->op.binop = OP_SUB;
+        assign_node->left_child = node;
+        assign_node->right_child = assign();
+        node = assign_node;
+    } else if (consume("*=")) {
+        Node* assign_node = create_node(ND_OPASSIGN);
+        assign_node->op.binop = OP_MUL;
+        assign_node->left_child = node;
+        assign_node->right_child = assign();
+        node = assign_node;
+    } else if (consume("/=")) {
+        Node* assign_node = create_node(ND_OPASSIGN);
+        assign_node->op.binop = OP_DIV;
+        assign_node->left_child = node;
+        assign_node->right_child = assign();
+        node = assign_node;
+    } else if (consume("%=")) {
+        Node* assign_node = create_node(ND_OPASSIGN);
+        assign_node->op.binop = OP_MOD;
+        assign_node->left_child = node;
+        assign_node->right_child = assign();
+        node = assign_node;
     }
     return node;
 }
