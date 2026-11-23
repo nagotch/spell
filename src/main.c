@@ -1,27 +1,27 @@
 #include "spell.h"
 
-static char* read_file(char* input_name);
+static char* read_file(char* src_name);
 
 int main(int argc, char **argv) {
     bool only_assembly = false;
     char* output_name = "a.out";
-    char* input_name = NULL;
+    src_name = NULL;
     for (int i=1; i<argc; i++) {
         if (strlen(argv[i]) == 2 && !memcmp(argv[i], "-S", 2)) {
             only_assembly = true;
         } else if (strlen(argv[i]) == 2 && !memcmp(argv[i], "-o", 2)) {
             output_name = argv[++i];
         } else {
-            input_name = argv[i];
+            src_name = argv[i];
         }
     }
 
-    if (!input_name) {
+    if (!src_name) {
         fprintf(stderr, "ファイルを指定してください");
         exit(1);
     }
 
-    char* src = read_file(input_name);
+    src = read_file(src_name);
 
     token = tokenize(src);
 
@@ -54,10 +54,10 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-static char* read_file(char* input_name) {
-    FILE *fp = fopen(input_name, "r");
+static char* read_file(char* src_name) {
+    FILE *fp = fopen(src_name, "r");
     if (!fp) {
-        fprintf(stderr, "ファイルが開けません: %s", input_name);
+        fprintf(stderr, "ファイルが開けません: %s", src_name);
         exit(1);
     }
     fseek(fp, 0, SEEK_END);

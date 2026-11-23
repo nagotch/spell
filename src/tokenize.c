@@ -1,6 +1,8 @@
 #include "spell.h"
 
 Token* token = NULL;
+static long token_start(Token* tok);
+static long token_end(Token* tok);
 
 static Token* new_token(TokenKind token_kind, Token* pre_token_ptr) {
     Token* next_token_ptr = calloc(1, sizeof(Token));
@@ -198,4 +200,12 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
     last_token_ptr -> str = buf;
     last_token_ptr -> len = len;
     return last_token_ptr;
+}
+
+static long token_start(Token* tok) {
+    return tok -> str - src;
+}
+
+static long token_end(Token* tok) {
+    return token_start(tok) + tok -> len;
 }
