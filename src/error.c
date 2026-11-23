@@ -21,83 +21,101 @@ void error_at(long start, long end, char* fmt, ...) {
     }
 
     fprintf(stderr, "%s:%ld:%ld: エラー: ", src_name, line, col);
-    
+
     va_list ap;
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
     fprintf(stderr, "\n");
 
-long line_end = line_start;
-while (src[line_end] != '\n' && src[line_end] != '\0') {
-    line_end++;
-}
-fprintf(stderr, "%ld | ", line);
-long disp = 0;
-for (long i = line_start; i < line_end; ) {
-    if (src[i] == '\t') {
-        long n = 4 - (disp % 4);
-        for (long k = 0; k < n; k++) {
-            fputc(' ', stderr);
+    long line_end = line_start;
+    while (src[line_end] != '\n' && src[line_end] != '\0') {
+        line_end++;
+    }
+    fprintf(stderr, "%ld | ", line);
+    long disp = 0;
+    for (long i = line_start; i < line_end; ) {
+        if (src[i] == '\t') {
+            long n = 4 - (disp % 4);
+            for (long k = 0; k < n; k++) {
+                fputc(' ', stderr);
+            }
+            disp += n;
+            i++;
+        } else {
+            long cp;
+            long len = utf8_read(i, &cp);
+            fwrite(&src[i], 1, len, stderr);
+            disp += char_width(cp);
+            i += len;
         }
-        disp += n;
-        i++;
-    } else {
-        long cp;
-        long len = utf8_read(i, &cp);
-        fwrite(&src[i], 1, len, stderr);
-        disp += char_width(cp);
-        i += len;
     }
-}
-fprintf(stderr, "\n");
+    fprintf(stderr, "\n");
 
-long digits = 1;
-for (long t = line; t >= 10; t /= 10) {
-    digits++;
-}
-for (long k = 0; k < digits; k++) {
-    fputc(' ', stderr);
-}
-fprintf(stderr, " | ");
-
-long udisp = 0;
-for (long i = line_start; i < start && i < line_end; ) {
-    if (src[i] == '\t') {
-        udisp += 4 - (udisp % 4);
-        i++;
-    } else {
-        long cp;
-        long len = utf8_read(i, &cp);
-        udisp += char_width(cp);
-        i += len;
+    long digits = 1;
+    for (long t = line; t >= 10; t /= 10) {
+        digits++;
     }
-}
-for (long k = 0; k < udisp; k++) {
-    fputc(' ', stderr);
-}
-
-long w = 0;
-for (long i = start; i < end && i < line_end; ) {
-    if (src[i] == '\t') {
-        w += 4 - ((udisp + w) % 4);
-        i++;
-    } else {
-        long cp;
-        long len = utf8_read(i, &cp);
-        w += char_width(cp);
-        i += len;
+    for (long k = 0; k < digits; k++) {
+        fputc(' ', stderr);
     }
-}
-if (w == 0) {
-    w = 1;
-}
-for (long k = 0; k < w; k++) {
-    fputc('^', stderr);
-}
-fprintf(stderr, "\n");
+    fprintf(stderr, " | ");
+
+    long udisp = 0;
+    for (long i = line_start; i < start && i < line_end; ) {
+        if (src[i] == '\t') {
+            udisp += 4 - (udisp % 4);
+            i++;
+        } else {
+            long cp;
+            long len = utf8_read(i, &cp);
+            udisp += char_width(cp);
+            i += len;
+        }
+    }
+    for (long k = 0; k < udisp; k++) {
+        fputc(' ', stderr);
+    }
+
+    long w = 0;
+    for (long i = start; i < end && i < line_end; ) {
+        if (src[i] == '\t') {
+            w += 4 - ((udisp + w) % 4);
+            i++;
+        } else {
+            long cp;
+            long len = utf8_read(i, &cp);
+            w += char_width(cp);
+            i += len;
+        }
+    }
+    if (w == 0) {
+        w = 1;
+    }
+    for (long k = 0; k < w; k++) {
+        fputc('^', stderr);
+    }
+    fprintf(stderr, "\n");
 
     exit(1);
+}
+
+void error_plain(char* fmt, ...) {
+    fprintf(stderr, "エラー: ");
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    fprintf(stderr, "\n");
+}
+
+void error_internal(char* fmt, ...) {
+    fprintf(stderr, "内部エラー: ");
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    fprintf(stderr, "\n");
 }
 
 static long utf8_read(long i, long* cp) {
