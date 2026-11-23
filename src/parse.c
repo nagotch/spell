@@ -64,7 +64,7 @@ static bool at_eof() {
     return false;
 }
 
-static Node* create_node(NodeKind kind) {
+Node* create_node(NodeKind kind) {
     Node* node = calloc(1, sizeof(Node));
     node -> kind = kind;
     return node;
