@@ -36,6 +36,7 @@ typedef enum {
     OP_NE,
     OP_LT,
     OP_LE,
+    OP_MOD,
 } BinOp;
 typedef enum {
     OP_ADDR,

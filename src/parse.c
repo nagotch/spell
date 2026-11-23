@@ -236,6 +236,8 @@ static Node* mul() {
             node = create_binary_operation_node(OP_MUL, node, unary());
         } else if (consume("/")) {
             node = create_binary_operation_node(OP_DIV, node, unary());
+        } else if (consume("%")) {
+            node = create_binary_operation_node(OP_MOD, node, unary());
         } else {
             break;
         }
