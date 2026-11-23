@@ -24,7 +24,7 @@ static Token* consume_ident() {
 }
 
 static bool consume_keyword(Keyword keyword) {
-    if (token->keyword == keyword) {
+    if (token->kind == TK_KEYWORD && token->keyword == keyword) {
         token = token->next;
         return true;
     }
