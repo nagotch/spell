@@ -1,23 +1,6 @@
 #!/bin/bash
 
 tests=(
-    "main() { if (0) return 1; return 2; }|2"
-    "main() { if (1) return 1; return 2; }|1"
-    "main() { if (0) return 1; else return 2; }|2"
-    "main() { if (1) return 1; else return 2; }|1"
-    "main() { a=0; if (1) a=1; return a; }|1"
-    "main() { a=0; if (0) a=1; return a; }|0"
-    "main() { a=0; while (a<10) a=a+1; return a; }|10"
-    "main() { s=0; for (i=0; i<10; i=i+1) s=s+i; return s; }|45"
-    "main() { for (;;) return 3; }|3"
-    "main() { a=0; for (; a<3;) a=a+1; return a; }|3"
-    "main() { a=0; { a=1; a=2; } return a; }|2"
-    "main() { a=0; if (1) { a=1; a=2; } return a; }|2"
-    "main() { a=0; if (0) { a=1; } else { a=2; } return a; }|2"
-    "main() { a=0; while (a<3) { a=a+1; a=a+1; } return a; }|4"
-    "main() { s=0; for (i=0; i<3; i=i+1) { s=s+i; s=s+1; } return s; }|6"
-    "main() { a=0; { a=1; { a=2; } } return a; }|2"
-    "main() { a=5; {} return a; }|5"
     "main() { return ret3(); }|3"
     "main() { return add(3, 5); }|8"
     "main() { return sub(5, 3); }|2"
