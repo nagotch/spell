@@ -33,7 +33,7 @@ static bool consume_keyword(TokenKind kind) {
 
 static void expect(char* symbol) {
     if (!consume(symbol)) {
-        fprintf(stderr, "予期されないToken\n");
+        error_at(token_start(token), token_end(token), "予期されないToken\n");
         exit(1);
     }
 }
@@ -44,7 +44,7 @@ static long expect_number() {
         token = token -> next;
         return num;
     }
-    fprintf(stderr, "予期されない数値\n");
+    error_at(token_start(token), token_end(token), "予期されない数値\n");
     exit(1);
 }
 
@@ -199,7 +199,7 @@ static Node* primary() {
                 new_node -> left_child = node;
                 node = new_node;
             } else {
-                fprintf(stderr, "不明なメンバ");
+                error_at(token_start(token), token_end(token), "不明なメンバ");
                 exit(1);
             }
         } else {
@@ -420,13 +420,13 @@ static Function* function() {
     locals = NULL;
     Token* tok = consume_ident();
     if (!tok) {
-        fprintf(stderr, "関数名を定義してください\n");
+        error_at(token_start(token), token_end(token), "関数名を定義してください\n");
         exit(1);
     }
     char* name = tok -> str;
     int len = tok -> len;
     if (!consume("(")) {
-        fprintf(stderr, "\"(\"が必要です");
+        error_at(token_start(token), token_end(token), "\"(\"が必要です");
         exit(1);
     }
     int nparams = 0;
