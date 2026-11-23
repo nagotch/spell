@@ -20,8 +20,7 @@ int main(int argc, char **argv) {
     }
 
     if (!src_name) {
-        fprintf(stderr, "ファイルを指定してください");
-        exit(1);
+        error_plain("ファイルを指定してください");
     }
 
     src = read_file(src_name);
@@ -33,7 +32,7 @@ int main(int argc, char **argv) {
     char assembly_output_name[256];
     snprintf(assembly_output_name, 256, "%s.s", output_name);
     if (!freopen(assembly_output_name, "w", stdout)) {
-        fprintf(stderr, "freopenが失敗");
+        error_plain("freopenが失敗");
         exit(1);
     }
 
@@ -49,7 +48,7 @@ int main(int argc, char **argv) {
     snprintf(command, 512, "cc -o \"%s\" \"%s\"", output_name, assembly_output_name);
     if (!only_assembly) {
         if (system(command)) {
-            fprintf(stderr, "アセンブリからバイナリに変換するのを失敗");
+            error_plain("アセンブリからバイナリに変換するのを失敗");
             exit(1);
         }
     }
@@ -60,7 +59,7 @@ int main(int argc, char **argv) {
 static char* read_file(char* src_name) {
     FILE *fp = fopen(src_name, "r");
     if (!fp) {
-        fprintf(stderr, "ファイルが開けません: %s", src_name);
+        error_plain("ファイルが開けません: %s", src_name);
         exit(1);
     }
     fseek(fp, 0, SEEK_END);
@@ -68,7 +67,7 @@ static char* read_file(char* src_name) {
     rewind(fp);
     char* src = malloc(size + 1);
     if (fread(src, 1, size, fp) != size) {
-        fprintf(stderr, "sizeが違う");
+        error_plain("sizeが違う");
         exit(1);
     }
     src[size] = '\0';
