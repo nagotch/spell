@@ -107,6 +107,7 @@ void error_plain(char* fmt, ...) {
     vfprintf(stderr, fmt, ap);
     va_end(ap);
     fprintf(stderr, "\n");
+    exit(1);
 }
 
 void error_internal(char* fmt, ...) {
@@ -116,6 +117,8 @@ void error_internal(char* fmt, ...) {
     vfprintf(stderr, fmt, ap);
     va_end(ap);
     fprintf(stderr, "\n");
+    fprintf(stderr, "プログラムではなくコンパイラ側の問題です\n");
+    exit(1);
 }
 
 static long utf8_read(long i, long* cp) {
