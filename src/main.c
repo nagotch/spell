@@ -32,8 +32,7 @@ int main(int argc, char **argv) {
     char assembly_output_name[256];
     snprintf(assembly_output_name, 256, "%s.s", output_name);
     if (!freopen(assembly_output_name, "w", stdout)) {
-        error_plain("ファイル%sを開けませんでした", src_name);
-        exit(1);
+        error_plain("ファイル`%s`を開けませんでした", assembly_output_name);
     }
 
     printf(".intel_syntax noprefix\n");
@@ -49,7 +48,6 @@ int main(int argc, char **argv) {
     if (!only_assembly) {
         if (system(command)) {
             error_plain("実行ファイルを作成できませんでした");
-            exit(1);
         }
     }
 
@@ -59,8 +57,7 @@ int main(int argc, char **argv) {
 static char* read_file(char* src_name) {
     FILE *fp = fopen(src_name, "r");
     if (!fp) {
-        error_plain("ファイル%sを開けませんでした", src_name);
-        exit(1);
+        error_plain("ファイル`%s`を開けませんでした", src_name);
     }
     fseek(fp, 0, SEEK_END);
     long size = ftell(fp);
@@ -68,8 +65,7 @@ static char* read_file(char* src_name) {
     char* src = malloc(size + 1);
     int read_size = fread(src, 1, size, fp);
     if (read_size != size) {
-        error_plain("ファイル%sから%ldバイト読み取る予定でしたが、%ldバイトを読み取りました", src_name, size, read_size);
-        exit(1);
+        error_plain("ファイル`%s`から%ldバイト読み取る予定でしたが、%ldバイトを読み取りました", src_name, size, read_size);
     }
     src[size] = '\0';
     fclose(fp);
