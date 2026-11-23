@@ -1,5 +1,8 @@
 #include "spell.h"
 
+char* src;
+char* src_name;
+
 static char* read_file(char* src_name);
 
 int main(int argc, char **argv) {
