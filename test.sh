@@ -124,6 +124,7 @@ done
 
 run_suite test_expr.sp
 run_suite test_stmt.sp
+run_suite test_func.sp
 run_selfcheck
 
 echo $(($n-$fail_count)) / $n tests passed.
