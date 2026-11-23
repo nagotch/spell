@@ -121,4 +121,5 @@ void error_internal(char* fmt, ...);
 
 Token* tokenize(char* s);
 Function* program();
+void desugar(Function* prog);
 void codegen(Function* prog);
