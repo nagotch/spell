@@ -37,6 +37,9 @@ t036() { 1>=1; }
 t037() { 1>=2; }
 t038() { 1+2==3; }
 t039() { 1<2==1; }
+t040() { 10%3; }
+t041() { 2+10%4; }
+t042() { (0-10)%3; }
 
 mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -90,6 +93,9 @@ main() {
     mark(37); fails=fails+check(t037(), 0);
     mark(38); fails=fails+check(t038(), 1);
     mark(39); fails=fails+check(t039(), 1);
+    mark(40); fails=fails+check(t040(), 1);
+    mark(41); fails=fails+check(t041(), 4);
+    mark(42); fails=fails+check(t042(), -1);
 
     print_str("done"); putchar(10);
     return fails > 0;
