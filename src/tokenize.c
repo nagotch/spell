@@ -41,7 +41,7 @@ Token* tokenize(char* s) {
         if (!memcmp(*endptr, "/*", 2)) {
             char* q = strstr(*endptr + 2, "*/");
             if (!q) {
-                error_at(*endptr - src, *endptr - src, "/*が閉じていない");
+                error_at(*endptr - src, *endptr - src + 2, "/*が閉じていない");
             }
             *endptr = q + 2;
             continue;
