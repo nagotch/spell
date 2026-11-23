@@ -4,8 +4,8 @@ Token* token = NULL;
 
 static Token* new_token(TokenKind token_kind, Token* pre_token_ptr) {
     Token* next_token_ptr = calloc(1, sizeof(Token));
-    pre_token_ptr -> next = next_token_ptr;
-    next_token_ptr -> kind = token_kind;
+    pre_token_ptr->next = next_token_ptr;
+    next_token_ptr->kind = token_kind;
     return next_token_ptr;
 }
 
@@ -86,8 +86,8 @@ Token* tokenize(char* s) {
             int target_len = strlen(target);
             if (!strncmp(*endptr, target, target_len)) {
                 last_token_ptr = new_token(TK_SYMBOL, last_token_ptr);
-                last_token_ptr -> str = *endptr;
-                last_token_ptr -> len = target_len;
+                last_token_ptr->str = *endptr;
+                last_token_ptr->len = target_len;
                 (*endptr) += target_len;
                 is_symbol = true;
                 break;
@@ -101,9 +101,9 @@ Token* tokenize(char* s) {
             char* prev_endptr = *endptr;
             long num = strtol(*endptr, endptr, 10);
             last_token_ptr = new_token(TK_NUM, last_token_ptr);
-            last_token_ptr -> val = num;
-            last_token_ptr -> len = *endptr - prev_endptr;
-            last_token_ptr -> str = prev_endptr;
+            last_token_ptr->val = num;
+            last_token_ptr->len = *endptr - prev_endptr;
+            last_token_ptr->str = prev_endptr;
             continue;
         }
 
@@ -114,23 +114,24 @@ Token* tokenize(char* s) {
             "while",
             "for",
         };
-        TokenKind kinds[] = {
-            TK_RETURN,
-            TK_IF,
-            TK_ELSE,
-            TK_WHILE,
-            TK_FOR,
+        Keyword kinds[] = {
+            KW_RETURN,
+            KW_IF,
+            KW_ELSE,
+            KW_WHILE,
+            KW_FOR,
         };
         bool is_keyword = false;
         size_t keywords_size = sizeof(keywords) / sizeof(keywords[0]);
         for (int i = 0; i < keywords_size; i++) {
             char* keyword = keywords[i];
             size_t keyword_size = strlen(keyword);
-            TokenKind kind = kinds[i];
+            Keyword kind = kinds[i];
             if (!strncmp(*endptr, keyword, keyword_size) && !can_use_variables((*endptr)[keyword_size])) {
-                last_token_ptr = new_token(kind, last_token_ptr);
-                last_token_ptr -> len = keyword_size;
-                last_token_ptr -> str = *endptr;
+                last_token_ptr = new_token(TK_KEYWORD, last_token_ptr);
+                last_token_ptr->keyword = kind;
+                last_token_ptr->len = keyword_size;
+                last_token_ptr->str = *endptr;
                 *endptr += keyword_size;
                 is_keyword = true;
                 break;
@@ -147,10 +148,10 @@ Token* tokenize(char* s) {
 
         if (can_use_variables_first(**endptr)) {
             last_token_ptr = new_token(TK_IDENT, last_token_ptr);
-            last_token_ptr -> str = *endptr;
-            last_token_ptr -> len = 0;
+            last_token_ptr->str = *endptr;
+            last_token_ptr->len = 0;
             while (can_use_variables(**endptr)) {
-                last_token_ptr -> len++;
+                last_token_ptr->len++;
                 (*endptr)++;
             }
             continue;
@@ -159,7 +160,7 @@ Token* tokenize(char* s) {
         error_at(*endptr - src, *endptr - src + 1, "ここでは文字`%c`を使えません", **endptr);
     }
     last_token_ptr = new_token(TK_EOF, last_token_ptr);
-    last_token_ptr -> str = *endptr;
+    last_token_ptr->str = *endptr;
     return first_token.next;
 }
 
@@ -199,38 +200,34 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
         exit(1);
     }
     (*endptr)++;
-    last_token_ptr -> str = buf;
-    last_token_ptr -> len = len;
+    last_token_ptr->str = buf;
+    last_token_ptr->len = len;
     return last_token_ptr;
 }
 
 long token_start(Token* tok) {
-    return tok -> str - src;
+    return tok->str - src;
 }
 
 long token_end(Token* tok) {
-    return token_start(tok) + tok -> len;
+    return token_start(tok) + tok->len;
 }
 
 char* token_text(Token* tok) {
     static char buf[256];
-    switch (tok -> kind) {
+    switch (tok->kind) {
         case TK_NUM:
-            snprintf(buf, sizeof(buf), "数値`%ld`", tok -> val);
+            snprintf(buf, sizeof(buf), "数値`%ld`", tok->val);
             break;
         case TK_EOF:
             return NULL;
             break;
         case TK_IDENT:
-            snprintf(buf, sizeof(buf), "名前`%.*s`", tok -> len, tok -> str);
+            snprintf(buf, sizeof(buf), "名前`%.*s`", tok->len, tok->str);
             break;
-        case TK_RETURN:
-        case TK_IF:
-        case TK_ELSE:
-        case TK_WHILE:
-        case TK_FOR:
+        case TK_KEYWORD:
         case TK_SYMBOL:
-            snprintf(buf, sizeof(buf), "`%.*s`", tok -> len, tok -> str);
+            snprintf(buf, sizeof(buf), "`%.*s`", tok->len, tok->str);
             break;
         case TK_STR:
             snprintf(buf, sizeof(buf), "文字列");
