@@ -44,6 +44,7 @@ static long expect_number() {
         return num;
     }
     error_at(token_start(token), token_end(token), "数値が必要です");
+    return 0;
 }
 
 static bool at_eof() {
