@@ -41,7 +41,7 @@ Token* tokenize(char* s) {
         if (!memcmp(*endptr, "/*", 2)) {
             char* q = strstr(*endptr + 2, "*/");
             if (!q) {
-                error_at(*endptr - src, *endptr - src + 2, "コメントを閉じる*/がないまま、ファイルの末尾に達しました");
+                error_at(*endptr - src, *endptr - src + 2, "コメントを閉じる`*/`がないまま、ファイルの末尾に達しました");
             }
             *endptr = q + 2;
             continue;
@@ -151,7 +151,7 @@ Token* tokenize(char* s) {
             continue;
         }
 
-        error_at(*endptr - src, *endptr - src + 1, "ここでは文字%cを使えません", **endptr);
+        error_at(*endptr - src, *endptr - src + 1, "ここでは文字`%c`を使えません", **endptr);
     }
     last_token_ptr = new_token(TK_EOF, last_token_ptr);
     last_token_ptr -> str = *endptr;
@@ -166,7 +166,7 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
     char* buf = malloc(strlen(*endptr) + 1);
     while (**endptr != '\"') {
         if (**endptr == '\0' || **endptr == '\n') {
-            error_at(first - src, first - src + 1, "文字列を閉じる\"がないまま、ファイルの末尾に達しました");
+            error_at(first - src, first - src + 1, "文字列を閉じる`\"`がないまま、ファイルの末尾に達しました");
         }
         if (**endptr == '\\') {
             if ((*endptr)[1] == 'n') {
@@ -190,7 +190,7 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
         len++;
     }
     if (**endptr != '\"') {
-        error_at(first - src, first - src + 1, "文字列を閉じる\"がないまま、ファイルの末尾に達しました");
+        error_at(first - src, first - src + 1, "文字列を閉じる`\"`がないまま、ファイルの末尾に達しました");
         exit(1);
     }
     (*endptr)++;
