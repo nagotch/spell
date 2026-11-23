@@ -28,6 +28,7 @@ int main(int argc, char **argv) {
     token = tokenize(src);
 
     Function* prog = program();
+    desugar(prog);
 
     char assembly_output_name[256];
     snprintf(assembly_output_name, 256, "%s.s", output_name);
