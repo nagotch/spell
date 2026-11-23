@@ -335,6 +335,12 @@ static Node* assign() {
         assign_node -> left_child = node;
         assign_node -> right_child = assign();
         node = assign_node;
+    } else if (consume("+=")) {
+        Node* assign_node = create_node(ND_OPASSIGN);
+        assign_node->op.binop = OP_ADD;
+        assign_node->left_child = node;
+        assign_node->right_child = assign();
+        node = assign_node;
     }
     return node;
 }

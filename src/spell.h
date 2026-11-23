@@ -38,7 +38,7 @@ typedef enum {
     OP_LE,
     OP_MOD,
     OP_AND,
-    OP_OR
+    OP_OR,
 } BinOp;
 typedef enum {
     OP_ADDR,
@@ -66,6 +66,7 @@ typedef enum {
     ND_NEWARRAY,
     ND_BINOP,
     ND_UNARY,
+    ND_OPASSIGN,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
