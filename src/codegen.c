@@ -357,6 +357,11 @@ static void gen_binop(Node* node) {
             printf("  setle al\n");
             printf("  movzb rax, al\n");
             break;
+        case OP_MOD:
+            printf("  cqo\n");
+            printf("  idiv rdi\n");
+            printf("  mov rax, rdx\n");
+            break;
         default:
             fprintf(stderr, "無効な2項演算子\n");
             exit(1);
