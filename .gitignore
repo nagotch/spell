@@ -1,4 +1,4 @@
-/spell
+src/spell
 tmp
 tmp.s
 *.o

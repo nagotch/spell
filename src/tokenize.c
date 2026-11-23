@@ -41,8 +41,7 @@ Token* tokenize(char* s) {
         if (!memcmp(*endptr, "/*", 2)) {
             char* q = strstr(*endptr + 2, "*/");
             if (!q) {
-                fprintf(stderr, "/*が閉じていない");
-                exit(1);
+                error_at(*endptr - src, *endptr - src + 2, "コメントを閉じる`*/`がないまま、ファイルの末尾に達しました");
             }
             *endptr = q + 2;
             continue;
@@ -152,22 +151,22 @@ Token* tokenize(char* s) {
             continue;
         }
 
-        fprintf(stderr, "不明な文字%s", *endptr);
-        exit(1);
+        error_at(*endptr - src, *endptr - src + 1, "ここでは文字`%c`を使えません", **endptr);
     }
     last_token_ptr = new_token(TK_EOF, last_token_ptr);
+    last_token_ptr -> str = *endptr;
     return first_token.next;
 }
 
 static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
+    char* first = *endptr;
     last_token_ptr = new_token(TK_STR, last_token_ptr);
     int len = 0;
     (*endptr)++;
     char* buf = malloc(strlen(*endptr) + 1);
     while (**endptr != '\"') {
         if (**endptr == '\0' || **endptr == '\n') {
-            fprintf(stderr, "\"で閉じられていない");
-            exit(1);
+            error_at(first - src, first - src + 1, "文字列を閉じる`\"`がないまま、ファイルの末尾に達しました");
         }
         if (**endptr == '\\') {
             if ((*endptr)[1] == 'n') {
@@ -191,11 +190,46 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
         len++;
     }
     if (**endptr != '\"') {
-        fprintf(stderr, "\"で閉じられていない");
+        error_at(first - src, first - src + 1, "文字列を閉じる`\"`がないまま、ファイルの末尾に達しました");
         exit(1);
     }
     (*endptr)++;
     last_token_ptr -> str = buf;
     last_token_ptr -> len = len;
     return last_token_ptr;
+}
+
+long token_start(Token* tok) {
+    return tok -> str - src;
+}
+
+long token_end(Token* tok) {
+    return token_start(tok) + tok -> len;
+}
+
+char* token_text(Token* tok) {
+    static char buf[256];
+    switch (tok -> kind) {
+        case TK_NUM:
+            snprintf(buf, sizeof(buf), "数値`%ld`", tok -> val);
+            break;
+        case TK_EOF:
+            return NULL;
+            break;
+        case TK_IDENT:
+            snprintf(buf, sizeof(buf), "名前`%.*s`", tok -> len, tok -> str);
+            break;
+        case TK_RETURN:
+        case TK_IF:
+        case TK_ELSE:
+        case TK_WHILE:
+        case TK_FOR:
+        case TK_SYMBOL:
+            snprintf(buf, sizeof(buf), "`%.*s`", tok -> len, tok -> str);
+            break;
+        case TK_STR:
+            snprintf(buf, sizeof(buf), "文字列");
+            break;
+    }
+    return buf;
 }

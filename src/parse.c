@@ -33,8 +33,12 @@ static bool consume_keyword(TokenKind kind) {
 
 static void expect(char* symbol) {
     if (!consume(symbol)) {
-        fprintf(stderr, "予期されないToken\n");
-        exit(1);
+        char* actual = token_text(token);
+        if (actual) {
+            error_at(token_start(token), token_end(token), "`%s`が必要ですが、%sが見つかりました", symbol, actual);
+        } else {
+            error_at(token_start(token), token_end(token), "`%s`が必要ですが、ファイルの末尾に達しました", symbol);
+        }
     }
 }
 
@@ -44,8 +48,13 @@ static long expect_number() {
         token = token -> next;
         return num;
     }
-    fprintf(stderr, "予期されない数値\n");
-    exit(1);
+    char* actual = token_text(token);
+    if (actual) {
+        error_at(token_start(token), token_end(token), "数値が必要ですが、%sが見つかりました", actual);
+    } else {
+        error_at(token_start(token), token_end(token), "数値が必要ですが、ファイルの末尾に達しました");
+    }
+    return 0;
 }
 
 static bool at_eof() {
@@ -199,8 +208,15 @@ static Node* primary() {
                 new_node -> left_child = node;
                 node = new_node;
             } else {
-                fprintf(stderr, "不明なメンバ");
-                exit(1);
+                if (ident_token) {
+                    error_at(token_start(ident_token), token_end(ident_token), "配列では`len`だけが使えますが、名前`%.*s`が指定されています", ident_token->len, ident_token->str);
+                }
+                char* actual = token_text(token);
+                if (actual) {
+                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、%sが指定されています", actual);
+                } else {
+                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、ファイルの末尾に達しました");
+                }
             }
         } else {
             break;
@@ -420,14 +436,16 @@ static Function* function() {
     locals = NULL;
     Token* tok = consume_ident();
     if (!tok) {
-        fprintf(stderr, "関数名を定義してください\n");
-        exit(1);
+        if (token) {
+            error_at(token_start(token), token_end(token), "関数名が必要ですが、%sが見つかりました", token_text(token));
+        } else {
+            error_at(token_start(token), token_end(token), "関数名が必要ですが、ファイルの末尾に達しました", token_text(token));
+        }
     }
     char* name = tok -> str;
     int len = tok -> len;
     if (!consume("(")) {
-        fprintf(stderr, "\"(\"が必要です");
-        exit(1);
+        expect("(");
     }
     int nparams = 0;
     if (!consume(")")) {

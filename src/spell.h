@@ -109,6 +109,15 @@ struct LVar {
 
 extern Token* token;
 extern LVar* locals;
+extern char* src;
+extern char* src_name;
+
+long token_start(Token* tok);
+long token_end(Token* tok);
+char* token_text(Token* tok);
+void error_at(long start, long end, char* fmt, ...);
+void error_plain(char* fmt, ...);
+void error_internal(char* fmt, ...);
 
 Token* tokenize(char* s);
 Function* program();

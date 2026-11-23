@@ -72,8 +72,7 @@ static void gen_lval(Node* node) {
         printf("  push rax\n");
         return;
     }
-    fprintf(stderr, "  不明な代入");
-    exit(1);
+    error_internal("代入の処理で想定外の形式を検出しました");
 }
 
 void codegen(Function* prog) {
@@ -119,8 +118,7 @@ static void gen_unary(Node* node) {
             printf("  push rax\n");
             break;
         default:
-            fprintf(stderr, "不明な単項演算子\n");
-            exit(1);
+            error_internal("単項演算の処理で想定外の演算子を検出しました");
     }
 }
 
@@ -316,8 +314,7 @@ static void gen_funcall(Node* node) {
         args_cnt++;
     }
     if (args_cnt > 6) {
-        fprintf(stderr, "関数の引数が6より多い");
-        exit(1);
+        error_plain("関数に渡せる引数は6個までですが、%ld個が指定されています", args_cnt);
     }
     for (int i = args_cnt - 1; i >= 0; i--) {
         printf("  pop %s\n", resister[i]);
@@ -406,8 +403,7 @@ static void gen_binop(Node* node) {
             printf("  mov rax, rdx\n");
             break;
         default:
-            fprintf(stderr, "無効な2項演算子\n");
-            exit(1);
+            error_internal("二項演算の処理で想定外の演算子を検出しました");
             break;
     }
     printf("  push rax\n");
