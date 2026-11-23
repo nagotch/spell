@@ -110,6 +110,14 @@ static void gen_unary(Node* node) {
             printf("  mov rax, [rax]\n");
             printf("  push rax\n");
             break;
+        case OP_NOT:
+            gen(node -> left_child);
+            printf("  pop rax\n");
+            printf("  cmp rax, 0\n");
+            printf("  sete al\n");
+            printf("  movzb rax, al\n");
+            printf("  push rax\n");
+            break;
         default:
             fprintf(stderr, "不明な単項演算子\n");
             exit(1);
@@ -319,6 +327,41 @@ static void gen_funcall(Node* node) {
 }
 
 static void gen_binop(Node* node) {
+    if (node -> op.binop == OP_AND) {
+        int label = max_label;
+        max_label++;
+        gen(node -> left_child);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je .Lfalse%d\n", label);
+        gen(node -> right_child);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je .Lfalse%d\n", label);
+        printf("  push 1\n");
+        printf("  jmp .Lend%d\n", label);
+        printf(".Lfalse%d:\n", label);
+        printf("  push 0\n");
+        printf(".Lend%d:", label);
+        return;
+    } else if (node -> op.binop == OP_OR) {
+        int label = max_label;
+        max_label++;
+        gen(node -> left_child);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  jne .Ltrue%d\n", label);
+        gen(node -> right_child);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  jne .Ltrue%d\n", label);
+        printf("  push 0\n");
+        printf("  jmp .Lend%d\n", label);
+        printf(".Ltrue%d:\n", label);
+        printf("  push 1\n");
+        printf(".Lend%d:", label);
+        return;
+    }
     gen(node -> left_child);
     gen(node -> right_child);
     printf("  pop rdi\n");

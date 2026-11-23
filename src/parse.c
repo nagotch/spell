@@ -225,6 +225,11 @@ static Node* unary() {
         node -> op.unop = OP_ADDR;
         node -> left_child = unary();
         return node;
+    } else if (consume("!")) {
+        Node* node = create_node(ND_UNARY);
+        node -> op.unop = OP_NOT;
+        node -> left_child = unary();
+        return node;
     }
     return primary();
 }
@@ -291,8 +296,24 @@ static Node* equality() {
     return node;
 }
 
-static Node* assign() {
+static Node* and() {
     Node* node = equality();
+    if (consume("&&")) {
+        node = create_binary_operation_node(OP_AND, node, and());
+    }
+    return node;
+}
+
+static Node* or() {
+    Node* node = and();
+    if (consume("||")) {
+        node = create_binary_operation_node(OP_OR, node, or());
+    }
+    return node;
+}
+
+static Node* assign() {
+    Node* node = or();
     if (consume("=")) {
         Node* assign_node = create_node(ND_ASSIGN);
         assign_node -> left_child = node;
