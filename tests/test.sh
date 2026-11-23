@@ -13,6 +13,10 @@ tests=(
 error_tests=(
     "main() { a = [1,2,3]; return a.5; }|不明なメンバ"
     "main() { return 1; } /*|/*が閉じていない"
+    "main() { return #; }|不明な文字"
+    "main() { return (1 + 2; }|\")\"が必要です"
+    "main() { return }; }|数値が必要です"
+    "main() { s = \"abc; return 1; }|\"で閉じられていない"
 )
 
 cc -c -o funcs.o funcs.c
