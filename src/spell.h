@@ -7,20 +7,25 @@
 #include <string.h>
 
 typedef enum {
+    KW_RETURN,
+    KW_IF,
+    KW_ELSE,
+    KW_WHILE,
+    KW_FOR,
+} Keyword;
+
+typedef enum {
     TK_NUM,
     TK_SYMBOL,
     TK_EOF,
     TK_IDENT,
-    TK_RETURN, 
-    TK_IF,
-    TK_ELSE,
-    TK_WHILE,
-    TK_FOR,
+    TK_KEYWORD,
     TK_STR,
 } TokenKind;
 typedef struct Token Token;
 struct Token {
     TokenKind kind;
+    Keyword keyword;
     long val;
     char* str;
     int len;

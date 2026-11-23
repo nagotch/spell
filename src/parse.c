@@ -7,25 +7,25 @@ static Node* expr();
 
 static bool consume(char* symbol) {
     int len = strlen(symbol);
-    if (token -> kind == TK_SYMBOL && token -> len == len && !memcmp(symbol, token -> str, token -> len)) {
-        token = token -> next;
+    if (token->kind == TK_SYMBOL && token->len == len && !memcmp(symbol, token->str, token->len)) {
+        token = token->next;
         return true;
     }
     return false;
 }
 
 static Token* consume_ident() {
-    if (token -> kind == TK_IDENT) {
+    if (token->kind == TK_IDENT) {
         Token* pre_token = token;
-        token = token -> next;
+        token = token->next;
         return pre_token;
     }
     return NULL;
 }
 
-static bool consume_keyword(TokenKind kind) {
-    if (token -> kind == kind) {
-        token = token -> next;
+static bool consume_keyword(Keyword keyword) {
+    if (token->keyword == keyword) {
+        token = token->next;
         return true;
     }
     return false;
@@ -43,9 +43,9 @@ static void expect(char* symbol) {
 }
 
 static long expect_number() {
-    if (token -> kind == TK_NUM) {
-        long num = token -> val;
-        token = token -> next;
+    if (token->kind == TK_NUM) {
+        long num = token->val;
+        token = token->next;
         return num;
     }
     char* actual = token_text(token);
@@ -58,7 +58,7 @@ static long expect_number() {
 }
 
 static bool at_eof() {
-    if (token -> kind == TK_EOF) {
+    if (token->kind == TK_EOF) {
         return true;
     }
     return false;
@@ -66,50 +66,50 @@ static bool at_eof() {
 
 Node* create_node(NodeKind kind) {
     Node* node = calloc(1, sizeof(Node));
-    node -> kind = kind;
+    node->kind = kind;
     return node;
 }
 
 static Node* create_binary_operation_node(BinOp kind, Node* left_child, Node* right_child) {
     Node* new_node_ptr = create_node(ND_BINOP);
-    new_node_ptr -> op.binop = kind;
-    new_node_ptr -> left_child = left_child;
-    new_node_ptr -> right_child = right_child;
+    new_node_ptr->op.binop = kind;
+    new_node_ptr->left_child = left_child;
+    new_node_ptr->right_child = right_child;
     return new_node_ptr;
 }
 
 static Node* create_number_node(long num) {
     Node* num_node_ptr = create_node(ND_NUM);
-    num_node_ptr -> val = num;
+    num_node_ptr->val = num;
     return num_node_ptr;
 }
 
 static void register_any() {
     LVar* lvar = calloc(1, sizeof(LVar));
-    lvar -> offset = locals ? locals -> offset + 8 * (locals -> array_len + 1): 8;
-    lvar -> next = locals;
+    lvar->offset = locals ? locals->offset + 8 * (locals->array_len + 1): 8;
+    lvar->next = locals;
     locals = lvar;
 }
 
 static void register_lvar(Token* tok) {
     register_any();
-    locals -> name = tok -> str;
-    locals -> len = tok -> len;
+    locals->name = tok->str;
+    locals->len = tok->len;
 }
 
 static void register_array(int array_len) {
     register_any();
-    locals -> array_len = array_len;
+    locals->array_len = array_len;
 }
 
 static Node* create_ident_node(Token* tok) {
     LVar* var = find_lvar(tok);
     Node* ident_node_ptr = create_node(ND_LVAR);
     if (var) {
-        ident_node_ptr -> offset = var -> offset;
+        ident_node_ptr->offset = var->offset;
     } else {
         register_lvar(tok);
-        ident_node_ptr -> offset = locals -> offset;
+        ident_node_ptr->offset = locals->offset;
     }
     return ident_node_ptr;
 }
@@ -117,19 +117,19 @@ static Node* create_ident_node(Token* tok) {
 static Node* char_array() {
     Node* node;
     Token* str_token = token;
-    token = token -> next;
+    token = token->next;
     node = create_node(ND_ARRAY);
     Node body;
     body.next = NULL;
     Node* cur = &body;
-    for (int i = 0; i < str_token -> len; i++) {
-        cur -> next = create_number_node(str_token -> str[i]);
-        cur = cur -> next;
+    for (int i = 0; i < str_token->len; i++) {
+        cur->next = create_number_node(str_token->str[i]);
+        cur = cur->next;
     }
-    register_array(str_token -> len);
-    node -> array_len = str_token -> len;
-    node -> body = body.next;
-    node -> offset = locals -> offset;
+    register_array(str_token->len);
+    node->array_len = str_token->len;
+    node->body = body.next;
+    node->offset = locals->offset;
     return node;
 }
 
@@ -139,24 +139,24 @@ static Node* array_literal() {
     if (consume(";")) {
         Node* len_expr = expr();
         node = create_node(ND_NEWARRAY);
-        node -> left_child = first_expr;
-        node -> right_child = len_expr;
+        node->left_child = first_expr;
+        node->right_child = len_expr;
     } else {
         node = create_node(ND_ARRAY);
         int array_len = 1;
         Node body;
         Node* cur = &body;
-        cur -> next = first_expr;
-        cur = cur -> next;
+        cur->next = first_expr;
+        cur = cur->next;
         while (consume(",")) {
-            cur -> next = expr();
-            cur = cur -> next;
+            cur->next = expr();
+            cur = cur->next;
             array_len++;
         }
         register_array(array_len);
-        node -> array_len = array_len;
-        node -> body = body.next;
-        node -> offset = locals -> offset;
+        node->array_len = array_len;
+        node->body = body.next;
+        node->offset = locals->offset;
     }
     expect("]");
     return node;
@@ -165,23 +165,23 @@ static Node* array_literal() {
 static Node* primary() {
     Node* node;
     Token* ident_token = consume_ident();
-    if (token -> kind == TK_STR) {
+    if (token->kind == TK_STR) {
         node = char_array();
     } else if (!ident_token && consume("[")) {
         node = array_literal();
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
-        node -> name = ident_token -> str;
-        node -> len = ident_token -> len;
+        node->name = ident_token->str;
+        node->len = ident_token->len;
         if (!consume(")")) {
             Node head;
             head.next = NULL;
             Node* cur = &head;
             do {
-                cur -> next = expr();
-                cur = cur -> next;
+                cur->next = expr();
+                cur = cur->next;
             } while (consume(","));
-            node -> args = head.next;
+            node->args = head.next;
             expect(")");
         }
     } else if (ident_token) {
@@ -198,14 +198,14 @@ static Node* primary() {
             Node* right_child = expr();
             expect("]");
             Node* new_node = create_node(ND_INDEX);
-            new_node -> left_child = node;
-            new_node -> right_child = right_child;
+            new_node->left_child = node;
+            new_node->right_child = right_child;
             node = new_node;
         } else if (consume(".")) {
             ident_token = consume_ident();
-            if (ident_token && ident_token -> len == 3 && !memcmp(ident_token -> str, "len", 3)) {
+            if (ident_token && ident_token->len == 3 && !memcmp(ident_token->str, "len", 3)) {
                 Node* new_node = create_node(ND_LEN);
-                new_node -> left_child = node;
+                new_node->left_child = node;
                 node = new_node;
             } else {
                 if (ident_token) {
@@ -233,18 +233,18 @@ static Node* unary() {
         return node;
     } else if (consume("*")) {
         Node* node = create_node(ND_UNARY);
-        node -> op.unop = OP_DEREF;
-        node -> left_child = unary();
+        node->op.unop = OP_DEREF;
+        node->left_child = unary();
         return node;
     } else if (consume("&")) {
         Node* node = create_node(ND_UNARY);
-        node -> op.unop = OP_ADDR;
-        node -> left_child = unary();
+        node->op.unop = OP_ADDR;
+        node->left_child = unary();
         return node;
     } else if (consume("!")) {
         Node* node = create_node(ND_UNARY);
-        node -> op.unop = OP_NOT;
-        node -> left_child = unary();
+        node->op.unop = OP_NOT;
+        node->left_child = unary();
         return node;
     }
     return primary();
@@ -332,8 +332,8 @@ static Node* assign() {
     Node* node = or();
     if (consume("=")) {
         Node* assign_node = create_node(ND_ASSIGN);
-        assign_node -> left_child = node;
-        assign_node -> right_child = assign();
+        assign_node->left_child = node;
+        assign_node->right_child = assign();
         node = assign_node;
     } else if (consume("+=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
@@ -382,13 +382,13 @@ static Node* stmt_for();
 static Node* stmt() {
     if (consume("{")) {
         return stmt_block();
-    } else if (consume_keyword(TK_RETURN)) {
+    } else if (consume_keyword(KW_RETURN)) {
         return stmt_return();
-    } else if (consume_keyword(TK_IF)) {
+    } else if (consume_keyword(KW_IF)) {
         return stmt_if();
-    } else if (consume_keyword(TK_WHILE)) {
+    } else if (consume_keyword(KW_WHILE)) {
         return stmt_while();
-    } else if (consume_keyword(TK_FOR)) {
+    } else if (consume_keyword(KW_FOR)) {
         return stmt_for();
     } else {
         Node* node = expr();
@@ -404,17 +404,17 @@ static Node* stmt_block() {
     head.next = NULL;
     Node* cur = &head;
     while (!consume("}")) {
-        cur -> next = stmt();
-        cur = cur -> next;
+        cur->next = stmt();
+        cur = cur->next;
     }
-    node -> body = head.next;
+    node->body = head.next;
     return node;
 }
 
 static Node* stmt_return() {
     Node* node;
     node = create_node(ND_RETURN);
-    node -> left_child = expr();
+    node->left_child = expr();
     expect(";");
     return node;
 }
@@ -423,11 +423,11 @@ static Node* stmt_if() {
     Node* node;
     node = create_node(ND_IF);
     expect("(");
-    node -> cond = expr();
+    node->cond = expr();
     expect(")");
-    node -> then = stmt();
-    if (consume_keyword(TK_ELSE)) {
-        node -> els = stmt();
+    node->then = stmt();
+    if (consume_keyword(KW_ELSE)) {
+        node->els = stmt();
     }
     return node;
 }
@@ -436,9 +436,9 @@ static Node* stmt_while() {
     Node* node;
     node = create_node(ND_WHILE);
     expect("(");
-    node -> cond = expr();
+    node->cond = expr();
     expect(")");
-    node -> then = stmt();
+    node->then = stmt();
     return node;
 }
 
@@ -447,18 +447,18 @@ static Node* stmt_for() {
     node = create_node(ND_FOR);
     expect("(");
     if (!consume(";")) {
-        node -> init = expr();
+        node->init = expr();
         expect(";");
     }
     if (!consume(";")) {
-        node -> cond = expr();
+        node->cond = expr();
         expect(";");
     }
     if (!consume(")")) {
-        node -> inc = expr();
+        node->inc = expr();
         expect(")");
     }
-    node -> then = stmt();
+    node->then = stmt();
     return node;
 }
 
@@ -472,8 +472,8 @@ static Function* function() {
             error_at(token_start(token), token_end(token), "関数名が必要ですが、ファイルの末尾に達しました", token_text(token));
         }
     }
-    char* name = tok -> str;
-    int len = tok -> len;
+    char* name = tok->str;
+    int len = tok->len;
     if (!consume("(")) {
         expect("(");
     }
@@ -490,25 +490,25 @@ static Function* function() {
     head.next = NULL;
     Node* cur = &head;
     while (!consume("}")) {
-        cur -> next = stmt();
-        cur = cur -> next;
+        cur->next = stmt();
+        cur = cur->next;
     }
     Function* func = calloc(1, sizeof(Function));
-    func -> name = name;
-    func -> len = len;
-    func -> body = head.next;
-    func -> nparams = nparams;
+    func->name = name;
+    func->len = len;
+    func->body = head.next;
+    func->nparams = nparams;
     LVar* head_lvar = locals;
     LVar* cur_lvar = head_lvar;
     int max_offset = 0;
     while (cur_lvar) {
-        int offset = cur_lvar -> offset + 8 * (cur_lvar -> array_len);
+        int offset = cur_lvar->offset + 8 * (cur_lvar->array_len);
         if (max_offset < offset) {
             max_offset = offset;
         }
-        cur_lvar = cur_lvar -> next;
+        cur_lvar = cur_lvar->next;
     }
-    func -> stack_size = (max_offset + 15) / 16 * 16;
+    func->stack_size = (max_offset + 15) / 16 * 16;
     return func;
 }
 
@@ -517,15 +517,15 @@ Function* program() {
     head.next = NULL;
     Function* cur = &head;
     while (!at_eof()) {
-        cur -> next = function();
-        cur = cur -> next;
+        cur->next = function();
+        cur = cur->next;
     }
     return head.next;
 }
 
 static LVar* find_lvar(Token* tok) {
-    for (LVar* var = locals; var; var = var -> next) {
-        if (var -> len == tok -> len && !memcmp(var -> name, tok -> str, tok -> len)) {
+    for (LVar* var = locals; var; var = var->next) {
+        if (var->len == tok->len && !memcmp(var->name, tok->str, tok->len)) {
             return var;
         }
     }
