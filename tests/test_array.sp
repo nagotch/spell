@@ -27,6 +27,7 @@ t026() { s = "abc"; s[1] = 120; return s[1]; }
 t027() { s = "hello"; c = 0; for (i = 0; i < s.len; i = i + 1) if (s[i] == 108) c = c + 1; return c; }
 t028() { s = "hi"; putchar(s[0]); putchar(s[1]); return 0; }
 t029() { s = ""; return s.len; }
+t030() { a = [1,2,3]; a[1] += 10; return a[1]; }
 
 mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -70,6 +71,7 @@ main() {
     mark(27); fails=fails+check(t027(), 2);
     mark(28); fails=fails+check(t028(), 0);
     mark(29); fails=fails+check(t029(), 0);
+    mark(30); fails=fails+check(t030(), 12);
 
     print_str("done"); putchar(10);
     return fails > 0;
