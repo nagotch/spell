@@ -112,6 +112,9 @@ extern LVar* locals;
 extern char* src;
 extern char* src_name;
 
+long token_start(Token* tok);
+long token_end(Token* tok);
+
 Token* tokenize(char* s);
 Function* program();
 void codegen(Function* prog);
