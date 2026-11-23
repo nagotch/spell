@@ -13,52 +13,33 @@ f(x) { y = x * 2; return y; } t012() { return f(21); }
 sum6(a, b, c, d, e, f) { return a + b + c + d + e + f; } t013() { return sum6(1, 2, 3, 4, 5, 6); }
 fib(x) { if (x <= 1) return 1; return fib(x - 1) + fib(x - 2); } t014() { return fib(9); }
 
+mark(n) {
+    print_int(n); putchar(10); fflush(0);
+    return 0;
+}
+
+check(got, expected) {
+    if (got != expected) return 1;
+    return 0;
+}
 
 main() {
     fails = 0;
-
-    print_int(1); putchar(10); fflush(0);
-    if (t001() != 3) { print_str("NG"); print_int(1); putchar(10); fails=fails+1; }
-
-    print_int(2); putchar(10); fflush(0);
-    if (t002() != 8) { print_str("NG"); print_int(2); putchar(10); fails=fails+1; }
-
-    print_int(3); putchar(10); fflush(0);
-    if (t003() != 2) { print_str("NG"); print_int(3); putchar(10); fails=fails+1; }
-
-    print_int(4); putchar(10); fflush(0);
-    if (t004() != 21) { print_str("NG"); print_int(4); putchar(10); fails=fails+1; }
-
-    print_int(5); putchar(10); fflush(0);
-    if (t005() != 85) { print_str("NG"); print_int(5); putchar(10); fails=fails+1; }
-
-    print_int(6); putchar(10); fflush(0);
-    if (t006() != 66) { print_str("NG"); print_int(6); putchar(10); fails=fails+1; }
-
-    print_int(7); putchar(10); fflush(0);
-    if (t007() != 136) { print_str("NG"); print_int(7); putchar(10); fails=fails+1; }
-
-    print_int(8); putchar(10); fflush(0);
-    if (t008() != 7) { print_str("NG"); print_int(8); putchar(10); fails=fails+1; }
-
-    print_int(9); putchar(10); fflush(0);
-    if (t009() != 6) { print_str("NG"); print_int(9); putchar(10); fails=fails+1; }
-
-    print_int(10); putchar(10); fflush(0);
-    if (t010() != 3) { print_str("NG"); print_int(10); putchar(10); fails=fails+1; }
-
-    print_int(11); putchar(10); fflush(0);
-    if (t011() != 8) { print_str("NG"); print_int(11); putchar(10); fails=fails+1; }
-
-    print_int(12); putchar(10); fflush(0);
-    if (t012() != 42) { print_str("NG"); print_int(12); putchar(10); fails=fails+1; }
-
-    print_int(13); putchar(10); fflush(0);
-    if (t013() != 21) { print_str("NG"); print_int(13); putchar(10); fails=fails+1; }
-
-    print_int(14); putchar(10); fflush(0);
-    if (t014() != 55) { print_str("NG"); print_int(14); putchar(10); fails=fails+1; }
-
+    
+    mark(1); fails=fails+check(t001(), 3);
+    mark(2); fails=fails+check(t002(), 8);
+    mark(3); fails=fails+check(t003(), 2);
+    mark(4); fails=fails+check(t004(), 21);
+    mark(5); fails=fails+check(t005(), 85);
+    mark(6); fails=fails+check(t006(), 66);
+    mark(7); fails=fails+check(t007(), 136);
+    mark(8); fails=fails+check(t008(), 7);
+    mark(9); fails=fails+check(t009(), 6);
+    mark(10); fails=fails+check(t010(), 3);
+    mark(11); fails=fails+check(t011(), 8);
+    mark(12); fails=fails+check(t012(), 42);
+    mark(13); fails=fails+check(t013(), 21);
+    mark(14); fails=fails+check(t014(), 55);
 
     print_str("done"); putchar(10);
     return fails > 0;
