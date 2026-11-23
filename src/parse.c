@@ -33,7 +33,7 @@ static bool consume_keyword(TokenKind kind) {
 
 static void expect(char* symbol) {
     if (!consume(symbol)) {
-        error_at(token_start(token), token_end(token), "\"%s\"が必要です");
+        error_at(token_start(token), token_end(token), "\"%s\"が必要です", symbol);
     }
 }
 
