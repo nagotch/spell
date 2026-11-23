@@ -13,7 +13,12 @@ void error_at(long start, long end, char* fmt, ...) {
             line_start = i + 1;
         }
     }
-    long col = start - line_start + 1;
+    long col = 1;
+    for (long i = line_start; i < start; ) {
+        long cp;
+        i += utf8_read(i, &cp);
+        col++;
+    }
 
     fprintf(stderr, "%s:%ld:%ld: エラー: ", src_name, line, col);
     
@@ -28,7 +33,23 @@ void error_at(long start, long end, char* fmt, ...) {
         line_end++;
     }
     fprintf(stderr, "%ld | ", line);
-    fwrite(&src[line_start], 1, line_end - line_start, stderr);
+    long disp = 0;
+    for (long i = line_start; i < line_end; ) {
+        if (src[i] == '\t') {
+            long n = 4 - (disp % 4);
+            for (long k = 0; k < n; k++) {
+                fputc(' ', stderr);
+            }
+            disp += n;
+            i++;
+        } else {
+            long cp;
+            long len = utf8_read(i, &cp);
+            fwrite(&src[i], 1, len, stderr);
+            disp += char_width(cp);
+            i += len;
+        }
+    }
     fprintf(stderr, "\n");
 
     exit(1);
