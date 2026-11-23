@@ -224,9 +224,11 @@ char* token_text(Token* tok) {
         case TK_ELSE:
         case TK_WHILE:
         case TK_FOR:
-        case TK_STR:
         case TK_SYMBOL:
             snprintf(buf, sizeof(buf), "`%.*s`", tok -> len, tok -> str);
+            break;
+        case TK_STR:
+            snprintf(buf, sizeof(buf), "文字列");
             break;
     }
     return buf;
