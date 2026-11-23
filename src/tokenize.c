@@ -41,7 +41,7 @@ Token* tokenize(char* s) {
         if (!memcmp(*endptr, "/*", 2)) {
             char* q = strstr(*endptr + 2, "*/");
             if (!q) {
-                error_at(*endptr - src, *endptr - src, "/*が閉じていない\n");
+                error_at(*endptr - src, *endptr - src, "/*が閉じていない");
             }
             *endptr = q + 2;
             continue;
@@ -165,7 +165,7 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
     char* buf = malloc(strlen(*endptr) + 1);
     while (**endptr != '\"') {
         if (**endptr == '\0' || **endptr == '\n') {
-            error_at(first - src, *endptr - src, "\"で閉じられていない");
+            error_at(first - src, first - src + 1, "\"で閉じられていない");
         }
         if (**endptr == '\\') {
             if ((*endptr)[1] == 'n') {
@@ -189,7 +189,7 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
         len++;
     }
     if (**endptr != '\"') {
-        error_at(first - src, *endptr - src, "\"で閉じられていない");
+        error_at(first - src, first - src + 1, "\"で閉じられていない");
         exit(1);
     }
     (*endptr)++;
