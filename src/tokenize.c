@@ -41,8 +41,7 @@ Token* tokenize(char* s) {
         if (!memcmp(*endptr, "/*", 2)) {
             char* q = strstr(*endptr + 2, "*/");
             if (!q) {
-                fprintf(stderr, "/*が閉じていない");
-                exit(1);
+                error_at(*endptr - src, *endptr - src, "/*が閉じていない\n");
             }
             *endptr = q + 2;
             continue;
@@ -152,22 +151,21 @@ Token* tokenize(char* s) {
             continue;
         }
 
-        fprintf(stderr, "不明な文字%s", *endptr);
-        exit(1);
+        error_at(*endptr - src, *endptr - src + 1, "不明な文字");
     }
     last_token_ptr = new_token(TK_EOF, last_token_ptr);
     return first_token.next;
 }
 
 static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
+    char* first = *endptr;
     last_token_ptr = new_token(TK_STR, last_token_ptr);
     int len = 0;
     (*endptr)++;
     char* buf = malloc(strlen(*endptr) + 1);
     while (**endptr != '\"') {
         if (**endptr == '\0' || **endptr == '\n') {
-            fprintf(stderr, "\"で閉じられていない");
-            exit(1);
+            error_at(first - src, *endptr - src, "\"で閉じられていない");
         }
         if (**endptr == '\\') {
             if ((*endptr)[1] == 'n') {
@@ -191,7 +189,7 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
         len++;
     }
     if (**endptr != '\"') {
-        fprintf(stderr, "\"で閉じられていない");
+        error_at(first - src, *endptr - src, "\"で閉じられていない");
         exit(1);
     }
     (*endptr)++;
