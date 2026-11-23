@@ -11,8 +11,12 @@ tests=(
 )
 
 error_tests=(
-    "main() { a = [1,2,3]; return a.5; }|不明なメンバ"
-    "main() { return 1; } /*|/*が閉じていない"
+    "main() { a = [1,2,3]; return a.5; }|数値\`5\`が指定されています"
+    "main() { return 1; } /*|コメントを閉じる"
+    "main() { return #; }|ここでは文字\`#\`を使えません"
+    "main() { return (1 + 2; }|\`)\`が必要ですが、\`;\`が見つかりました"
+    "main() { return }; }|数値が必要ですが、\`}\`が見つかりました"
+    "main() { s = \"abc; return 1; }|文字列を閉じる"
 )
 
 cc -c -o funcs.o funcs.c

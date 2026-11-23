@@ -1,27 +1,29 @@
 #include "spell.h"
 
-static char* read_file(char* input_name);
+char* src;
+char* src_name;
+
+static char* read_file(char* src_name);
 
 int main(int argc, char **argv) {
     bool only_assembly = false;
     char* output_name = "a.out";
-    char* input_name = NULL;
+    src_name = NULL;
     for (int i=1; i<argc; i++) {
         if (strlen(argv[i]) == 2 && !memcmp(argv[i], "-S", 2)) {
             only_assembly = true;
         } else if (strlen(argv[i]) == 2 && !memcmp(argv[i], "-o", 2)) {
             output_name = argv[++i];
         } else {
-            input_name = argv[i];
+            src_name = argv[i];
         }
     }
 
-    if (!input_name) {
-        fprintf(stderr, "ファイルを指定してください");
-        exit(1);
+    if (!src_name) {
+        error_plain("入力ファイルが指定されていません");
     }
 
-    char* src = read_file(input_name);
+    src = read_file(src_name);
 
     token = tokenize(src);
 
@@ -30,8 +32,7 @@ int main(int argc, char **argv) {
     char assembly_output_name[256];
     snprintf(assembly_output_name, 256, "%s.s", output_name);
     if (!freopen(assembly_output_name, "w", stdout)) {
-        fprintf(stderr, "freopenが失敗");
-        exit(1);
+        error_plain("ファイル`%s`を開けませんでした", assembly_output_name);
     }
 
     printf(".intel_syntax noprefix\n");
@@ -46,27 +47,25 @@ int main(int argc, char **argv) {
     snprintf(command, 512, "cc -o \"%s\" \"%s\"", output_name, assembly_output_name);
     if (!only_assembly) {
         if (system(command)) {
-            fprintf(stderr, "アセンブリからバイナリに変換するのを失敗");
-            exit(1);
+            error_plain("実行ファイルを作成できませんでした");
         }
     }
 
     return 0;
 }
 
-static char* read_file(char* input_name) {
-    FILE *fp = fopen(input_name, "r");
+static char* read_file(char* src_name) {
+    FILE *fp = fopen(src_name, "r");
     if (!fp) {
-        fprintf(stderr, "ファイルが開けません: %s", input_name);
-        exit(1);
+        error_plain("ファイル`%s`を開けませんでした", src_name);
     }
     fseek(fp, 0, SEEK_END);
     long size = ftell(fp);
     rewind(fp);
     char* src = malloc(size + 1);
-    if (fread(src, 1, size, fp) != size) {
-        fprintf(stderr, "sizeが違う");
-        exit(1);
+    int read_size = fread(src, 1, size, fp);
+    if (read_size != size) {
+        error_plain("ファイル`%s`から%ldバイト読み取る予定でしたが、%ldバイトを読み取りました", src_name, size, read_size);
     }
     src[size] = '\0';
     fclose(fp);
