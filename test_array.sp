@@ -28,96 +28,48 @@ t027() { s = "hello"; c = 0; for (i = 0; i < s.len; i = i + 1) if (s[i] == 108) 
 t028() { s = "hi"; putchar(s[0]); putchar(s[1]); return 0; }
 t029() { s = ""; return s.len; }
 
+mark(n) {
+    print_int(n); putchar(10); fflush(0);
+    return 0;
+}
+
+check(got, expected) {
+    if (got != expected) return 1;
+    return 0;
+}
+
 main() {
     fails = 0;
-
-    print_int(1); putchar(10); fflush(0);
-    if (t001() != 3) { print_str("NG"); print_int(1); putchar(10); fails=fails+1; }
-
-    print_int(2); putchar(10); fflush(0);
-    if (t002() != 3) { print_str("NG"); print_int(2); putchar(10); fails=fails+1; }
-
-    print_int(3); putchar(10); fflush(0);
-    if (t003() != 7) { print_str("NG"); print_int(3); putchar(10); fails=fails+1; }
-
-    print_int(4); putchar(10); fflush(0);
-    if (t004() != 42) { print_str("NG"); print_int(4); putchar(10); fails=fails+1; }
-
-    print_int(5); putchar(10); fflush(0);
-    if (t005() != 5) { print_str("NG"); print_int(5); putchar(10); fails=fails+1; }
-
-    print_int(6); putchar(10); fflush(0);
-    if (t006() != 5) { print_str("NG"); print_int(6); putchar(10); fails=fails+1; }
-
-    print_int(7); putchar(10); fflush(0);
-    if (t007() != 9) { print_str("NG"); print_int(7); putchar(10); fails=fails+1; }
-
-    print_int(8); putchar(10); fflush(0);
-    if (t008() != 8) { print_str("NG"); print_int(8); putchar(10); fails=fails+1; }
-
-    print_int(9); putchar(10); fflush(0);
-    if (t009() != 60) { print_str("NG"); print_int(9); putchar(10); fails=fails+1; }
-
-    print_int(10); putchar(10); fflush(0);
-    if (t010() != 42) { print_str("NG"); print_int(10); putchar(10); fails=fails+1; }
-
-    print_int(11); putchar(10); fflush(0);
-    if (t011() != 7) { print_str("NG"); print_int(11); putchar(10); fails=fails+1; }
-
-    print_int(12); putchar(10); fflush(0);
-    if (t012() != 10) { print_str("NG"); print_int(12); putchar(10); fails=fails+1; }
-
-    print_int(13); putchar(10); fflush(0);
-    if (t013() != 6) { print_str("NG"); print_int(13); putchar(10); fails=fails+1; }
-
-    print_int(14); putchar(10); fflush(0);
-    if (t014() != 3) { print_str("NG"); print_int(14); putchar(10); fails=fails+1; }
-
-    print_int(15); putchar(10); fflush(0);
-    if (t015() != 1) { print_str("NG"); print_int(15); putchar(10); fails=fails+1; }
-
-    print_int(16); putchar(10); fflush(0);
-    if (t016() != 10) { print_str("NG"); print_int(16); putchar(10); fails=fails+1; }
-
-    print_int(17); putchar(10); fflush(0);
-    if (t017() != 5) { print_str("NG"); print_int(17); putchar(10); fails=fails+1; }
-
-    print_int(18); putchar(10); fflush(0);
-    if (t018() != 43) { print_str("NG"); print_int(18); putchar(10); fails=fails+1; }
-
-    print_int(19); putchar(10); fflush(0);
-    if (t019() != 14) { print_str("NG"); print_int(19); putchar(10); fails=fails+1; }
-
-    print_int(20); putchar(10); fflush(0);
-    if (t020() != 0) { print_str("NG"); print_int(20); putchar(10); fails=fails+1; }
-
-    print_int(21); putchar(10); fflush(0);
-    if (t021() != 20) { print_str("NG"); print_int(21); putchar(10); fails=fails+1; }
-
-    print_int(22); putchar(10); fflush(0);
-    if (t022() != 12) { print_str("NG"); print_int(22); putchar(10); fails=fails+1; }
-
-    print_int(23); putchar(10); fflush(0);
-    if (t023() != 5) { print_str("NG"); print_int(23); putchar(10); fails=fails+1; }
-
-    print_int(24); putchar(10); fflush(0);
-    if (t024() != 104) { print_str("NG"); print_int(24); putchar(10); fails=fails+1; }
-
-    print_int(25); putchar(10); fflush(0);
-    if (t025() != 10) { print_str("NG"); print_int(25); putchar(10); fails=fails+1; }
-
-    print_int(26); putchar(10); fflush(0);
-    if (t026() != 120) { print_str("NG"); print_int(26); putchar(10); fails=fails+1; }
-
-    print_int(27); putchar(10); fflush(0);
-    if (t027() != 2) { print_str("NG"); print_int(27); putchar(10); fails=fails+1; }
-
-    print_int(28); putchar(10); fflush(0);
-    if (t028() != 0) { print_str("NG"); print_int(28); putchar(10); fails=fails+1; }
-
-    print_int(29); putchar(10); fflush(0);
-    if (t029() != 0) { print_str("NG"); print_int(29); putchar(10); fails=fails+1; }
-
+    
+    mark(1); fails=fails+check(t001(), 3);
+    mark(2); fails=fails+check(t002(), 3);
+    mark(3); fails=fails+check(t003(), 7);
+    mark(4); fails=fails+check(t004(), 42);
+    mark(5); fails=fails+check(t005(), 5);
+    mark(6); fails=fails+check(t006(), 5);
+    mark(7); fails=fails+check(t007(), 9);
+    mark(8); fails=fails+check(t008(), 8);
+    mark(9); fails=fails+check(t009(), 60);
+    mark(10); fails=fails+check(t010(), 42);
+    mark(11); fails=fails+check(t011(), 7);
+    mark(12); fails=fails+check(t012(), 10);
+    mark(13); fails=fails+check(t013(), 6);
+    mark(14); fails=fails+check(t014(), 3);
+    mark(15); fails=fails+check(t015(), 1);
+    mark(16); fails=fails+check(t016(), 10);
+    mark(17); fails=fails+check(t017(), 5);
+    mark(18); fails=fails+check(t018(), 43);
+    mark(19); fails=fails+check(t019(), 14);
+    mark(20); fails=fails+check(t020(), 0);
+    mark(21); fails=fails+check(t021(), 20);
+    mark(22); fails=fails+check(t022(), 12);
+    mark(23); fails=fails+check(t023(), 5);
+    mark(24); fails=fails+check(t024(), 104);
+    mark(25); fails=fails+check(t025(), 10);
+    mark(26); fails=fails+check(t026(), 120);
+    mark(27); fails=fails+check(t027(), 2);
+    mark(28); fails=fails+check(t028(), 0);
+    mark(29); fails=fails+check(t029(), 0);
 
     print_str("done"); putchar(10);
     return fails > 0;
