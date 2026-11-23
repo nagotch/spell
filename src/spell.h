@@ -109,6 +109,8 @@ struct LVar {
 
 extern Token* token;
 extern LVar* locals;
+extern char* src;
+extern char* src_name;
 
 Token* tokenize(char* s);
 Function* program();
