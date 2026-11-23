@@ -18,7 +18,6 @@
         ];
 
         shellHook = ''
-          echo "spell devShell: gcc, gnumake, clang-tools"
         '';
       };
     };
