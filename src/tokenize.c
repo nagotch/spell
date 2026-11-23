@@ -54,6 +54,8 @@ Token* tokenize(char* s) {
             "!=",
             "<=",
             ">=",
+            "&&",
+            "||",
             "+",
             "-",
             "*",
@@ -72,6 +74,7 @@ Token* tokenize(char* s) {
             "]",
             ".",
             "%",
+            "!",
         };
         size_t targets_size = sizeof(targets) / sizeof(targets[0]);
         for (int i = 0; i < targets_size; i++) {

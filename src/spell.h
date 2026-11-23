@@ -37,10 +37,13 @@ typedef enum {
     OP_LT,
     OP_LE,
     OP_MOD,
+    OP_AND,
+    OP_OR
 } BinOp;
 typedef enum {
     OP_ADDR,
     OP_DEREF,
+    OP_NOT,
 } UnaryOp;
 typedef union {
     BinOp binop;
