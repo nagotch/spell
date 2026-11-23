@@ -1,18 +1,6 @@
 #!/bin/bash
 
 tests=(
-    "main() { a=3; a; }|3"
-    "main() { a=3; b=5*6-8; a+b/2; }|14"
-    "main() { a=b=3; a+b; }|6"
-    "main() { foo=3; foo; }|3"
-    "main() { foo=3; bar=5; foo+bar; }|8"
-    "main() { fo=1; foo=2; fo+foo; }|3"
-    "main() { foo1=5; foo1; }|5"
-    "main() { return 42; }|42"
-    "main() { return 5; return 8; }|5"
-    "main() { a=3; b=5*6-8; return a+b/2; }|14"
-    "main() { returnx=3; returnx; }|3"
-    "main() { return1=7; return1; }|7"
     "main() { if (0) return 1; return 2; }|2"
     "main() { if (1) return 1; return 2; }|1"
     "main() { if (0) return 1; else return 2; }|2"
@@ -166,6 +154,7 @@ for i in "${!error_tests[@]}"; do
 done
 
 run_suite test_expr.sp
+run_suite test_stmt.sp
 run_selfcheck
 
 echo $(($n-$fail_count)) / $n tests passed.
