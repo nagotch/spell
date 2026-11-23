@@ -35,9 +35,9 @@ static void expect(char* symbol) {
     if (!consume(symbol)) {
         char* actual = token_text(token);
         if (actual) {
-            error_at(token_start(token), token_end(token), "\"%s\"が必要ですが、%sが見つかりました", symbol, actual);
+            error_at(token_start(token), token_end(token), "`%s`が必要ですが、%sが見つかりました", symbol, actual);
         } else {
-            error_at(token_start(token), token_end(token), "\"%s\"が必要ですが、ファイルの末尾に達しました", symbol);
+            error_at(token_start(token), token_end(token), "`%s`が必要ですが、ファイルの末尾に達しました", symbol);
         }
     }
 }
@@ -208,11 +208,14 @@ static Node* primary() {
                 new_node -> left_child = node;
                 node = new_node;
             } else {
+                if (ident_token) {
+                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、名前%.*sが指定されています", ident_token->len, ident_token->str);
+                }
                 char* actual = token_text(token);
                 if (actual) {
                     error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、名前%sが指定されています", actual);
                 } else {
-                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、名前%.*sが指定されています", ident_token->len, ident_token->str);
+                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、ファイルの末尾に達しました", ident_token->len, ident_token->str);
                 }
             }
         } else {
@@ -433,7 +436,11 @@ static Function* function() {
     locals = NULL;
     Token* tok = consume_ident();
     if (!tok) {
-        error_at(token_start(token), token_end(token), "関数名が必要ですが、%sが見つかりました", token_text(token));
+        if (token) {
+            error_at(token_start(token), token_end(token), "関数名が必要ですが、%sが見つかりました", token_text(token));
+        } else {
+            error_at(token_start(token), token_end(token), "関数名が必要ですが、ファイルの末尾に達しました", token_text(token));
+        }
     }
     char* name = tok -> str;
     int len = tok -> len;
