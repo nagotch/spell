@@ -17,6 +17,38 @@ struct GVarType {
 };
 static GVarType* global_types;
 
+static bool type_equals(Type* a, Type* b) {
+    if (a->kind != b->kind) {
+        return false;
+    }
+    if (a->kind == TY_ARRAY) {
+        return type_equals(a->elem, b->elem);
+    }
+    return true;
+}
+
+char* type_text(Type* type) {
+    static char buf[256];
+    switch (type->kind) {
+        case TY_UNKNOWN:
+            snprintf(buf, sizeof(buf), "型`unknown`");
+            break;
+        case TY_INT:
+            snprintf(buf, sizeof(buf), "型`int`");
+            break;
+        case TY_BOOL:
+            snprintf(buf, sizeof(buf), "型`bool`");
+            break;
+        case TY_CHAR:
+            snprintf(buf, sizeof(buf), "型`char`");
+            break;
+        case TY_ARRAY:
+            snprintf(buf, sizeof(buf), "型`array`");
+            break;
+    }
+    return buf;
+}
+
 static Type* find_global_type(Node* node) {
     for (GVarType* g = global_types; g; g = g->next) {
         if (g->len == node->len && !memcmp(g->name, node->name, g->len)) {
