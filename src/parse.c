@@ -569,13 +569,24 @@ static Function* function() {
     if (!consume("(")) {
         expect("(");
     }
+    Type* param_types[6] = {};
     int nparams = 0;
     if (!consume(")")) {
         do {
             register_lvar(consume_ident());
+            if (consume(":")) {
+                Type* pt = parse_type();
+                if (nparams < 6) {
+                    param_types[nparams] = pt;
+                }
+            }
             nparams++;
         } while (consume(","));
         expect(")");
+    }
+    Type* return_type = NULL;
+    if (consume("->")) {
+        return_type = parse_type();
     }
     expect("{");
     Node head;
@@ -590,6 +601,8 @@ static Function* function() {
     func->len = len;
     func->body = head.next;
     func->nparams = nparams;
+    func->return_type = return_type;
+    memcpy(func->param_types, param_types, sizeof(param_types));
     LVar* head_lvar = locals;
     LVar* cur_lvar = head_lvar;
     int max_offset = 0;
