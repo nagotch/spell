@@ -101,7 +101,6 @@ static void register_lvar(Token* tok) {
 
 static void register_gvar(Token* tok) {
     LVar* gvar = calloc(1, sizeof(LVar));
-    gvar->offset = globals ? locals->offset + 8 * (locals->array_len + 1): 8;
     gvar->next = globals;
     globals = gvar;
     globals->name = tok->str;
