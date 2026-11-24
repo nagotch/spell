@@ -6,7 +6,7 @@ def read_int() {
         is_negative = 1;
         char = getchar();
     }
-    for (i = 0; (48 <= char) * (char <= 57); i = i + 1) {
+    for (i = 0; 48 <= char && char <= 57; i = i + 1) {
         ret = ret * 10 + char - 48;
         char = getchar();
     }
@@ -20,7 +20,7 @@ def read_str() {
     str = [0; 100];
     n = 0;
     char = getchar();
-    while (char>32) {
+    while (char != -1) {
         str[n] = char;
         char = getchar();
         n=n+1;
