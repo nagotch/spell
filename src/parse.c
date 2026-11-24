@@ -290,6 +290,9 @@ static Function* function(Class* klass) {
         } while (consume(","));
         expect(")");
     }
+    if (nparams > 6) {
+        error_at(token_start(tok), token_end(tok), "引数は6個までですが、%d個が指定されています", nparams);
+    }
     Type* return_type = NULL;
     if (consume("->")) {
         return_type = parse_type();
