@@ -27,6 +27,16 @@ class Box {
     v: int;
 }
 
+class Bag {
+    n: int;
+    def __init__(self, n: int) {
+        self.n = n;
+    }
+    def len(self) -> int {
+        return self.n * 2;
+    }
+}
+
 def t001() {
     p = Point(3, 4);
     return p.x * 10 + p.y;
@@ -70,6 +80,21 @@ def t008() {
     return p.x * 10 + p.y;
 }
 
+def t009() {
+    p = Point(3, 4);
+    return p.sum;
+}
+
+def t010() {
+    b = Bag(21);
+    return b.len + b.len();
+}
+
+def t011() {
+    a = [1, 2, 3];
+    return a.len + a.len();
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -90,6 +115,9 @@ def main() {
     mark(6); fails=fails+check(t006(), 17);
     mark(7); fails=fails+check(t007(), 17);
     mark(8); fails=fails+check(t008(), 84);
+    mark(9); fails=fails+check(t009(), 7);
+    mark(10); fails=fails+check(t010(), 84);
+    mark(11); fails=fails+check(t011(), 6);
 
     print_str("done"); putchar(10);
     return fails > 0;
