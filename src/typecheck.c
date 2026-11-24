@@ -5,7 +5,39 @@ static Type ty_bool = { TY_BOOL, NULL };
 static Type ty_unknown = { TY_UNKNOWN, NULL };
 
 static Type* local_types[1024];
-static Type* global_types[1024];
+
+typedef struct GVarType GVarType;
+struct GVarType {
+    char* name;
+    int len;
+    Type* type;
+    GVarType* next;
+};
+static GVarType* global_types;
+
+static Type* find_global_type(Node* node) {
+    for (GVarType* g = global_types; g; g = g->next) {
+        if (g->len == node->len && !memcmp(g->name, node->name, g->len)) {
+            return g->type;
+        }
+    }
+    return &ty_unknown;
+}
+
+static void record_global_type(Node* node, Type* type) {
+    for (GVarType* g = global_types; g; g = g->next) {
+        if (g->len == node->len && !memcmp(g->name, node->name, g->len)) {
+            g->type = type;
+            return;
+        }
+    }
+    GVarType* g = calloc(1, sizeof(GVarType));
+    g->name = node->name;
+    g->len = node->len;
+    g->type = type;
+    g->next = global_types;
+    global_types = g;
+}
 
 static Type* array_type(Type* elem) {
     Type* t = calloc(1, sizeof(Type));
@@ -48,6 +80,7 @@ static Type* check_node(Node* node) {
                 local_types[lhs->offset / 8] = rhs;
                 lhs->type = rhs;
             } else if (lhs->kind == ND_GVAR) {
+                record_global_type(lhs, rhs);
                 lhs->type = rhs;
             } else {
                 check_node(lhs);
@@ -55,6 +88,7 @@ static Type* check_node(Node* node) {
             result = rhs;
             break;
         case ND_GVAR:
+            result = find_global_type(node);
             break;
         case ND_UNARY:
             if (node->op.unop == OP_NOT) {
