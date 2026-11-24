@@ -99,6 +99,7 @@ typedef enum {
     ND_BREAK,
     ND_CONTINUE,
     ND_MEMBER,
+    ND_MCALL,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
