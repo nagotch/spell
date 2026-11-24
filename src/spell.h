@@ -123,6 +123,8 @@ struct Function {
     Node* body;
     int nparams;
     int stack_size;
+    Type* param_types[6];
+    Type* return_type;
 };
 
 typedef struct LVar LVar;
