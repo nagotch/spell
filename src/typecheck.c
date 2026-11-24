@@ -16,6 +16,18 @@ struct GVarType {
     GVarType* next;
 };
 static GVarType* global_types;
+static Function* current_fn;
+static Type* current_return;
+static Function* functions;
+
+static Function* find_function(Node* node) {
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->len == node->len && !memcmp(fn->name, node->name, fn->len)) {
+            return fn;
+        }
+    }
+    return NULL;
+}
 
 static bool type_equals(Type* a, Type* b) {
     if (a->kind == TY_UNKNOWN || b->kind == TY_UNKNOWN) {
@@ -190,10 +202,37 @@ static Type* check_node(Node* node) {
             }
             break;
         case ND_FUNCALL:
+            ;
+            Type* arg_types[6];
+            int nargs = 0;
             for (Node* arg = node->args; arg; arg = arg->next) {
-                check_node(arg);
+                Type* at = check_node(arg);
+                if (nargs < 6) {
+                    arg_types[nargs] = at;
+                }
+                nargs++;
             }
-            result = &ty_unknown;
+            Function* callee = find_function(node);
+            if (!callee) {
+                if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
+                    result = &ty_int;
+                } else {
+                    result = &ty_unknown;
+                }
+                break;
+            }
+            if (nargs != callee->nparams) {
+                error_plain("関数`%.*s`の引数は%d個ですが、%d個が指定されています", node->len, node->name, callee->nparams, nargs);
+            }
+            for (int i = 0; i < nargs && i < callee->nparams && i < 6; i++) {
+                Type* pt = callee->param_types[i];
+                if (pt && arg_types[i]->kind != TY_UNKNOWN && !type_equals(pt, arg_types[i])) {
+                    char expected[256];
+                    strcpy(expected, type_text(pt));
+                    error_plain("関数`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", node->len, node->name, expected, type_text(arg_types[i]));
+                }
+            }
+            result = callee->return_type ? callee->return_type : &ty_unknown;
             break;
         case ND_ARRAY:
             ;
@@ -261,7 +300,19 @@ static Type* check_node(Node* node) {
             check_node(node->inc);
             break;
         case ND_RETURN:
-            check_node(node->left_child);
+            ;
+            Type* rt = check_node(node->left_child);
+            if (rt->kind != TY_UNKNOWN) {
+                if (!current_return) {
+                    current_fn->return_type = rt;
+                    current_return = rt;
+                } else if (!type_equals(current_return, rt)) {
+                    char expected[256];
+                    strcpy(expected, type_text(current_return));
+                    error_plain("関数`%.*s`の戻り値は`%s`ですが、`%s`が返されています", current_fn->len, current_fn->name, expected, type_text(rt));
+                }
+            }
+            result = rt;
             break;
         default:
             break;
@@ -271,8 +322,16 @@ static Type* check_node(Node* node) {
 }
 
 void typecheck(Function* prog) {
+    functions = prog;
     for (Function* fn = prog; fn; fn = fn->next) {
         memset(local_types, 0, sizeof(local_types));
+        current_fn = fn;
+        current_return = fn->return_type;
+        for (int i = 0; i < fn->nparams && i < 6; i++) {
+            if (fn->param_types[i]) {
+                local_types[i + 1] = fn->param_types[i];
+            }
+        }
         for (Node* stmt = fn->body; stmt; stmt = stmt->next) {
             check_node(stmt);
         }

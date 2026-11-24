@@ -27,6 +27,10 @@ error_tests=(
     "def main() { a = [1, 2]; return a[1 < 2]; }|添え字には\`int\`が必要ですが"
     "def main() { a = [1, 2]; a[0] = 1 < 2; return 0; }|配列の要素は\`int\`ですが"
     "def main() { a = [0; 1 < 2]; return 0; }|長さには\`int\`が必要ですが"
+    "def add(x: int, y: int) -> int { return x + y; } def main() { return add(1, 1 < 2); }|引数には\`int\`が必要ですが"
+    "def add(x: int, y: int) -> int { return x + y; } def main() { return add(1); }|引数は2個ですが"
+    "def f() -> int { return 1 < 2; } def main() { return 0; }|戻り値は\`int\`ですが"
+    "def f() { if (1) { return 1; } return 1 < 2; } def main() { return 0; }|戻り値は\`int\`ですが"
 )
 
 cc -c -o funcs.o funcs.c
