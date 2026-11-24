@@ -15,6 +15,7 @@ typedef enum {
     KW_BREAK,
     KW_CONTINUE,
     KW_DEF,
+    KW_CLASS,
 } Keyword;
 
 typedef enum {
@@ -64,6 +65,7 @@ typedef enum {
     TY_BOOL,
     TY_CHAR,
     TY_ARRAY,
+    TY_CLASS,
 } TypeKind;
 typedef struct Type Type;
 struct Type {
@@ -134,6 +136,24 @@ struct LVar {
     int offset;
     LVar* next;
     int array_len;
+};
+
+typedef struct Field Field;
+struct Field {
+    Field* next;
+    char* name;
+    int len;
+    Type* type;
+    int offset;
+};
+
+typedef struct Class Class;
+struct Class {
+    Class* next;
+    char* name;
+    int len;
+    Field* fields;
+    Type* type;
 };
 
 extern Token* token;

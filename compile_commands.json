@@ -1,0 +1,114 @@
+[
+  {
+    "file": "codegen.c",
+    "arguments": [
+      "/nix/store/ii6p6kc1brz3vycqg88q4zb4xd2dmqwp-gcc-wrapper-16.2.0/bin/gcc",
+      "-std=c11",
+      "-g",
+      "-c",
+      "-o",
+      "codegen.o",
+      "codegen.c"
+    ],
+    "directory": "/home/nagotch/spell/src",
+    "output": "codegen.o"
+  },
+  {
+    "file": "desugar.c",
+    "arguments": [
+      "/nix/store/ii6p6kc1brz3vycqg88q4zb4xd2dmqwp-gcc-wrapper-16.2.0/bin/gcc",
+      "-std=c11",
+      "-g",
+      "-c",
+      "-o",
+      "desugar.o",
+      "desugar.c"
+    ],
+    "directory": "/home/nagotch/spell/src",
+    "output": "desugar.o"
+  },
+  {
+    "file": "error.c",
+    "arguments": [
+      "/nix/store/ii6p6kc1brz3vycqg88q4zb4xd2dmqwp-gcc-wrapper-16.2.0/bin/gcc",
+      "-std=c11",
+      "-g",
+      "-c",
+      "-o",
+      "error.o",
+      "error.c"
+    ],
+    "directory": "/home/nagotch/spell/src",
+    "output": "error.o"
+  },
+  {
+    "file": "expr.c",
+    "arguments": [
+      "/nix/store/ii6p6kc1brz3vycqg88q4zb4xd2dmqwp-gcc-wrapper-16.2.0/bin/gcc",
+      "-std=c11",
+      "-g",
+      "-c",
+      "-o",
+      "expr.o",
+      "expr.c"
+    ],
+    "directory": "/home/nagotch/spell/src",
+    "output": "expr.o"
+  },
+  {
+    "file": "main.c",
+    "arguments": [
+      "/nix/store/ii6p6kc1brz3vycqg88q4zb4xd2dmqwp-gcc-wrapper-16.2.0/bin/gcc",
+      "-std=c11",
+      "-g",
+      "-c",
+      "-o",
+      "main.o",
+      "main.c"
+    ],
+    "directory": "/home/nagotch/spell/src",
+    "output": "main.o"
+  },
+  {
+    "file": "parse.c",
+    "arguments": [
+      "/nix/store/ii6p6kc1brz3vycqg88q4zb4xd2dmqwp-gcc-wrapper-16.2.0/bin/gcc",
+      "-std=c11",
+      "-g",
+      "-c",
+      "-o",
+      "parse.o",
+      "parse.c"
+    ],
+    "directory": "/home/nagotch/spell/src",
+    "output": "parse.o"
+  },
+  {
+    "file": "tokenize.c",
+    "arguments": [
+      "/nix/store/ii6p6kc1brz3vycqg88q4zb4xd2dmqwp-gcc-wrapper-16.2.0/bin/gcc",
+      "-std=c11",
+      "-g",
+      "-c",
+      "-o",
+      "tokenize.o",
+      "tokenize.c"
+    ],
+    "directory": "/home/nagotch/spell/src",
+    "output": "tokenize.o"
+  },
+  {
+    "file": "typecheck.c",
+    "arguments": [
+      "/nix/store/ii6p6kc1brz3vycqg88q4zb4xd2dmqwp-gcc-wrapper-16.2.0/bin/gcc",
+      "-std=c11",
+      "-g",
+      "-c",
+      "-o",
+      "typecheck.o",
+      "typecheck.c"
+    ],
+    "directory": "/home/nagotch/spell/src",
+    "output": "typecheck.o"
+  }
+]
