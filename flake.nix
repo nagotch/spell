@@ -15,6 +15,7 @@
           gnumake
           clang-tools
           python3
+          bear
         ];
 
         shellHook = ''
