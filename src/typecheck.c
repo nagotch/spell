@@ -368,6 +368,7 @@ static Type* check_node(Node* node) {
             node->offset = field->offset;
             node->klass = klass;
             result = field->type;
+            break;
         default:
             break;
     }
