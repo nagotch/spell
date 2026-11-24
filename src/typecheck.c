@@ -216,8 +216,7 @@ static Type* check_node(Node* node) {
                 result = &ty_bool;
             }
             break;
-        case ND_FUNCALL:
-            ;
+        case ND_FUNCALL: {
             Type* arg_types[6];
             int nargs = 0;
             for (Node* arg = node->args; arg; arg = arg->next) {
@@ -267,6 +266,7 @@ static Type* check_node(Node* node) {
             }
             result = callee->return_type ? callee->return_type : &ty_unknown;
             break;
+         }
         case ND_ARRAY:
             ;
             Type* elem = &ty_unknown;
@@ -347,8 +347,7 @@ static Type* check_node(Node* node) {
             }
             result = rt;
             break;
-        case ND_MEMBER:
-            ;
+        case ND_MEMBER: {
             Type* obj = check_node(node->left_child);
             if (obj->kind == TY_UNKNOWN) {
                 result = &ty_unknown;
@@ -371,6 +370,46 @@ static Type* check_node(Node* node) {
             node->offset = field->offset;
             node->klass = klass;
             result = field->type;
+            break;
+        }
+        case ND_MCALL:
+            ;
+            Type* obj = check_node(node->left_child);
+            Type* arg_types[6];
+            int nargs = 0;
+            for (Node* arg = node->args; arg; arg = arg->next) {
+                Type* at = check_node(arg);
+                if (nargs < 6) {
+                    arg_types[nargs] = at;
+                }
+                nargs++;
+            }
+            if (obj->kind == TY_UNKNOWN) {
+                result = &ty_unknown;
+                break;
+            }
+            if (obj->kind != TY_CLASS) {
+                error_plain("`%s`型の値にメソッドは使えません", type_text(obj));
+            }
+            Class* klass = obj->klass;
+            Function* method = find_method(klass, node->name, node->len);
+            if (!method) {
+                error_plain("クラス`%.*s`にメソッド`%.*s`は定義されていません", klass->len, klass->name, node->len, node->name);
+            }
+            node->func = method;
+            node->klass = klass;
+            if (nargs != method->nparams - 1) {
+                error_plain("クラス`%.*s`のメソッド`%.*s`の引数は%d個ですが、%d個が指定されています", klass->len, klass->name, node->len, node->name, method->nparams - 1, nargs);
+            }
+            for (int i = 0; i < nargs && i + 1 < method->nparams; i++) {
+                Type* pt = method->param_types[i + 1];
+                if (pt && arg_types[i]->kind != TY_UNKNOWN && !type_equals(pt, arg_types[i])) {
+                    char buf[256];
+                    strcpy(buf, type_text(pt));
+                    error_plain("クラス`%.*s`のメソッド`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, node->len, node->name, buf, type_text(arg_types[i]));
+                }
+            }
+            result = method->return_type ? method->return_type : &ty_unknown;
             break;
         default:
             break;
