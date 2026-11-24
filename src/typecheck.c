@@ -65,10 +65,27 @@ static Type* check_node(Node* node) {
         case ND_LEN:
             break;
         case ND_BLOCK:
+            for (Node* cur = node->body; cur; cur = cur->next) {
+                check_node(cur);
+            }
+            break;
         case ND_IF:
+            check_node(node->cond);
+            check_node(node->then);
+            check_node(node->els);
+            break;
         case ND_WHILE:
+            check_node(node->cond);
+            check_node(node->then);
+            break;
         case ND_FOR:
+            check_node(node->init);
+            check_node(node->cond);
+            check_node(node->then);
+            check_node(node->inc);
+            break;
         case ND_RETURN:
+            check_node(node->left_child);
             break;
         default:
             break;
