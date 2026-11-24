@@ -67,9 +67,9 @@ static Node* primary() {
             } else {
                 char* actual = token_text(token);
                 if (actual) {
-                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、%sが指定されています", actual);
+                    error_at(token_start(token), token_end(token), "フィールド名が必要ですが、%sが指定されています", actual);
                 } else {
-                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、ファイルの末尾に達しました");
+                    error_at(token_start(token), token_end(token), "フィールド名が必要ですが、ファイルの末尾に達しました");
                 }
             }
         } else {
