@@ -3,6 +3,7 @@
 
 LVar* locals = NULL;
 LVar* globals = NULL;
+static Class* classes;
 bool is_top_level = false;
 
 static LVar* find_lvar(Token* tok);
@@ -258,7 +259,7 @@ static Node* stmt_for() {
     return node;
 }
 
-static Function* function() {
+static Function* function(Class* klass) {
     locals = NULL;
     consume_keyword(KW_DEF);
     Token* tok = consume_ident();
@@ -308,6 +309,10 @@ static Function* function() {
     func->nparams = nparams;
     func->return_type = return_type;
     memcpy(func->param_types, param_types, sizeof(param_types));
+    func->klass = klass;
+    if (klass && nparams > 0) {
+        func->param_types[0] = klass->type;
+    }
     LVar* head_lvar = locals;
     LVar* cur_lvar = head_lvar;
     int max_offset = 0;
@@ -322,6 +327,47 @@ static Function* function() {
     return func;
 }
 
+static void class_decl(Function** cur) {
+    consume_keyword(KW_CLASS);
+    Token* tok = consume_ident();
+    if (!tok) {
+        error_at(token_start(token), token_end(token), "クラス名が必要ですが、%sが見つかりました", token_text(token));
+    }
+    Class* klass = calloc(1, sizeof(Class));
+    klass->name = tok->str;
+    klass->len = tok->len;
+    klass->type = calloc(1, sizeof(Type));
+    klass->type->kind = TY_CLASS;
+    klass->type->klass = klass;
+    klass->next = classes;
+    classes = klass;
+    expect("{");
+    int offset = 0;
+    while (!consume("}")) {
+        if (token->kind == TK_KEYWORD && token->keyword == KW_DEF) {
+            (*cur)->next = function(klass);
+            *cur = (*cur)->next;
+        } else {
+            Token* field_tok = consume_ident();
+            for (Field* f = klass->fields; f; f = f->next) {
+                if (f->len == field_tok->len && !memcmp(f->name, field_tok->str, f->len)) {
+                    error_at(token_start(field_tok), token_end(field_tok), "フィールド`%.*s`は既に定義されています", field_tok->len, field_tok->str);
+                }
+            }
+            expect(":");
+            Field* field = calloc(1, sizeof(Field));
+            field->name = field_tok->str;
+            field->len = field_tok->len;
+            field->type = parse_type();
+            field->offset = offset;
+            offset += 8;
+            field->next = klass->fields;
+            klass->fields = field;
+            consume(";");
+        }
+    }
+}
+
 Function* program() {
     Function head;
     head.next = NULL;
@@ -330,8 +376,10 @@ Function* program() {
     stmt_head.next = NULL;
     Node* stmt_cur = &stmt_head;
     while (!at_eof()) {
-        if (token->kind == TK_KEYWORD && token->keyword == KW_DEF || consume(":")) {
-            cur->next = function();
+        if (token->kind == TK_KEYWORD && token->keyword == KW_CLASS) {
+            class_decl(&cur);
+        } else if (token->kind == TK_KEYWORD && token->keyword == KW_DEF || consume(":")) {
+            cur->next = function(NULL);
             cur = cur->next;
         } else {
             is_top_level = true;
@@ -380,6 +428,15 @@ static LVar* find_gvar(Token* tok) {
     for (LVar* var = globals; var; var = var->next) {
         if (var->len == tok->len && !memcmp(var->name, tok->str, tok->len)) {
             return var;
+        }
+    }
+    return NULL;
+}
+
+Class* find_class(char* name, int len) {
+    for (Class* c = classes; c; c = c->next) {
+        if (c->len == len && !memcmp(c->name, name, len)) {
+            return c;
         }
     }
     return NULL;
