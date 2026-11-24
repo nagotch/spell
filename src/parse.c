@@ -114,23 +114,28 @@ static void register_array(int array_len) {
 }
 
 static Node* create_ident_node(Token* tok) {
-    LVar* lvar = find_lvar(tok);
+    if (!is_top_level) {
+        LVar* lvar = find_lvar(tok);
+        if (lvar) {
+            Node* node = create_node(ND_LVAR);
+            node->offset = lvar->offset;
+            return node;
+        }
+    }
     LVar* gvar = find_gvar(tok);
-    Node* ident_node_ptr;
-    if (is_top_level) {
-        ident_node_ptr = create_node(ND_GVAR);
-    } else {
-        ident_node_ptr = create_node(ND_LVAR);
+    if (!gvar) {
+        if (!is_top_level) {
+            register_lvar(tok);
+            Node* node = create_node(ND_LVAR);
+            node->offset = locals->offset;
+            return node;
+        }
+        register_gvar(tok);
     }
-    if (lvar) {
-        ident_node_ptr->offset = lvar->offset;
-    } else if (gvar) {
-        ident_node_ptr->offset = gvar->offset;
-    } else {
-        register_lvar(tok);
-        ident_node_ptr->offset = locals->offset;
-    }
-    return ident_node_ptr;
+    Node* node = create_node(ND_GVAR);
+    node->name = tok->str;
+    node->len = tok->len;
+    return node;
 }
 
 static Node* char_array() {
