@@ -249,6 +249,9 @@ static Type* check_node(Node* node) {
                     result = klass->type;
                     break;
                 }
+                if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
+                    result = &ty_int;
+                }
                 break;
             }
             if (nargs != callee->nparams) {
