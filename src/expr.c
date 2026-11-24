@@ -50,13 +50,18 @@ static Node* primary() {
                 node = new_node;
             } else {
                 if (ident_token) {
-                    error_at(token_start(ident_token), token_end(ident_token), "配列では`len`だけが使えますが、名前`%.*s`が指定されています", ident_token->len, ident_token->str);
-                }
-                char* actual = token_text(token);
-                if (actual) {
-                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、%sが指定されています", actual);
+                    Node* new_node = create_node(ND_MEMBER);
+                    new_node->left_child = node;
+                    new_node->name = ident_token->str;
+                    new_node->len = ident_token->len;
+                    node = new_node;
                 } else {
-                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、ファイルの末尾に達しました");
+                    char* actual = token_text(token);
+                    if (actual) {
+                        error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、%sが指定されています", actual);
+                    } else {
+                        error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、ファイルの末尾に達しました");
+                    }
                 }
             }
         } else {

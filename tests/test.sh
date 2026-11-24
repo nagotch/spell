@@ -37,6 +37,11 @@ error_tests=(
     "class P { x: int; } def main() { v: P = 1; return 0; }|変数\`v\`の型は\`P\`ですが"
     "class P { x: int; ; } def main() { return 0; }|フィールド名が必要ですが"
     "class P { def f() { return 1; } } def main() { return 0; }|最初の引数\`self\`が必要です"
+    "class P { x: int; } def f(p: P) { return p.y; } def main() { return 0; }|フィールド\`y\`は定義されていません"
+    "def main() { x = 5; return x.foo; }|型の値にフィールドは使えません"
+    "class P { x: int; def __init__(self, x: int) { } } def main() { p = P(1, 2); return 0; }|の\`__init__\`の引数は1個ですが、2個が指定されています"
+    "class P { x: int; def __init__(self, x: int) { } } def main() { p = P(1 < 2); return 0; }|の\`__init__\`の引数には\`int\`が必要ですが、\`bool\`が指定されています"
+    "def f() { c: bool = getchar(); return 1; } def main() { return 0; }|の型は\`bool\`ですが、\`int\`が代入されています"
 )
 
 cc -c -o funcs.o funcs.c
@@ -142,6 +147,7 @@ run_suite test_expr.sp
 run_suite test_stmt.sp
 run_suite test_func.sp
 run_suite test_array.sp
+run_suite test_class.sp
 run_selfcheck
 one_io_test "def main() { print_int(42); putchar(10); return 0; }" "" "42\n"
 one_io_test "def main() { print_int(0 - 42); putchar(10); return 0; }" "" "-42\n"

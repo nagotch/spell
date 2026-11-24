@@ -20,6 +20,15 @@ static Function* current_fn;
 static Type* current_return;
 static Function* functions;
 
+static Function* find_method(Class* klass, char* name, int len) {
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->klass == klass && fn->len == len && !memcmp(fn->name, name, len)) {
+            return fn;
+        }
+    }
+    return NULL;
+}
+
 static Function* find_function(Node* node) {
     for (Function* fn = functions; fn; fn = fn->next) {
         if (!fn->klass && fn->len == node->len && !memcmp(fn->name, node->name, fn->len)) {
@@ -220,10 +229,28 @@ static Type* check_node(Node* node) {
             }
             Function* callee = find_function(node);
             if (!callee) {
+                Class* klass = find_class(node->name, node->len);
+                if (klass) {
+                    node->klass = klass;
+                    Function* init = find_method(klass, "__init__", 8);
+                    node->func = init;
+                    int expected = init ? init->nparams - 1 : 0;
+                    if (nargs != expected) {
+                        error_plain("クラス`%.*s`の`__init__`の引数は%d個ですが、%d個が指定されています", klass->len, klass->name, expected, nargs);
+                    }
+                    for (int i = 0; i < nargs; i++) {
+                        Type* pt = init->param_types[i + 1];
+                        if (pt && arg_types[i]->kind != TY_UNKNOWN && !type_equals(pt, arg_types[i])) {
+                            char buf[256];
+                            strcpy(buf, type_text(pt));
+                            error_plain("クラス`%.*s`の`__init__`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, buf, type_text(arg_types[i]));
+                        }
+                    }
+                    result = klass->type;
+                    break;
+                }
                 if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
                     result = &ty_int;
-                } else {
-                    result = &ty_unknown;
                 }
                 break;
             }
@@ -319,6 +346,31 @@ static Type* check_node(Node* node) {
                 }
             }
             result = rt;
+            break;
+        case ND_MEMBER:
+            ;
+            Type* obj = check_node(node->left_child);
+            if (obj->kind == TY_UNKNOWN) {
+                result = &ty_unknown;
+                break;
+            }
+            if (obj->kind != TY_CLASS) {
+                error_plain("`%s`型の値にフィールドは使えません", type_text(obj));
+            }
+            Class* klass = obj->klass;
+            Field* field = NULL;
+            for (Field* f = klass->fields; f; f = f->next) {
+                if (f->len == node->len && !memcmp(f->name, node->name, f->len)) {
+                    field = f;
+                    break;
+                }
+            }
+            if (!field) {
+                error_plain("クラス`%.*s`にフィールド`%.*s`は定義されていません", klass->len, klass->name, node->len, node->name);
+            }
+            node->offset = field->offset;
+            node->klass = klass;
+            result = field->type;
             break;
         default:
             break;
