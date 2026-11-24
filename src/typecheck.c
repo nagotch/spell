@@ -18,6 +18,9 @@ struct GVarType {
 static GVarType* global_types;
 
 static bool type_equals(Type* a, Type* b) {
+    if (a->kind == TY_UNKNOWN || b->kind == TY_UNKNOWN) {
+        return true;
+    }
     if (a->kind != b->kind) {
         return false;
     }
