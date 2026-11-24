@@ -18,6 +18,9 @@ struct GVarType {
 static GVarType* global_types;
 
 static bool type_equals(Type* a, Type* b) {
+    if (a->kind == TY_UNKNOWN || b->kind == TY_UNKNOWN) {
+        return true;
+    }
     if (a->kind != b->kind) {
         return false;
     }
@@ -80,11 +83,25 @@ static void record_global_type(Node* node, Type* type) {
     global_types = g;
 }
 
-static Type* array_type(Type* elem) {
+Type* array_type(Type* elem) {
     Type* t = calloc(1, sizeof(Type));
     t->kind = TY_ARRAY;
     t->elem = elem;
     return t;
+}
+
+static Type* adopt_type(Type* anno, Type* rhs) {
+    if (rhs->kind == TY_UNKNOWN) {
+        return anno;
+    }
+    if (anno->kind == TY_ARRAY && rhs->kind == TY_ARRAY) {
+        Type* elem = adopt_type(anno->elem, rhs->elem);
+        if (elem == rhs->elem) {
+            return rhs;
+        }
+        return array_type(elem);
+    }
+    return rhs;
 }
 
 static Type* check_node(Node* node) {
@@ -116,6 +133,9 @@ static Type* check_node(Node* node) {
         case ND_ASSIGN:
             ;
             Type* rhs = check_node(node->right_child);
+            if (node->anno) {
+                rhs = adopt_type(node->anno, rhs);
+            }
             Node* lhs = node->left_child;
             if (lhs->kind == ND_LVAR) {
                 Type* recorded = local_types[lhs->offset / 8];
@@ -149,6 +169,15 @@ static Type* check_node(Node* node) {
                     record_global_type(lhs, node->anno ? node->anno : rhs);
                 }
                 lhs->type = find_global_type(lhs);
+            } else if (lhs->kind == ND_INDEX) {
+                Type* elem = check_node(lhs);
+                if (elem->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(elem, rhs)) {
+                    char expected[256];
+                    strcpy(expected, type_text(elem));
+                    error_plain("配列の要素は`%s`ですが、`%s`が代入されています", expected, type_text(rhs));
+                }
+            } else {
+                check_node(lhs);
             }
             result = rhs;
             break;
@@ -164,15 +193,24 @@ static Type* check_node(Node* node) {
             for (Node* arg = node->args; arg; arg = arg->next) {
                 check_node(arg);
             }
-            result = &ty_int;
+            result = &ty_unknown;
             break;
         case ND_ARRAY:
             ;
             Type* elem = &ty_unknown;
-            for (Node* cur = node->body; cur; cur = cur->next) {
-                Type* t = check_node(cur);
-                if (cur == node->body) {
-                    elem = t;
+            for (Node* e = node->body; e; e = e->next) {
+                Type* et = check_node(e);
+                if (et->kind == TY_UNKNOWN) {
+                    continue;
+                }
+                if (elem->kind == TY_UNKNOWN) {
+                    elem = et;
+                    continue;
+                }
+                if (!type_equals(elem, et)) {
+                    char expected[256];
+                    strcpy(expected, type_text(elem));
+                    error_plain("配列の要素は`%s`ですが、`%s`が含まれています", expected, type_text(et));
                 }
             }
             result = array_type(elem);
@@ -180,16 +218,23 @@ static Type* check_node(Node* node) {
         case ND_NEWARRAY:
             ;
             Type* fill = check_node(node->left_child);
-            check_node(node->right_child);
+            Type* len = check_node(node->right_child);
+            if (len->kind != TY_UNKNOWN && len->kind != TY_INT) {
+                error_plain("長さには`int`が必要ですが、`%s`が指定されています", type_text(len));
+            }
             result = array_type(fill);
             break;
         case ND_INDEX:
             ;
-            Type* arr = check_node(node->left_child);
-            check_node(node->right_child);
-            if (arr->kind == TY_ARRAY) {
-                result = arr->elem;
+            Type* lt = check_node(node->left_child);
+            Type* it = check_node(node->right_child);
+            if (lt->kind != TY_UNKNOWN && lt->kind != TY_ARRAY) {
+                error_plain("`%s`型の値に添え字は使えません", type_text(lt));
             }
+            if (it->kind != TY_UNKNOWN && it->kind != TY_INT) {
+                error_plain("添え字には`int`が必要ですが、`%s`が指定されています", type_text(it));
+            }
+            result = lt->kind == TY_ARRAY ? lt->elem : &ty_unknown;
             break;
         case ND_LEN:
             check_node(node->left_child);
