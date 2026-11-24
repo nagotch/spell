@@ -17,6 +17,9 @@ struct GVarType {
 };
 static GVarType* global_types;
 
+static Function* current_fn;
+static Type* current_return;
+
 static bool type_equals(Type* a, Type* b) {
     if (a->kind == TY_UNKNOWN || b->kind == TY_UNKNOWN) {
         return true;
@@ -261,7 +264,19 @@ static Type* check_node(Node* node) {
             check_node(node->inc);
             break;
         case ND_RETURN:
-            check_node(node->left_child);
+            ;
+            Type* rt = check_node(node->left_child);
+            if (rt->kind != TY_UNKNOWN) {
+                if (!current_return) {
+                    current_fn->return_type = rt;
+                    current_return = rt;
+                } else if (!type_equals(current_return, rt)) {
+                    char expected[256];
+                    strcpy(expected, type_text(current_return));
+                    error_plain("関数`%.*s`の戻り値は`%s`ですが、`%s`が返されています", current_fn->len, current_fn->name, expected, type_text(rt));
+                }
+            }
+            result = rt;
             break;
         default:
             break;
@@ -272,6 +287,13 @@ static Type* check_node(Node* node) {
 
 void typecheck(Function* prog) {
     for (Function* fn = prog; fn; fn = fn->next) {
+        current_fn = fn;
+        current_return = fn->return_type;
+        for (int i = 0; i < fn->nparams && i < 6; i++) {
+            if (fn->param_types[i]) {
+                local_types[i + 1] = fn->param_types[i];
+            }
+        }
         memset(local_types, 0, sizeof(local_types));
         for (Node* stmt = fn->body; stmt; stmt = stmt->next) {
             check_node(stmt);
