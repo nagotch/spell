@@ -59,6 +59,18 @@ typedef union {
 } Op;
 
 typedef enum {
+    TY_UNKNOWN,
+    TY_INT,
+    TY_BOOL,
+    TY_CHAR,
+} TypeKind;
+typedef struct Type Type;
+struct Type {
+    TypeKind kind;
+    Type* elem;
+};
+
+typedef enum {
     ND_NUM,
     ND_ASSIGN, 
     ND_LVAR,
@@ -98,6 +110,7 @@ struct Node {
     int len;
     Node* args;
     int array_len;
+    Type* type;
 };
 
 typedef struct Function Function;
@@ -119,18 +132,6 @@ struct LVar {
     int array_len;
 };
 
-typedef enum {
-    TY_UNKNOWN,
-    TY_INT,
-    TY_BOOL,
-    TY_CHAR,
-} TypeKind;
-typedef struct Type Type;
-struct Type {
-    TypeKind kind;
-    Type* elem;
-};
-
 extern Token* token;
 extern LVar* locals;
 extern LVar* globals;
@@ -150,4 +151,5 @@ void error_internal(char* fmt, ...);
 Token* tokenize(char* s);
 Function* program();
 void desugar(Function* prog);
+void typecheck(Function* prog);
 void codegen(Function* prog);
