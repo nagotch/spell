@@ -152,6 +152,8 @@ char* token_text(Token* tok);
 
 Node* create_node(NodeKind kind);
 
+Type* array_type(Type* elem);
+
 void error_at(long start, long end, char* fmt, ...);
 void error_plain(char* fmt, ...);
 void error_internal(char* fmt, ...);
