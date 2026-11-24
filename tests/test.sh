@@ -18,6 +18,10 @@ error_tests=(
     "def main() { return (1 + 2; }|\`)\`が必要ですが、\`;\`が見つかりました"
     "def main() { return }; }|数値が必要ですが、\`}\`が見つかりました"
     "def main() { s = \"abc; return 1; }|文字列を閉じる"
+    "def main() { x: int = 1 < 2; return 0; }|が代入されています"
+    "def main() { x = 1; x = 1 < 2; return 0; }|が代入されています"
+    "def main() { x: foo = 1; return 0; }|は定義されていません"
+    "def main() { (1 + 2): int = 3; return 0; }|型注釈は変数にだけ付けられます"
 )
 
 cc -c -o funcs.o funcs.c
