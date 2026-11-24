@@ -118,6 +118,8 @@ static Node* create_ident_node(Token* tok) {
         LVar* lvar = find_lvar(tok);
         if (lvar) {
             Node* node = create_node(ND_LVAR);
+            node->name = tok->str;
+            node->len = node->len;
             node->offset = lvar->offset;
             return node;
         }
@@ -127,6 +129,8 @@ static Node* create_ident_node(Token* tok) {
         if (!is_top_level) {
             register_lvar(tok);
             Node* node = create_node(ND_LVAR);
+            node->name = tok->str;
+            node->len = node->len;
             node->offset = locals->offset;
             return node;
         }
@@ -354,15 +358,17 @@ static Node* or() {
 
 static Node* assign() {
     Node* node = or();
-    Token* error_token = token;
     if (consume(":")) {
         Node* assign_node = create_node(ND_ASSIGN);
-        if (node->kind != ND_LVAR || node->kind != ND_GVAR) {
+        if (node->kind != ND_LVAR && node->kind != ND_GVAR) {
             error_at(token_start(error_token), token_end(error_token), "型注釈は変数にだけ付けられます");
         }
         Token* ident = consume_ident();
         if (!ident) {
-            error_at(token_start(ident), token_end(ident), "型名が必要ですが、%sが見つかりました", token_text(ident));
+            if (token->kind == TK_EOF) {
+                error_at(token_start(token), token_end(token), "型名が必要ですが、ファイルの末尾に達しました");
+            }
+            error_at(token_start(token), token_end(token), "型名が必要ですが、%sが見つかりました", token_text(token));
         }
         char* type_name[] = {
             "int",
@@ -381,7 +387,7 @@ static Node* assign() {
             }
         }
         if (!assign_node->anno) {
-            error_at(token_start(error_token), token_end(error_token), "型`%.*s`は定義されていません", ident->str);
+            error_at(token_start(ident), token_end(ident), "型`%.*s`は定義されていません", ident->len, ident->str);
         }
         expect("=");
         assign_node->left_child = node;
