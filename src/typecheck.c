@@ -34,9 +34,18 @@ static Type* check_node(Node* node) {
             }
             break;
         case ND_ASSIGN:
-            check_node(node->right_child);
-            if (node->left_child->kind == ND_LVAR || node->left_child->kind == ND_GVAR) {
+            ;
+            Type* rhs = check_node(node->right_child);
+            Node* lhs = node->left_child;
+            if (lhs->kind == ND_LVAR) {
+                local_types[lhs->offset / 8] = rhs;
+                lhs->type = rhs;
+            } else if (lhs->kind == ND_GVAR) {
+                lhs->type = rhs;
+            } else {
+                check_node(lhs);
             }
+            result = rhs;
             break;
         case ND_GVAR:
             break;
