@@ -293,6 +293,12 @@ Type* parse_type() {
         }
     }
     if (!anno) {
+        Class* klass = find_class(ident->str, ident->len);
+        if (klass) {
+            anno = klass->type;
+        }
+    }
+    if (!anno) {
         error_at(token_start(ident), token_end(ident), "型`%.*s`は定義されていません", ident->len, ident->str);
     }
     return anno;
