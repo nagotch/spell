@@ -164,7 +164,7 @@ static Type* check_node(Node* node) {
             for (Node* arg = node->args; arg; arg = arg->next) {
                 check_node(arg);
             }
-            result = &ty_int;
+            result = &ty_unknown;
             break;
         case ND_ARRAY:
             ;
