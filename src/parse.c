@@ -390,6 +390,14 @@ static Node* stmt() {
         return stmt_while();
     } else if (consume_keyword(KW_FOR)) {
         return stmt_for();
+    } else if (consume_keyword(KW_BREAK)) {
+        Node* node = create_node(ND_BREAK);
+        expect(";");
+        return node;
+    } else if (consume_keyword(KW_CONTINUE)) {
+        Node* node = create_node(ND_CONTINUE);
+        expect(";");
+        return node;
     } else {
         Node* node = expr();
         expect(";");
