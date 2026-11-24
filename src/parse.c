@@ -2,6 +2,7 @@
 
 LVar* locals = NULL;
 LVar* globals = NULL;
+bool is_top_level = false;
 
 static LVar* find_lvar(Token* tok);
 static LVar* find_gvar(Token* tok);
@@ -115,7 +116,12 @@ static void register_array(int array_len) {
 static Node* create_ident_node(Token* tok) {
     LVar* lvar = find_lvar(tok);
     LVar* gvar = find_gvar(tok);
-    Node* ident_node_ptr = create_node(ND_LVAR);
+    Node* ident_node_ptr;
+    if (is_top_level) {
+        ident_node_ptr = create_node(ND_GVAR);
+    } else {
+        ident_node_ptr = create_node(ND_LVAR);
+    }
     if (lvar) {
         ident_node_ptr->offset = lvar->offset;
     } else if (gvar) {
@@ -546,8 +552,10 @@ Function* program() {
             cur->next = function();
             cur = cur->next;
         } else {
+            is_top_level = true;
             stmt_cur->next = stmt();
             stmt_cur = stmt_cur->next;
+            is_top_level = false;
         }
     }
     if (!stmt_head.next) {
