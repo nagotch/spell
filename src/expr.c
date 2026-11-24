@@ -50,7 +50,11 @@ static Node* primary() {
                 node = new_node;
             } else {
                 if (ident_token) {
-                    error_at(token_start(ident_token), token_end(ident_token), "配列では`len`だけが使えますが、名前`%.*s`が指定されています", ident_token->len, ident_token->str);
+                    Node* new_node = create_node(ND_MEMBER);
+                    new_node->left_child = node;
+                    new_node->name = ident_token->str;
+                    new_node->len = ident_token->len;
+                    node = new_node;
                 }
                 char* actual = token_text(token);
                 if (actual) {
