@@ -112,6 +112,7 @@ struct Node {
     Node* args;
     int array_len;
     Type* type;
+    Type* anno;
 };
 
 typedef struct Function Function;
@@ -138,6 +139,12 @@ extern LVar* locals;
 extern LVar* globals;
 extern char* src;
 extern char* src_name;
+
+extern Type ty_int;
+extern Type ty_bool;
+extern Type ty_char;
+extern Type ty_array;
+extern Type ty_unknown;
 
 long token_start(Token* tok);
 long token_end(Token* tok);

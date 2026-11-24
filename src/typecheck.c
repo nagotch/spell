@@ -1,8 +1,10 @@
 #include "spell.h"
 
-static Type ty_int = { TY_INT, NULL };
-static Type ty_bool = { TY_BOOL, NULL };
-static Type ty_unknown = { TY_UNKNOWN, NULL };
+Type ty_int = { TY_INT, NULL };
+Type ty_bool = { TY_BOOL, NULL };
+Type ty_char = { TY_CHAR, NULL };
+Type ty_arary = { TY_ARRAY, NULL };
+Type ty_unknown = { TY_UNKNOWN, NULL };
 
 static Type* local_types[1024];
 
