@@ -198,7 +198,10 @@ static Type* check_node(Node* node) {
         case ND_NEWARRAY:
             ;
             Type* fill = check_node(node->left_child);
-            check_node(node->right_child);
+            Type* len = check_node(node->right_child);
+            if (len->kind != TY_UNKNOWN && len->kind != TY_INT) {
+                error_plain("長さには`int`が必要ですが、`%s`が指定されています", type_text(len));
+            }
             result = array_type(fill);
             break;
         case ND_INDEX:
