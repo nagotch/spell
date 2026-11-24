@@ -51,11 +51,13 @@ static void gen(Node* node) {
                 error_plain("ここでは`break`を使えません");
             }
             printf("  jmp .Lend%d\n", break_label);
+            break;
         case ND_CONTINUE:
             if (continue_label < 0) {
                 error_plain("ここでは`continue`を使えません");
             }
             printf("  jmp .Lcont%d\n", continue_label);
+            break;
     }
 }
 
@@ -273,6 +275,7 @@ static void gen_while(Node* node) {
     break_label = label;
     continue_label = label;
     printf(".Lbegin%d:\n", label);
+    printf(".Lcont%d:\n", label);
     gen(node -> cond);
     printf("  pop rax\n");
     printf("  cmp rax, 0\n");
@@ -308,6 +311,7 @@ static void gen_for(Node* node) {
     printf("  pop rax\n");
     break_label = saved_break;
     continue_label = saved_continue;
+    printf(".Lcont%d:\n", label);
     if (node -> inc) {
         gen(node -> inc);
         printf("  pop rax\n");
