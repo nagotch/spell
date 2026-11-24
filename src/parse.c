@@ -524,11 +524,43 @@ Function* program() {
     Function head;
     head.next = NULL;
     Function* cur = &head;
+    Node stmt_head;
+    stmt_head.next = NULL;
+    Node* stmt_cur = &stmt_head;
     while (!at_eof()) {
-        cur->next = function();
-        cur = cur->next;
+        if (token->kind == TK_KEYWORD && token->keyword == KW_DEF) {
+            cur->next = function();
+            cur = cur->next;
+        } else {
+            stmt_cur->next = stmt();
+            stmt_cur = stmt_cur->next;
+        }
     }
-    return head.next;
+    if (!stmt_head.next) {
+        return head.next;
+    }
+    Node* ret = create_node(ND_RETURN);
+    ret->left_child = create_number_node(0);
+    stmt_cur->next = ret;
+    Node* block = create_node(ND_BLOCK);
+    block->body = stmt_head.next;
+    Function* init = calloc(1, sizeof(Function));
+    init->body = block;
+    bool has_main = false;
+    for (Function* fn = head.next; fn; fn = fn->next) {
+        if (fn->len == 4 && !memcmp(fn->name, "main", 4)) {
+            has_main = true;
+        }
+    }
+    if (has_main) {
+        init->name = "__spell_init";
+        init->len = 12;
+    } else {
+        init->name = "main";
+        init->len = 4;
+    }
+    init->next = head.next;
+    return init;
 }
 
 static LVar* find_lvar(Token* tok) {
