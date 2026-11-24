@@ -80,7 +80,7 @@ static void record_global_type(Node* node, Type* type) {
     global_types = g;
 }
 
-static Type* array_type(Type* elem) {
+Type* array_type(Type* elem) {
     Type* t = calloc(1, sizeof(Type));
     t->kind = TY_ARRAY;
     t->elem = elem;

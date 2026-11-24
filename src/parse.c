@@ -364,6 +364,42 @@ static Node* or() {
     return node;
 }
 
+static Type* parse_type() {
+    if (consume("[")) {
+        Type* elem = parse_type();
+        expect("]");
+        return array_type(elem);
+    }
+    Token* ident = consume_ident();
+    if (!ident) {
+        if (token->kind == TK_EOF) {
+            error_at(token_start(token), token_end(token), "型名が必要ですが、ファイルの末尾に達しました");
+        }
+        error_at(token_start(token), token_end(token), "型名が必要ですが、%sが見つかりました", token_text(token));
+    }
+    Type* anno;
+    char* type_name[] = {
+        "int",
+        "bool",
+        "char",
+    };
+    Type* types[] = {
+        &ty_int,
+        &ty_bool,
+        &ty_char,
+    };
+    for (int i = 0; i < sizeof(type_name) / sizeof(type_name[0]); i++) {
+        int len = strlen(type_name[i]);
+        if (ident->len == len && !memcmp(ident->str, type_name[i], len)) {
+            anno = types[i];
+        }
+    }
+    if (!anno) {
+        error_at(token_start(ident), token_end(ident), "型`%.*s`は定義されていません", ident->len, ident->str);
+    }
+    return anno;
+}
+
 static Node* assign() {
     Node* node = or();
     Token* error_token = token;
@@ -379,25 +415,7 @@ static Node* assign() {
             }
             error_at(token_start(token), token_end(token), "型名が必要ですが、%sが見つかりました", token_text(token));
         }
-        char* type_name[] = {
-            "int",
-            "bool",
-            "char",
-        };
-        Type* types[] = {
-            &ty_int,
-            &ty_bool,
-            &ty_char,
-        };
-        for (int i = 0; i < sizeof(type_name) / sizeof(type_name[0]); i++) {
-            int len = strlen(type_name[i]);
-            if (ident->len == len && !memcmp(ident->str, type_name[i], len)) {
-                assign_node->anno = types[i];
-            }
-        }
-        if (!assign_node->anno) {
-            error_at(token_start(ident), token_end(ident), "型`%.*s`は定義されていません", ident->len, ident->str);
-        }
+        assign_node->anno = parse_type();
         expect("=");
         assign_node->left_child = node;
         assign_node->right_child = assign();
