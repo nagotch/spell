@@ -79,6 +79,7 @@ Token* tokenize(char* s) {
             ".",
             "%",
             "!",
+            ":",
         };
         size_t targets_size = sizeof(targets) / sizeof(targets[0]);
         for (int i = 0; i < targets_size; i++) {
@@ -115,6 +116,7 @@ Token* tokenize(char* s) {
             "for",
             "break",
             "continue",
+            "def"
         };
         Keyword kinds[] = {
             KW_RETURN,
@@ -124,6 +126,7 @@ Token* tokenize(char* s) {
             KW_FOR,
             KW_BREAK,
             KW_CONTINUE,
+            KW_DEF,
         };
         bool is_keyword = false;
         size_t keywords_size = sizeof(keywords) / sizeof(keywords[0]);
