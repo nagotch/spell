@@ -5,7 +5,7 @@ static Type ty_bool = { TY_BOOL, NULL };
 static Type ty_unknown = { TY_UNKNOWN, NULL };
 
 static Type* local_types[1024];
-static Type* global_types;
+static Type* global_types[1024];
 
 static Type* check_node(Node* node) {
     if (!node) {
@@ -61,10 +61,16 @@ static Type* check_node(Node* node) {
         case ND_FOR:
         case ND_RETURN:
             break;
+        default:
+            break;
     }
     node->type = result;
     return result;
 }
 
 void typecheck(Function* prog) {
+    for (Function* fn = prog; fn; fn = fn->next) {
+        memset(local_types, 0, sizeof(local_types));
+        check_node(fn->body);
+    }
 }
