@@ -5,6 +5,22 @@ class Point {
         self.x = x;
         self.y = y;
     }
+
+    def sum(self) -> int {
+        return self.x + self.y;
+    }
+
+    def add(self, a:int) -> int {
+        return self.x + self.y + a;
+    }
+
+    def total(self) -> int {
+        return self.add(10);
+    }
+
+    def move(self, dx: int) {
+        self.x = self.x + dx;
+    }
 }
 
 class Box {
@@ -35,6 +51,25 @@ def t004() {
     return p.x * 10 + p.y;
 }
 
+def t005() {
+    p = Point(3, 4);
+    return p.sum();
+}
+
+def t006() {
+    return Point(3, 4).add(10);
+}
+
+def t007() {
+    return Point(3, 4).total();
+}
+
+def t008() {
+    p = Point(3, 4);
+    p.move(5);
+    return p.x * 10 + p.y;
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -51,6 +86,10 @@ def main() {
     mark(2); fails=fails+check(t002(), 94);
     mark(3); fails=fails+check(t003(), 7);
     mark(4); fails=fails+check(t004(), 15);
+    mark(5); fails=fails+check(t005(), 7);
+    mark(6); fails=fails+check(t006(), 17);
+    mark(7); fails=fails+check(t007(), 17);
+    mark(8); fails=fails+check(t008(), 84);
 
     print_str("done"); putchar(10);
     return fails > 0;

@@ -55,6 +55,20 @@ static Node* primary() {
                     new_node->name = ident_token->str;
                     new_node->len = ident_token->len;
                     node = new_node;
+                    if (consume("(")) {
+                        new_node->kind = ND_MCALL;
+                        if (!consume(")")) {
+                            Node head;
+                            head.next = NULL;
+                            Node* cur = &head;
+                            do {
+                                cur->next = expr();
+                                cur = cur->next;
+                            } while (consume(","));
+                            new_node->args = head.next;
+                            expect(")");
+                        }
+                    }
                 } else {
                     char* actual = token_text(token);
                     if (actual) {
