@@ -14,6 +14,7 @@ typedef enum {
     KW_FOR,
     KW_BREAK,
     KW_CONTINUE,
+    KW_DEF,
 } Keyword;
 
 typedef enum {
@@ -61,6 +62,7 @@ typedef enum {
     ND_NUM,
     ND_ASSIGN, 
     ND_LVAR,
+    ND_GVAR,
     ND_RETURN,
     ND_IF,
     ND_WHILE,
@@ -119,6 +121,7 @@ struct LVar {
 
 extern Token* token;
 extern LVar* locals;
+extern LVar* globals;
 extern char* src;
 extern char* src_name;
 

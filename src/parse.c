@@ -1,8 +1,11 @@
 #include "spell.h"
 
 LVar* locals = NULL;
+LVar* globals = NULL;
+bool is_top_level = false;
 
 static LVar* find_lvar(Token* tok);
+static LVar* find_gvar(Token* tok);
 static Node* expr();
 
 static bool consume(char* symbol) {
@@ -97,21 +100,42 @@ static void register_lvar(Token* tok) {
     locals->len = tok->len;
 }
 
+static void register_gvar(Token* tok) {
+    LVar* gvar = calloc(1, sizeof(LVar));
+    gvar->next = globals;
+    globals = gvar;
+    globals->name = tok->str;
+    globals->len = tok->len;
+}
+
 static void register_array(int array_len) {
     register_any();
     locals->array_len = array_len;
 }
 
 static Node* create_ident_node(Token* tok) {
-    LVar* var = find_lvar(tok);
-    Node* ident_node_ptr = create_node(ND_LVAR);
-    if (var) {
-        ident_node_ptr->offset = var->offset;
-    } else {
-        register_lvar(tok);
-        ident_node_ptr->offset = locals->offset;
+    if (!is_top_level) {
+        LVar* lvar = find_lvar(tok);
+        if (lvar) {
+            Node* node = create_node(ND_LVAR);
+            node->offset = lvar->offset;
+            return node;
+        }
     }
-    return ident_node_ptr;
+    LVar* gvar = find_gvar(tok);
+    if (!gvar) {
+        if (!is_top_level) {
+            register_lvar(tok);
+            Node* node = create_node(ND_LVAR);
+            node->offset = locals->offset;
+            return node;
+        }
+        register_gvar(tok);
+    }
+    Node* node = create_node(ND_GVAR);
+    node->name = tok->str;
+    node->len = tok->len;
+    return node;
 }
 
 static Node* char_array() {
@@ -472,6 +496,7 @@ static Node* stmt_for() {
 
 static Function* function() {
     locals = NULL;
+    consume_keyword(KW_DEF);
     Token* tok = consume_ident();
     if (!tok) {
         if (token) {
@@ -524,15 +549,58 @@ Function* program() {
     Function head;
     head.next = NULL;
     Function* cur = &head;
+    Node stmt_head;
+    stmt_head.next = NULL;
+    Node* stmt_cur = &stmt_head;
     while (!at_eof()) {
-        cur->next = function();
-        cur = cur->next;
+        if (token->kind == TK_KEYWORD && token->keyword == KW_DEF || consume(":")) {
+            cur->next = function();
+            cur = cur->next;
+        } else {
+            is_top_level = true;
+            stmt_cur->next = stmt();
+            stmt_cur = stmt_cur->next;
+            is_top_level = false;
+        }
     }
-    return head.next;
+    if (!stmt_head.next) {
+        return head.next;
+    }
+    Node* ret = create_node(ND_RETURN);
+    ret->left_child = create_number_node(0);
+    stmt_cur->next = ret;
+    Node* block = create_node(ND_BLOCK);
+    block->body = stmt_head.next;
+    Function* init = calloc(1, sizeof(Function));
+    init->body = block;
+    bool has_main = false;
+    for (Function* fn = head.next; fn; fn = fn->next) {
+        if (fn->len == 4 && !memcmp(fn->name, "main", 4)) {
+            has_main = true;
+        }
+    }
+    if (has_main) {
+        init->name = "__spell_init";
+        init->len = 12;
+    } else {
+        init->name = "main";
+        init->len = 4;
+    }
+    init->next = head.next;
+    return init;
 }
 
 static LVar* find_lvar(Token* tok) {
     for (LVar* var = locals; var; var = var->next) {
+        if (var->len == tok->len && !memcmp(var->name, tok->str, tok->len)) {
+            return var;
+        }
+    }
+    return NULL;
+}
+
+static LVar* find_gvar(Token* tok) {
+    for (LVar* var = globals; var; var = var->next) {
         if (var->len == tok->len && !memcmp(var->name, tok->str, tok->len)) {
             return var;
         }
