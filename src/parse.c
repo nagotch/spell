@@ -354,7 +354,38 @@ static Node* or() {
 
 static Node* assign() {
     Node* node = or();
-    if (consume("=")) {
+    if (consume(":")) {
+        Node* assign_node = create_node(ND_ASSIGN);
+        if (node->left_child->kind != ND_LVAR || node->left_child->kind != ND_GVAR) {
+            error_at(token_start(token), token_end(token), "エラー文");
+        }
+        Token* ident = consume_ident();
+        char* type_name[] = {
+            "int",
+            "bool",
+            "char",
+        };
+        Type types[] = {
+            ty_int,
+            ty_bool,
+            ty_char,
+        };
+        for (int i = 0; i < sizeof(type_name) / sizeof(type_name[0]); i++) {
+            int len = strlen(type_name[i]);
+            if (ident->len == len && !memcmp(ident->str, type_name[i], len)) {
+                assign_node->anno = &types[i];
+            }
+        }
+        if (!assign_node->anno) {
+            error_at(token_start(token), token_end(token), "エラー文");
+        }
+        if (!consume("=")) {
+            error_at(token_start(token), token_end(token), "エラー文");
+        }
+        assign_node->left_child = node;
+        assign_node->right_child = assign();
+        node = assign_node;
+    } else if (consume("=")) {
         Node* assign_node = create_node(ND_ASSIGN);
         assign_node->left_child = node;
         assign_node->right_child = assign();
