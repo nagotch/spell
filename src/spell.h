@@ -63,6 +63,7 @@ typedef enum {
     TY_INT,
     TY_BOOL,
     TY_CHAR,
+    TY_ARRAY,
 } TypeKind;
 typedef struct Type Type;
 struct Type {

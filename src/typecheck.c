@@ -7,6 +7,13 @@ static Type ty_unknown = { TY_UNKNOWN, NULL };
 static Type* local_types[1024];
 static Type* global_types[1024];
 
+static Type* array_type(Type* elem) {
+    Type* t = calloc(1, sizeof(Type));
+    t->kind = TY_ARRAY;
+    t->elem = elem;
+    return t;
+}
+
 static Type* check_node(Node* node) {
     if (!node) {
         return &ty_unknown;
@@ -55,14 +62,39 @@ static Type* check_node(Node* node) {
             }
             break;
         case ND_FUNCALL:
+            for (Node* arg = node->args; arg; arg = arg->next) {
+                check_node(arg);
+            }
+            result = &ty_int;
             break;
         case ND_ARRAY:
+            ;
+            Type* elem = &ty_unknown;
+            for (Node* cur = node->body; cur; cur = cur->next) {
+                Type* t = check_node(cur);
+                if (cur == node->body) {
+                    elem = t;
+                }
+            }
+            result = array_type(elem);
             break;
         case ND_NEWARRAY:
+            ;
+            Type* fill = check_node(node->left_child);
+            check_node(node->right_child);
+            result = array_type(fill);
             break;
         case ND_INDEX:
+            ;
+            Type* arr = check_node(node->left_child);
+            check_node(node->right_child);
+            if (arr->kind == TY_ARRAY) {
+                result = arr->elem;
+            }
             break;
         case ND_LEN:
+            check_node(node->left_child);
+            result = &ty_int;
             break;
         case ND_BLOCK:
             for (Node* cur = node->body; cur; cur = cur->next) {
