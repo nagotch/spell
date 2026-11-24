@@ -16,9 +16,18 @@ struct GVarType {
     GVarType* next;
 };
 static GVarType* global_types;
-
 static Function* current_fn;
 static Type* current_return;
+static Function* functions;
+
+static Function* find_function(Node* node) {
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->len == node->len && !memcmp(fn->name, node->name, fn->len)) {
+            return fn;
+        }
+    }
+    return NULL;
+}
 
 static bool type_equals(Type* a, Type* b) {
     if (a->kind == TY_UNKNOWN || b->kind == TY_UNKNOWN) {
@@ -193,10 +202,38 @@ static Type* check_node(Node* node) {
             }
             break;
         case ND_FUNCALL:
+        case ND_FUNCALL:
+            ;
+            Type* arg_types[6];
+            int nargs = 0;
             for (Node* arg = node->args; arg; arg = arg->next) {
-                check_node(arg);
+                Type* at = check_node(arg);
+                if (nargs < 6) {
+                    arg_types[nargs] = at;
+                }
+                nargs++;
             }
-            result = &ty_unknown;
+            Function* callee = find_function(node);
+            if (!callee) {
+                if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
+                    result = &ty_int;
+                } else {
+                    result = &ty_unknown;
+                }
+                break;
+            }
+            if (nargs != callee->nparams) {
+                error_plain("関数`%.*s`の引数は%d個ですが、%d個が指定されています", node->len, node->name, callee->nparams, nargs);
+            }
+            for (int i = 0; i < nargs && i < callee->nparams && i < 6; i++) {
+                Type* pt = callee->param_types[i];
+                if (pt && arg_types[i]->kind != TY_UNKNOWN && !type_equals(pt, arg_types[i])) {
+                    char expected[256];
+                    strcpy(expected, type_text(pt));
+                    error_plain("関数`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", node->len, node->name, expected, type_text(arg_types[i]));
+                }
+            }
+            result = callee->return_type ? callee->return_type : &ty_unknown;
             break;
         case ND_ARRAY:
             ;
