@@ -1,39 +1,39 @@
-t001() { return ret3(); }
-t002() { return add(3, 5); }
-t003() { return sub(5, 3); }
-t004() { return add6(1, 2, 3, 4, 5, 6); }
-t005() { return sub6(100, 1, 2, 3, 4, 5); }
-t006() { return add6(1, 2, add6(3,4,5,6,7,8),9,10,11); }
-t007() { return add6(1,2,add6(3,add6(4,5,6,7,8,9),10,11,12,13),14,15,16); }
-t008() { a=3; return add(a,4); }
-t009() { return ret3() + ret3(); }
-three() { return 3; } t010() { return three(); }
-plus(x, y) { return x + y; } t011() { return plus(3, 5); }
-f(x) { y = x * 2; return y; } t012() { return f(21); }
-sum6(a, b, c, d, e, f) { return a + b + c + d + e + f; } t013() { return sum6(1, 2, 3, 4, 5, 6); }
-fib(x) { if (x <= 1) return 1; return fib(x - 1) + fib(x - 2); } t014() { return fib(9); }
-t015() {
+def t001() { return ret3(); }
+def t002() { return add(3, 5); }
+def t003() { return sub(5, 3); }
+def t004() { return add6(1, 2, 3, 4, 5, 6); }
+def t005() { return sub6(100, 1, 2, 3, 4, 5); }
+def t006() { return add6(1, 2, add6(3,4,5,6,7,8),9,10,11); }
+def t007() { return add6(1,2,add6(3,add6(4,5,6,7,8,9),10,11,12,13),14,15,16); }
+def t008() { a=3; return add(a,4); }
+def t009() { return ret3() + ret3(); }
+def three() { return 3; } t010() { return three(); }
+def plus(x, y) { return x + y; } t011() { return plus(3, 5); }
+def f(x) { y = x * 2; return y; } t012() { return f(21); }
+def sum6(a, b, c, d, e, f) { return a + b + c + d + e + f; } t013() { return sum6(1, 2, 3, 4, 5, 6); }
+def fib(x) { if (x <= 1) return 1; return fib(x - 1) + fib(x - 2); } t014() { return fib(9); }
+def t015() {
     // 1を返す
     return 1;
 }
-t016() {
+def t016() {
     /*
     1を返す
     */
     return 1;
 }
 
-mark(n) {
+def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
 }
 
-check(got, expected) {
+def check(got, expected) {
     if (got != expected) return 1;
     return 0;
 }
 
-main() {
+def main() {
     fails = 0;
     
     mark(1); fails=fails+check(t001(), 3);

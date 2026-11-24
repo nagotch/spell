@@ -6,17 +6,17 @@ make -C ../src
 SPELL=../src/spell
 
 tests=(
-    "main() { i = 0; while (i < 1000000) i = i + 1; return 0; }|0"
-    "main() { s = 0; for (i = 0; i < 1000000; i = i + 1) s = s + 1; return 0; }|0"
+    "def main() { i = 0; while (i < 1000000) i = i + 1; return 0; }|0"
+    "def main() { s = 0; for (i = 0; i < 1000000; i = i + 1) s = s + 1; return 0; }|0"
 )
 
 error_tests=(
-    "main() { a = [1,2,3]; return a.5; }|数値\`5\`が指定されています"
-    "main() { return 1; } /*|コメントを閉じる"
-    "main() { return #; }|ここでは文字\`#\`を使えません"
-    "main() { return (1 + 2; }|\`)\`が必要ですが、\`;\`が見つかりました"
-    "main() { return }; }|数値が必要ですが、\`}\`が見つかりました"
-    "main() { s = \"abc; return 1; }|文字列を閉じる"
+    "def main() { a = [1,2,3]; return a.5; }|数値\`5\`が指定されています"
+    "def main() { return 1; } /*|コメントを閉じる"
+    "def main() { return #; }|ここでは文字\`#\`を使えません"
+    "def main() { return (1 + 2; }|\`)\`が必要ですが、\`;\`が見つかりました"
+    "def main() { return }; }|数値が必要ですが、\`}\`が見つかりました"
+    "def main() { s = \"abc; return 1; }|文字列を閉じる"
 )
 
 cc -c -o funcs.o funcs.c
@@ -123,9 +123,9 @@ run_suite test_stmt.sp
 run_suite test_func.sp
 run_suite test_array.sp
 run_selfcheck
-one_io_test "main() { print_int(42); putchar(10); return 0; }" "" "42\n"
-one_io_test "main() { print_int(0 - 42); putchar(10); return 0; }" "" "-42\n"
-one_io_test "main() { b = read_int(); r = read_int(); print_int((30 - b) * (30 - r)); putchar(10); return 0; }" "10 20\n" "200\n"
+one_io_test "def main() { print_int(42); putchar(10); return 0; }" "" "42\n"
+one_io_test "def main() { print_int(0 - 42); putchar(10); return 0; }" "" "-42\n"
+one_io_test "def main() { b = read_int(); r = read_int(); print_int((30 - b) * (30 - r)); putchar(10); return 0; }" "10 20\n" "200\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
