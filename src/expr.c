@@ -55,12 +55,13 @@ static Node* primary() {
                     new_node->name = ident_token->str;
                     new_node->len = ident_token->len;
                     node = new_node;
-                }
-                char* actual = token_text(token);
-                if (actual) {
-                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、%sが指定されています", actual);
                 } else {
-                    error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、ファイルの末尾に達しました");
+                    char* actual = token_text(token);
+                    if (actual) {
+                        error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、%sが指定されています", actual);
+                    } else {
+                        error_at(token_start(token), token_end(token), "配列では`len`だけが使えますが、ファイルの末尾に達しました");
+                    }
                 }
             }
         } else {
