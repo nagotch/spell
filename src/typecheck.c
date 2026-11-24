@@ -322,6 +322,7 @@ static Type* check_node(Node* node) {
 }
 
 void typecheck(Function* prog) {
+    functions = prog;
     for (Function* fn = prog; fn; fn = fn->next) {
         memset(local_types, 0, sizeof(local_types));
         current_fn = fn;
