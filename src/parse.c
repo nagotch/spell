@@ -119,7 +119,7 @@ static Node* create_ident_node(Token* tok) {
         if (lvar) {
             Node* node = create_node(ND_LVAR);
             node->name = tok->str;
-            node->len = node->len;
+            node->len = tok->len;
             node->offset = lvar->offset;
             return node;
         }
@@ -130,7 +130,7 @@ static Node* create_ident_node(Token* tok) {
             register_lvar(tok);
             Node* node = create_node(ND_LVAR);
             node->name = tok->str;
-            node->len = node->len;
+            node->len = tok->len;
             node->offset = locals->offset;
             return node;
         }
@@ -358,6 +358,7 @@ static Node* or() {
 
 static Node* assign() {
     Node* node = or();
+    Token* error_token = token;
     if (consume(":")) {
         Node* assign_node = create_node(ND_ASSIGN);
         if (node->kind != ND_LVAR && node->kind != ND_GVAR) {
