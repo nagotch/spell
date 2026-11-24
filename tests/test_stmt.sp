@@ -1,48 +1,48 @@
-t001() { a=3; a; }
-t002() { a=3; b=5*6-8; a+b/2; }
-t003() { a=b=3; a+b; }
-t004() { foo=3; foo; }
-t005() { foo=3; bar=5; foo+bar; }
-t006() { fo=1; foo=2; fo+foo; }
-t007() { foo1=5; foo1; }
-t008() { return 42; }
-t009() { return 5; return 8; }
-t010() { a=3; b=5*6-8; return a+b/2; }
-t011() { returnx=3; returnx; }
-t012() { return1=7; return1; }
-t013() { if (0) return 1; return 2; }
-t014() { if (1) return 1; return 2; }
-t015() { if (0) return 1; else return 2; }
-t016() { if (1) return 1; else return 2; }
-t017() { a=0; if (1) a=1; return a; }
-t018() { a=0; if (0) a=1; return a; }
-t019() { a=0; while (a<10) a=a+1; return a; }
-t020() { s=0; for (i=0; i<10; i=i+1) s=s+i; return s; }
-t021() { for (;;) return 3; }
-t022() { a=0; for (; a<3;) a=a+1; return a; }
-t023() { a=0; { a=1; a=2; } return a; }
-t024() { a=0; if (1) { a=1; a=2; } return a; }
-t025() { a=0; if (0) { a=1; } else { a=2; } return a; }
-t026() { a=0; while (a<3) { a=a+1; a=a+1; } return a; }
-t027() { s=0; for (i=0; i<3; i=i+1) { s=s+i; s=s+1; } return s; }
-t028() { a=0; { a=1; { a=2; } } return a; }
-t029() { a=5; {} return a; }
-t030() { i = 0; while (1) { i += 1; if (i == 5) { break; } } return i; }
-t031() { i = 0; s = 0; while (i < 10) { i += 1; if (i == 5) { continue; } s += i; } return s; }
-t032() { s = 0; for (i = 0; i < 5; i += 1) { if (i == 2) { continue; } s += i; } return s; }
-t033() { total = 0; for (i = 0; i < 3; i += 1) { for (j = 0; j < 10; j += 1) { if (j == 2) { break; } total += 1; } } return total; }
+def t001() { a=3; a; }
+def t002() { a=3; b=5*6-8; a+b/2; }
+def t003() { a=b=3; a+b; }
+def t004() { foo=3; foo; }
+def t005() { foo=3; bar=5; foo+bar; }
+def t006() { fo=1; foo=2; fo+foo; }
+def t007() { foo1=5; foo1; }
+def t008() { return 42; }
+def t009() { return 5; return 8; }
+def t010() { a=3; b=5*6-8; return a+b/2; }
+def t011() { returnx=3; returnx; }
+def t012() { return1=7; return1; }
+def t013() { if (0) return 1; return 2; }
+def t014() { if (1) return 1; return 2; }
+def t015() { if (0) return 1; else return 2; }
+def t016() { if (1) return 1; else return 2; }
+def t017() { a=0; if (1) a=1; return a; }
+def t018() { a=0; if (0) a=1; return a; }
+def t019() { a=0; while (a<10) a=a+1; return a; }
+def t020() { s=0; for (i=0; i<10; i=i+1) s=s+i; return s; }
+def t021() { for (;;) return 3; }
+def t022() { a=0; for (; a<3;) a=a+1; return a; }
+def t023() { a=0; { a=1; a=2; } return a; }
+def t024() { a=0; if (1) { a=1; a=2; } return a; }
+def t025() { a=0; if (0) { a=1; } else { a=2; } return a; }
+def t026() { a=0; while (a<3) { a=a+1; a=a+1; } return a; }
+def t027() { s=0; for (i=0; i<3; i=i+1) { s=s+i; s=s+1; } return s; }
+def t028() { a=0; { a=1; { a=2; } } return a; }
+def t029() { a=5; {} return a; }
+def t030() { i = 0; while (1) { i += 1; if (i == 5) { break; } } return i; }
+def t031() { i = 0; s = 0; while (i < 10) { i += 1; if (i == 5) { continue; } s += i; } return s; }
+def t032() { s = 0; for (i = 0; i < 5; i += 1) { if (i == 2) { continue; } s += i; } return s; }
+def t033() { total = 0; for (i = 0; i < 3; i += 1) { for (j = 0; j < 10; j += 1) { if (j == 2) { break; } total += 1; } } return total; }
 
-mark(n) {
+def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
 }
 
-check(got, expected) {
+def check(got, expected) {
     if (got != expected) return 1;
     return 0;
 }
 
-main() {
+def main() {
     fails = 0;
 
     mark(1); fails=fails+check(t001(), 3);

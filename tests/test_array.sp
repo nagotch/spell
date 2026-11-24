@@ -1,45 +1,47 @@
-t001() { x=3; y=&x; return *y; }
-t002() { x=3; return *&x; }
-t003() { a=3; b=4; p=&a; q=&b; return *p + *q; }
-t004() { x=42; p=&x; q=&p; return **q; }
-t005() { x=3; y=&x; *y=5; return x; }
-t006() { x=3; y=&x; *y=*y+2; return x; }
-t007() { x=7; y=&x; z=&y; **z=9; return x; }
-t008() { x=3; y=&x; *y=8; return *y; }
-t009() { a = [10, 20, 30]; return a[0] + a[1] + a[2]; }
-t010() { a = [1, 2, 3]; a[1] = 42; return a[1]; }
-t011() { a = [5, 6, 7]; i = 2; return a[i]; }
-t012() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < 4; i = i+ 1) s = s + a[i]; return s; }
-t013() { x = 3; a = [x, x * 2]; return a[1]; }
-t014() { a = [10, 20, 30]; return a.len; }
-t015() { a = [7]; return a.len; }
-t016() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < a.len; i = i + 1) s = s + a[i]; return s; }
-count(a) { return a.len; } t017() { x = [1, 2, 3, 4, 5]; return count(x); }
-t018() { n = 3; a = [0; n]; a[0] = 10; a[2] = 30; return a[0] + a[1] + a[2] + a.len; }
-t019() { a = [7; 4]; return a[0] + a[3]; }
-t020() { a = [5; 0]; return a.len; }
-t021() { n = 5; a = [0; n]; for (i = 0; i < a.len; i = i + 1) a[i] = i * 2; s = 0; for (i = 0; i < a.len; i = i + 1) s = s + a[i]; return s; }
-make(n) { return [9; n]; } t022() { a = make(3); return a[2] + a.len; }
-t023() { s = "hello"; return s.len; }
-t024() { s = "hello"; return s[0]; }
-t025() { s = "A\n"; return s[1]; }
-t026() { s = "abc"; s[1] = 120; return s[1]; }
-t027() { s = "hello"; c = 0; for (i = 0; i < s.len; i = i + 1) if (s[i] == 108) c = c + 1; return c; }
-t028() { s = "hi"; putchar(s[0]); putchar(s[1]); return 0; }
-t029() { s = ""; return s.len; }
-t030() { a = [1,2,3]; a[1] += 10; return a[1]; }
+def t001() { x=3; y=&x; return *y; }
+def t002() { x=3; return *&x; }
+def t003() { a=3; b=4; p=&a; q=&b; return *p + *q; }
+def t004() { x=42; p=&x; q=&p; return **q; }
+def t005() { x=3; y=&x; *y=5; return x; }
+def t006() { x=3; y=&x; *y=*y+2; return x; }
+def t007() { x=7; y=&x; z=&y; **z=9; return x; }
+def t008() { x=3; y=&x; *y=8; return *y; }
+def t009() { a = [10, 20, 30]; return a[0] + a[1] + a[2]; }
+def t010() { a = [1, 2, 3]; a[1] = 42; return a[1]; }
+def t011() { a = [5, 6, 7]; i = 2; return a[i]; }
+def t012() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < 4; i = i+ 1) s = s + a[i]; return s; }
+def t013() { x = 3; a = [x, x * 2]; return a[1]; }
+def t014() { a = [10, 20, 30]; return a.len; }
+def t015() { a = [7]; return a.len; }
+def t016() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < a.len; i = i + 1) s = s + a[i]; return s; }
+def count(a) { return a.len; }
+def t017() { x = [1, 2, 3, 4, 5]; return count(x); }
+def t018() { n = 3; a = [0; n]; a[0] = 10; a[2] = 30; return a[0] + a[1] + a[2] + a.len; }
+def t019() { a = [7; 4]; return a[0] + a[3]; }
+def t020() { a = [5; 0]; return a.len; }
+def t021() { n = 5; a = [0; n]; for (i = 0; i < a.len; i = i + 1) a[i] = i * 2; s = 0; for (i = 0; i < a.len; i = i + 1) s = s + a[i]; return s; }
+def make(n) { return [9; n]; }
+def t022() { a = make(3); return a[2] + a.len; }
+def t023() { s = "hello"; return s.len; }
+def t024() { s = "hello"; return s[0]; }
+def t025() { s = "A\n"; return s[1]; }
+def t026() { s = "abc"; s[1] = 120; return s[1]; }
+def t027() { s = "hello"; c = 0; for (i = 0; i < s.len; i = i + 1) if (s[i] == 108) c = c + 1; return c; }
+def t028() { s = "hi"; putchar(s[0]); putchar(s[1]); return 0; }
+def t029() { s = ""; return s.len; }
+def t030() { a = [1,2,3]; a[1] += 10; return a[1]; }
 
-mark(n) {
+def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
 }
 
-check(got, expected) {
+def check(got, expected) {
     if (got != expected) return 1;
     return 0;
 }
 
-main() {
+def main() {
     fails = 0;
     
     mark(1); fails=fails+check(t001(), 3);

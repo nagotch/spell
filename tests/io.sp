@@ -1,4 +1,4 @@
-read_int() {
+def read_int() {
     char = getchar();
     ret=0;
     is_negative = 0;
@@ -16,7 +16,7 @@ read_int() {
     return ret;
 }
 
-read_str() {
+def read_str() {
     str = [0; 100];
     n = 0;
     char = getchar();
@@ -32,7 +32,7 @@ read_str() {
     return r_str;
 }
 
-print_int(n) {
+def print_int(n) {
     is_negative = n<0;
     if (n==0) {
         putchar(48);
@@ -58,7 +58,7 @@ print_int(n) {
     }
 }
 
-print_str(s) {
+def print_str(s) {
     for (i=0; i<s.len; i=i+1) {
         putchar(s[i]);
     }
