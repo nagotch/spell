@@ -6,6 +6,9 @@
 #include <stdbool.h>
 #include <string.h>
 
+typedef struct Field Field;
+typedef struct Class Class;
+
 typedef enum {
     KW_RETURN,
     KW_IF,
@@ -71,6 +74,7 @@ typedef struct Type Type;
 struct Type {
     TypeKind kind;
     Type* elem;
+    Class* klass;
 };
 
 typedef enum {
@@ -127,6 +131,7 @@ struct Function {
     int stack_size;
     Type* param_types[6];
     Type* return_type;
+    Class* klass;
 };
 
 typedef struct LVar LVar;
@@ -138,7 +143,6 @@ struct LVar {
     int array_len;
 };
 
-typedef struct Field Field;
 struct Field {
     Field* next;
     char* name;
@@ -147,7 +151,6 @@ struct Field {
     int offset;
 };
 
-typedef struct Class Class;
 struct Class {
     Class* next;
     char* name;
@@ -173,6 +176,7 @@ long token_end(Token* tok);
 char* token_text(Token* tok);
 
 Node* create_node(NodeKind kind);
+Class* find_class(char* name, int len);
 
 Type* array_type(Type* elem);
 
