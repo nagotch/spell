@@ -119,6 +119,18 @@ struct LVar {
     int array_len;
 };
 
+typedef enum {
+    TY_UNKNOWN,
+    TY_INT,
+    TY_BOOL,
+    TY_CHAR,
+} TypeKind;
+typedef struct Type Type;
+struct Type {
+    TypeKind kind;
+    Type* elem;
+};
+
 extern Token* token;
 extern LVar* locals;
 extern LVar* globals;
