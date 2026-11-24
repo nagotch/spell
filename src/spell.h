@@ -8,6 +8,7 @@
 
 typedef struct Field Field;
 typedef struct Class Class;
+typedef struct Function Function;
 
 typedef enum {
     KW_RETURN,
@@ -97,6 +98,7 @@ typedef enum {
     ND_OPASSIGN,
     ND_BREAK,
     ND_CONTINUE,
+    ND_MEMBER,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
@@ -119,9 +121,10 @@ struct Node {
     int array_len;
     Type* type;
     Type* anno;
+    Class* klass;
+    Function* func;
 };
 
-typedef struct Function Function;
 struct Function {
     Function* next;
     char* name;
