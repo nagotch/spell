@@ -9,6 +9,7 @@ tests=(
     "def main() { i = 0; while (i < 1000000) i = i + 1; return 0; }|0"
     "def main() { s = 0; for (i = 0; i < 1000000; i = i + 1) s = s + 1; return 0; }|0"
     "x = 30; y = 12; return x + y;|42"
+    "class P { x: int; def one(self) -> int { return 1; } } def main() { return 42; }|42"
 )
 
 error_tests=(
@@ -31,6 +32,11 @@ error_tests=(
     "def add(x: int, y: int) -> int { return x + y; } def main() { return add(1); }|引数は2個ですが"
     "def f() -> int { return 1 < 2; } def main() { return 0; }|戻り値は\`int\`ですが"
     "def f() { if (1) { return 1; } return 1 < 2; } def main() { return 0; }|戻り値は\`int\`ですが"
+    "class P { x: int; x: int; } def main() { return 0; }|フィールド\`x\`は既に定義されています"
+    "class P { x: int; } def f(p: P) -> int { return 1; } def main() { return f(0); }|引数には\`P\`が必要ですが"
+    "class P { x: int; } def main() { v: P = 1; return 0; }|変数\`v\`の型は\`P\`ですが"
+    "class P { x: int; ; } def main() { return 0; }|フィールド名が必要ですが"
+    "class P { def f() { return 1; } } def main() { return 0; }|最初の引数\`self\`が必要です"
 )
 
 cc -c -o funcs.o funcs.c
