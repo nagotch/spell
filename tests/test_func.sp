@@ -28,6 +28,7 @@ def t016() {
     return 1;
 }
 def t017(p) { x = p; x = 1; return x;}
+def t018(x: int, y: int) -> int { return x + y; }
 
 g_val = 40 + 2;
 g_counter = 0;
