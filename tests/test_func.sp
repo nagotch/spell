@@ -27,6 +27,10 @@ def t016() {
     */
     return 1;
 }
+g_val = 40 + 2;
+g_counter = 0;
+def get_g() { return g_val; }
+def bump() { g_counter += 1; return g_counter; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -57,6 +61,9 @@ def main() {
     mark(14); fails=fails+check(t014(), 55);
     mark(15); fails=fails+check(t015(), 1);
     mark(16); fails=fails+check(t016(), 1);
+    mark(17); fails=fails+check(get_g(), 42);
+    mark(18); fails=fails+check(bump(), 1);
+    mark(19); fails=fails+check(bump(), 2);
 
     print_str("done"); putchar(10);
     return fails > 0;

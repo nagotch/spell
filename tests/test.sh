@@ -8,6 +8,7 @@ SPELL=../src/spell
 tests=(
     "def main() { i = 0; while (i < 1000000) i = i + 1; return 0; }|0"
     "def main() { s = 0; for (i = 0; i < 1000000; i = i + 1) s = s + 1; return 0; }|0"
+    "x = 30; y = 12; return x + y;|42"
 )
 
 error_tests=(
