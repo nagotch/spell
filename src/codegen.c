@@ -17,6 +17,8 @@ static void gen_funcall(Node* node);
 static void gen_binop(Node* node);
 
 static int max_label = 0;
+static int break_label = -1;
+static int continue_label = -1;
 
 static char* resister[] = {
     "rdi",
@@ -44,6 +46,18 @@ static void gen(Node* node) {
         case ND_BLOCK: gen_block(node); break;
         case ND_FUNCALL: gen_funcall(node); break;
         case ND_BINOP: gen_binop(node); break;
+        case ND_BREAK:
+            if (break_label < 0) {
+                error_plain("ここでは`break`を使えません");
+            }
+            printf("  jmp .Lend%d\n", break_label);
+            break;
+        case ND_CONTINUE:
+            if (continue_label < 0) {
+                error_plain("ここでは`continue`を使えません");
+            }
+            printf("  jmp .Lcont%d\n", continue_label);
+            break;
     }
 }
 
@@ -256,13 +270,20 @@ static void gen_if(Node* node) {
 static void gen_while(Node* node) {
     int label = max_label;
     max_label++;
+    int saved_break = break_label;
+    int saved_continue = continue_label;
+    break_label = label;
+    continue_label = label;
     printf(".Lbegin%d:\n", label);
+    printf(".Lcont%d:\n", label);
     gen(node -> cond);
     printf("  pop rax\n");
     printf("  cmp rax, 0\n");
     printf("  je .Lend%d\n", label);
     gen(node -> then);
     printf("  pop rax\n");
+    break_label = saved_break;
+    continue_label = saved_continue;
     printf("  jmp .Lbegin%d\n", label);
     printf(".Lend%d:\n", label);
     printf("  push 0\n");
@@ -271,6 +292,10 @@ static void gen_while(Node* node) {
 static void gen_for(Node* node) {
     int label = max_label;
     max_label++;
+    int saved_break = break_label;
+    int saved_continue = continue_label;
+    break_label = label;
+    continue_label = label;
     if (node -> init) {
         gen(node -> init);
         printf("  pop rax\n");
@@ -284,6 +309,9 @@ static void gen_for(Node* node) {
     }
     gen(node -> then);
     printf("  pop rax\n");
+    break_label = saved_break;
+    continue_label = saved_continue;
+    printf(".Lcont%d:\n", label);
     if (node -> inc) {
         gen(node -> inc);
         printf("  pop rax\n");

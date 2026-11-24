@@ -27,6 +27,10 @@ t026() { a=0; while (a<3) { a=a+1; a=a+1; } return a; }
 t027() { s=0; for (i=0; i<3; i=i+1) { s=s+i; s=s+1; } return s; }
 t028() { a=0; { a=1; { a=2; } } return a; }
 t029() { a=5; {} return a; }
+t030() { i = 0; while (1) { i += 1; if (i == 5) { break; } } return i; }
+t031() { i = 0; s = 0; while (i < 10) { i += 1; if (i == 5) { continue; } s += i; } return s; }
+t032() { s = 0; for (i = 0; i < 5; i += 1) { if (i == 2) { continue; } s += i; } return s; }
+t033() { total = 0; for (i = 0; i < 3; i += 1) { for (j = 0; j < 10; j += 1) { if (j == 2) { break; } total += 1; } } return total; }
 
 mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -70,6 +74,10 @@ main() {
     mark(27); fails=fails+check(t027(), 6);
     mark(28); fails=fails+check(t028(), 2);
     mark(29); fails=fails+check(t029(), 5);
+    mark(30); fails=fails+check(t030(), 5);
+    mark(31); fails=fails+check(t031(), 50);
+    mark(32); fails=fails+check(t032(), 8);
+    mark(33); fails=fails+check(t033(), 6);
 
     print_str("done"); putchar(10);
     return fails > 0;
