@@ -133,6 +133,9 @@ static Type* check_node(Node* node) {
                     local_types[lhs->offset / 8] = node->anno ? node->anno : rhs;
                 }
                 lhs->type = local_types[lhs->offset / 8];
+            } else if (lhs->kind == ND_GVAR) {
+                record_global_type(lhs, rhs);
+                lhs->type = rhs;
             }
             result = rhs;
             break;
@@ -212,6 +215,8 @@ static Type* check_node(Node* node) {
 void typecheck(Function* prog) {
     for (Function* fn = prog; fn; fn = fn->next) {
         memset(local_types, 0, sizeof(local_types));
-        check_node(fn->body);
+        for (Node* stmt = fn->body; stmt; stmt = stmt->next) {
+            check_node(fn->body);
+        }
     }
 }
