@@ -14,6 +14,7 @@ static void gen_while(Node* node);
 static void gen_for(Node* node);
 static void gen_block(Node* node);
 static void gen_funcall(Node* node);
+static void gen_member(Node* node);
 static void gen_binop(Node* node);
 
 static int max_label = 0;
@@ -46,6 +47,7 @@ static void gen(Node* node) {
         case ND_FOR: gen_for(node); break;
         case ND_BLOCK: gen_block(node); break;
         case ND_FUNCALL: gen_funcall(node); break;
+        case ND_MEMBER: gen_member(node); break;
         case ND_BINOP: gen_binop(node); break;
         case ND_BREAK:
             if (break_label < 0) {
@@ -92,6 +94,13 @@ static void gen_lval(Node* node) {
         printf("  push rax\n");
         return;
     }
+    if (node->kind == ND_MEMBER) {
+        gen(node->left_child);
+        printf("  pop rax\n");
+        printf("  add rax, %d\n", node->offset);
+        printf("  push rax\n");
+        return;
+    }
     error_internal("代入の処理で想定外の形式を検出しました");
 }
 
@@ -111,8 +120,13 @@ void codegen(Function* prog) {
         printf(".text\n");
     }
     while (prog) {
-        printf(".global %.*s\n", prog->len, prog->name);
-        printf("%.*s:\n", prog->len, prog->name);
+        if (prog->klass) {
+            printf(".global %.*s.%.*s\n", prog->klass->len, prog->klass->name, prog->len, prog->name);
+            printf("%.*s.%.*s:\n", prog->klass->len, prog->klass->name, prog->len, prog->name);
+        } else {
+            printf(".global %.*s\n", prog->len, prog->name);
+            printf("%.*s:\n", prog->len, prog->name);
+        }
         printf("  push rbp\n");
         printf("  mov rbp, rsp\n");
         printf("  sub rsp, %d\n", prog->stack_size);
@@ -228,6 +242,21 @@ static void call(int label, int len, char* name) {
     printf("  sub rsp, 8\n");
     printf("  mov rax, 0\n");
     printf("  call %.*s\n", len, name);
+    printf("  add rsp, 8\n");
+    printf(".Lend%d:\n", label);
+}
+
+static void call_method(int label, Function* fn) {
+    printf("  mov rax, rsp\n");
+    printf("  and rax, 15\n");
+    printf("  jnz .Lcall%d\n", label);
+    printf("  mov rax, 0\n");
+    printf("  call %.*s.%.*s\n", fn->klass->len, fn->klass->name, fn->len, fn->name);
+    printf("  jmp .Lend%d\n", label);
+    printf(".Lcall%d:\n", label);
+    printf("  sub rsp, 8\n");
+    printf("  mov rax, 0\n");
+    printf("  call %.*s.%.*s\n", fn->klass->len, fn->klass->name, fn->len, fn->name);
     printf("  add rsp, 8\n");
     printf(".Lend%d:\n", label);
 }
@@ -354,7 +383,42 @@ static void gen_block(Node* node) {
     printf("  push rax\n");
 }
 
+static void gen_construct(Node* node) {
+    int args_cnt = 0;
+    for (Node* arg = node->args; arg; arg = arg->next) {
+        gen(arg);
+        args_cnt++;
+    }
+    if (args_cnt > 5) {
+        error_plain("`__init__`に渡せる引数は5個までですが、%d個が指定されています", args_cnt);
+    }
+    int size = 0;
+    for (Field* f = node->klass->fields; f; f = f->next) {
+        size += 8;
+    }
+    if (size == 0) {
+        size = 8;
+    }
+    int label = max_label++;
+    printf("  mov rdi, %d\n", size);
+    call(label, 6, "malloc");
+    printf("  push rax\n");
+    printf("  pop rdi\n");
+    int i = args_cnt - 1;
+    for (int k = args_cnt - 1; k >= 0; k--) {
+        printf("  pop %s\n", resister[k+1]);
+    }
+    printf("  push rdi\n");
+    if (node->func) {
+        call_method(max_label++, node->func);
+    }
+}
+
 static void gen_funcall(Node* node) {
+    if (node->klass) {
+        gen_construct(node);
+        return;
+    }
     int label = max_label;
     max_label++;
     Node* head = node->args;
@@ -374,6 +438,13 @@ static void gen_funcall(Node* node) {
     if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
         printf("  movsxd rax, eax\n");
     }
+    printf("  push rax\n");
+}
+
+static void gen_member(Node* node) {
+    gen(node->left_child);
+    printf("  pop rax\n");
+    printf("  mov rax, [rax + %d]\n", node->offset);
     printf("  push rax\n");
 }
 
