@@ -1,8 +1,10 @@
 #include "spell.h"
 
-static Type ty_int = { TY_INT, NULL };
-static Type ty_bool = { TY_BOOL, NULL };
-static Type ty_unknown = { TY_UNKNOWN, NULL };
+Type ty_int = { TY_INT, NULL };
+Type ty_bool = { TY_BOOL, NULL };
+Type ty_char = { TY_CHAR, NULL };
+Type ty_array = { TY_ARRAY, NULL };
+Type ty_unknown = { TY_UNKNOWN, NULL };
 
 static Type* local_types[1024];
 
@@ -14,6 +16,45 @@ struct GVarType {
     GVarType* next;
 };
 static GVarType* global_types;
+
+static bool type_equals(Type* a, Type* b) {
+    if (a->kind != b->kind) {
+        return false;
+    }
+    if (a->kind == TY_ARRAY) {
+        return type_equals(a->elem, b->elem);
+    }
+    return true;
+}
+
+static char* type_text_write(Type* type, char* p) {
+    switch (type->kind) {
+        case TY_INT:
+            p += sprintf(p, "int");
+            break;
+        case TY_BOOL:
+            p += sprintf(p, "bool");
+            break;
+        case TY_CHAR:
+            p += sprintf(p, "char");
+            break;
+        case TY_ARRAY:
+            p += sprintf(p, "[");
+            p = type_text_write(type->elem, p);
+            p += sprintf(p, "]");
+            break;
+        case TY_UNKNOWN:
+            p += sprintf(p, "unknown");
+            break;
+    }
+    return p;
+}
+
+char* type_text(Type* type) {
+    static char buf[256];
+    type_text_write(type, buf);
+    return buf;
+}
 
 static Type* find_global_type(Node* node) {
     for (GVarType* g = global_types; g; g = g->next) {
@@ -77,13 +118,37 @@ static Type* check_node(Node* node) {
             Type* rhs = check_node(node->right_child);
             Node* lhs = node->left_child;
             if (lhs->kind == ND_LVAR) {
-                local_types[lhs->offset / 8] = rhs;
-                lhs->type = rhs;
+                Type* recorded = local_types[lhs->offset / 8];
+                if (node->anno && rhs->kind != TY_UNKNOWN && !type_equals(node->anno, rhs)) {
+                    char expected[256];
+                    strcpy(expected, type_text(node->anno));
+                    error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
+                }
+                if (recorded && rhs->kind != TY_UNKNOWN && !type_equals(recorded, rhs)) {
+                    char expected[256];
+                    strcpy(expected, type_text(recorded));
+                    error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
+                }
+                if (!recorded && (node->anno || rhs->kind != TY_UNKNOWN)) {
+                    local_types[lhs->offset / 8] = node->anno ? node->anno : rhs;
+                }
+                lhs->type = local_types[lhs->offset / 8];
             } else if (lhs->kind == ND_GVAR) {
-                record_global_type(lhs, rhs);
-                lhs->type = rhs;
-            } else {
-                check_node(lhs);
+                Type* recorded = find_global_type(lhs);
+                if (node->anno && rhs->kind != TY_UNKNOWN && !type_equals(node->anno, rhs)) {
+                    char expected[256];
+                    strcpy(expected, type_text(node->anno));
+                    error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
+                }
+                if (recorded->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(recorded, rhs)) {
+                    char expected[256];
+                    strcpy(expected, type_text(recorded));
+                    error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
+                }
+                if (recorded->kind == TY_UNKNOWN) {
+                    record_global_type(lhs, node->anno ? node->anno : rhs);
+                }
+                lhs->type = find_global_type(lhs);
             }
             result = rhs;
             break;
@@ -163,6 +228,8 @@ static Type* check_node(Node* node) {
 void typecheck(Function* prog) {
     for (Function* fn = prog; fn; fn = fn->next) {
         memset(local_types, 0, sizeof(local_types));
-        check_node(fn->body);
+        for (Node* stmt = fn->body; stmt; stmt = stmt->next) {
+            check_node(stmt);
+        }
     }
 }
