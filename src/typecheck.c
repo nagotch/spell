@@ -194,11 +194,15 @@ static Type* check_node(Node* node) {
             break;
         case ND_INDEX:
             ;
-            Type* arr = check_node(node->left_child);
-            check_node(node->right_child);
-            if (arr->kind == TY_ARRAY) {
-                result = arr->elem;
+            Type* lt = check_node(node->left_child);
+            Type* it = check_node(node->right_child);
+            if (lt->kind != TY_UNKNOWN && lt->kind != TY_ARRAY) {
+                error_plain("`%s`型の値に添え字は使えません", type_text(lt));
             }
+            if (it->kind != TY_UNKNOWN && it->kind != TY_INT) {
+                error_plain("添え字には`int`が必要ですが、`%s`が指定されています", type_text(it));
+            }
+            result = lt->kind == TY_ARRAY ? lt->elem : &ty_unknown;
             break;
         case ND_LEN:
             check_node(node->left_child);
