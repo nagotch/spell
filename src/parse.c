@@ -472,6 +472,7 @@ static Node* stmt_for() {
 
 static Function* function() {
     locals = NULL;
+    consume_keyword(KW_DEF);
     Token* tok = consume_ident();
     if (!tok) {
         if (token) {

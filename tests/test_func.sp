@@ -7,11 +7,16 @@ def t006() { return add6(1, 2, add6(3,4,5,6,7,8),9,10,11); }
 def t007() { return add6(1,2,add6(3,add6(4,5,6,7,8,9),10,11,12,13),14,15,16); }
 def t008() { a=3; return add(a,4); }
 def t009() { return ret3() + ret3(); }
-def three() { return 3; } t010() { return three(); }
-def plus(x, y) { return x + y; } t011() { return plus(3, 5); }
-def f(x) { y = x * 2; return y; } t012() { return f(21); }
-def sum6(a, b, c, d, e, f) { return a + b + c + d + e + f; } t013() { return sum6(1, 2, 3, 4, 5, 6); }
-def fib(x) { if (x <= 1) return 1; return fib(x - 1) + fib(x - 2); } t014() { return fib(9); }
+def three() { return 3; }
+def t010() { return three(); }
+def plus(x, y) { return x + y; }
+def t011() { return plus(3, 5); }
+def f(x) { y = x * 2; return y; }
+def t012() { return f(21); }
+def sum6(a, b, c, d, e, f) { return a + b + c + d + e + f; }
+def t013() { return sum6(1, 2, 3, 4, 5, 6); }
+def fib(x) { if (x <= 1) return 1; return fib(x - 1) + fib(x - 2); }
+def t014() { return fib(9); }
 def t015() {
     // 1を返す
     return 1;
