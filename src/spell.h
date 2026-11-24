@@ -12,6 +12,8 @@ typedef enum {
     KW_ELSE,
     KW_WHILE,
     KW_FOR,
+    KW_BREAK,
+    KW_CONTINUE,
 } Keyword;
 
 typedef enum {
@@ -72,6 +74,8 @@ typedef enum {
     ND_BINOP,
     ND_UNARY,
     ND_OPASSIGN,
+    ND_BREAK,
+    ND_CONTINUE,
 } NodeKind;
 typedef struct Node Node;
 struct Node {

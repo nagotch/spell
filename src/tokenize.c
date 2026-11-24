@@ -113,6 +113,8 @@ Token* tokenize(char* s) {
             "else",
             "while",
             "for",
+            "break",
+            "continue",
         };
         Keyword kinds[] = {
             KW_RETURN,
@@ -120,6 +122,8 @@ Token* tokenize(char* s) {
             KW_ELSE,
             KW_WHILE,
             KW_FOR,
+            KW_BREAK,
+            KW_CONTINUE,
         };
         bool is_keyword = false;
         size_t keywords_size = sizeof(keywords) / sizeof(keywords[0]);
