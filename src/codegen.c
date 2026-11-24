@@ -463,7 +463,7 @@ static void gen_mcall(Node* node) {
     if (args_cnt > 5) {
         error_plain("メソッドに渡せる引数は5個までですが、%d個が指定されています", args_cnt);
     }
-    for (int k = args_cnt - 1; k >= 0; k++) {
+    for (int k = args_cnt - 1; k >= 0; k--) {
         printf("  pop %s\n", resister[k + 1]);
     }
     printf("  pop rdi\n");
