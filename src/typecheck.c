@@ -202,7 +202,6 @@ static Type* check_node(Node* node) {
             }
             break;
         case ND_FUNCALL:
-        case ND_FUNCALL:
             ;
             Type* arg_types[6];
             int nargs = 0;
