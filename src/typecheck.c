@@ -169,10 +169,19 @@ static Type* check_node(Node* node) {
         case ND_ARRAY:
             ;
             Type* elem = &ty_unknown;
-            for (Node* cur = node->body; cur; cur = cur->next) {
-                Type* t = check_node(cur);
-                if (cur == node->body) {
-                    elem = t;
+            for (Node* e = node->body; e; e = e->next) {
+                Type* et = check_node(e);
+                if (et->kind == TY_UNKNOWN) {
+                    continue;
+                }
+                if (elem->kind == TY_UNKNOWN) {
+                    elem = et;
+                    continue;
+                }
+                if (!type_equals(elem, et)) {
+                    char expected[256];
+                    strcpy(expected, type_text(elem));
+                    error_plain("配列の要素は`%s`ですが、`%s`が含まれています", expected, type_text(et));
                 }
             }
             result = array_type(elem);
