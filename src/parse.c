@@ -310,6 +310,9 @@ static Function* function(Class* klass) {
     func->return_type = return_type;
     memcpy(func->param_types, param_types, sizeof(param_types));
     func->klass = klass;
+    if (klass && nparams == 0) {
+        error_at(token_start(tok), token_end(tok), "メソッドには最初の引数`self`が必要です");
+    }
     if (klass && nparams > 0) {
         func->param_types[0] = klass->type;
     }
@@ -349,6 +352,9 @@ static void class_decl(Function** cur) {
             *cur = (*cur)->next;
         } else {
             Token* field_tok = consume_ident();
+            if (!field_tok) {
+                error_at(token_start(token), token_end(token), "フィールド名が必要ですが、%sが見つかりました", token_text(token));
+            }
             for (Field* f = klass->fields; f; f = f->next) {
                 if (f->len == field_tok->len && !memcmp(f->name, field_tok->str, f->len)) {
                     error_at(token_start(field_tok), token_end(field_tok), "フィールド`%.*s`は既に定義されています", field_tok->len, field_tok->str);

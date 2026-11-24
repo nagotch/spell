@@ -35,6 +35,8 @@ error_tests=(
     "class P { x: int; x: int; } def main() { return 0; }|フィールド\`x\`は既に定義されています"
     "class P { x: int; } def f(p: P) -> int { return 1; } def main() { return f(0); }|引数には\`P\`が必要ですが"
     "class P { x: int; } def main() { v: P = 1; return 0; }|変数\`v\`の型は\`P\`ですが"
+    "class P { x: int; ; } def main() { return 0; }|フィールド名が必要ですが"
+    "class P { def f() { return 1; } } def main() { return 0; }|最初の引数\`self\`が必要です"
 )
 
 cc -c -o funcs.o funcs.c
