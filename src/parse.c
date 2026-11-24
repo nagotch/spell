@@ -1,6 +1,7 @@
 #include "spell.h"
 
 LVar* locals = NULL;
+LVar* globals = NULL;
 
 static LVar* find_lvar(Token* tok);
 static Node* expr();
@@ -95,6 +96,12 @@ static void register_lvar(Token* tok) {
     register_any();
     locals->name = tok->str;
     locals->len = tok->len;
+}
+
+static void register_gvar(Token* tok) {
+    register_any();
+    globals->name = tok->str;
+    globals->len = tok->len;
 }
 
 static void register_array(int array_len) {
@@ -566,6 +573,15 @@ Function* program() {
 
 static LVar* find_lvar(Token* tok) {
     for (LVar* var = locals; var; var = var->next) {
+        if (var->len == tok->len && !memcmp(var->name, tok->str, tok->len)) {
+            return var;
+        }
+    }
+    return NULL;
+}
+
+static LVar* find_gvar(Token* tok) {
+    for (LVar* var = globals; var; var = var->next) {
         if (var->len == tok->len && !memcmp(var->name, tok->str, tok->len)) {
             return var;
         }
