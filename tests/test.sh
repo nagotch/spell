@@ -127,7 +127,7 @@ run_selfcheck
 one_io_test "def main() { print_int(42); putchar(10); return 0; }" "" "42\n"
 one_io_test "def main() { print_int(0 - 42); putchar(10); return 0; }" "" "-42\n"
 one_io_test "def main() { b = read_int(); r = read_int(); print_int((30 - b) * (30 - r)); putchar(10); return 0; }" "10 20\n" "200\n"
-one_io_test "def main() { return getchar()==-1; }" " " "-1\n"
+one_io_test "def main() { print_int(getchar()==-1); putchar(10); return 0; }" "" "-1\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
