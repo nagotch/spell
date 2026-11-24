@@ -120,6 +120,7 @@ struct LVar {
 
 extern Token* token;
 extern LVar* locals;
+extern LVar* globals;
 extern char* src;
 extern char* src_name;
 
