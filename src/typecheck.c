@@ -134,8 +134,21 @@ static Type* check_node(Node* node) {
                 }
                 lhs->type = local_types[lhs->offset / 8];
             } else if (lhs->kind == ND_GVAR) {
-                record_global_type(lhs, rhs);
-                lhs->type = rhs;
+                Type* recorded = local_types[lhs->offset / 8];
+                if (node->anno && rhs->kind != TY_UNKNOWN && !type_equals(node->anno, rhs)) {
+                    char expected[256];
+                    strcpy(expected, type_text(node->anno));
+                    error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
+                }
+                if (recorded && rhs->kind != TY_UNKNOWN && !type_equals(recorded, rhs)) {
+                    char expected[256];
+                    strcpy(expected, type_text(recorded));
+                    error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
+                }
+                if (!recorded) {
+                    record_global_type(lhs, node->anno ? node->anno : rhs);
+                }
+                lhs->type = find_global_type(lhs);
             }
             result = rhs;
             break;
@@ -216,7 +229,7 @@ void typecheck(Function* prog) {
     for (Function* fn = prog; fn; fn = fn->next) {
         memset(local_types, 0, sizeof(local_types));
         for (Node* stmt = fn->body; stmt; stmt = stmt->next) {
-            check_node(fn->body);
+            check_node(stmt);
         }
     }
 }
