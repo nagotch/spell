@@ -62,6 +62,7 @@ typedef enum {
     ND_NUM,
     ND_ASSIGN, 
     ND_LVAR,
+    ND_GVAR,
     ND_RETURN,
     ND_IF,
     ND_WHILE,

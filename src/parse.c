@@ -4,6 +4,7 @@ LVar* locals = NULL;
 LVar* globals = NULL;
 
 static LVar* find_lvar(Token* tok);
+static LVar* find_gvar(Token* tok);
 static Node* expr();
 
 static bool consume(char* symbol) {
@@ -99,7 +100,10 @@ static void register_lvar(Token* tok) {
 }
 
 static void register_gvar(Token* tok) {
-    register_any();
+    LVar* gvar = calloc(1, sizeof(LVar));
+    gvar->offset = globals ? locals->offset + 8 * (locals->array_len + 1): 8;
+    gvar->next = globals;
+    globals = gvar;
     globals->name = tok->str;
     globals->len = tok->len;
 }
@@ -110,10 +114,13 @@ static void register_array(int array_len) {
 }
 
 static Node* create_ident_node(Token* tok) {
-    LVar* var = find_lvar(tok);
+    LVar* lvar = find_lvar(tok);
+    LVar* gvar = find_gvar(tok);
     Node* ident_node_ptr = create_node(ND_LVAR);
-    if (var) {
-        ident_node_ptr->offset = var->offset;
+    if (lvar) {
+        ident_node_ptr->offset = lvar->offset;
+    } else if (gvar) {
+        ident_node_ptr->offset = gvar->offset;
     } else {
         register_lvar(tok);
         ident_node_ptr->offset = locals->offset;
@@ -536,7 +543,7 @@ Function* program() {
     stmt_head.next = NULL;
     Node* stmt_cur = &stmt_head;
     while (!at_eof()) {
-        if (token->kind == TK_KEYWORD && token->keyword == KW_DEF) {
+        if (token->kind == TK_KEYWORD && token->keyword == KW_DEF || consume(":")) {
             cur->next = function();
             cur = cur->next;
         } else {
