@@ -163,6 +163,14 @@ static Node* char_array() {
 
 static Node* array_literal() {
     Node* node;
+    if (consume("]")) {
+        node = create_node(ND_ARRAY);
+        register_array(0);
+        node->array_len = 0;
+        node->body = NULL;
+        node->offset = locals->offset;
+        return node;
+    }
     Node* first_expr = expr();
     if (consume(";")) {
         Node* len_expr = expr();
