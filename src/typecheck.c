@@ -287,6 +287,7 @@ static Type* check_node(Node* node) {
 
 void typecheck(Function* prog) {
     for (Function* fn = prog; fn; fn = fn->next) {
+        memset(local_types, 0, sizeof(local_types));
         current_fn = fn;
         current_return = fn->return_type;
         for (int i = 0; i < fn->nparams && i < 6; i++) {
@@ -294,7 +295,6 @@ void typecheck(Function* prog) {
                 local_types[i + 1] = fn->param_types[i];
             }
         }
-        memset(local_types, 0, sizeof(local_types));
         for (Node* stmt = fn->body; stmt; stmt = stmt->next) {
             check_node(stmt);
         }
