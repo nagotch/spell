@@ -32,7 +32,8 @@ static char* resister[] = {
 static void gen(Node* node) {
     switch (node->kind) {
         case ND_UNARY: gen_unary(node); break;
-        case ND_LVAR: gen_lvar(node); break;
+        case ND_LVAR:
+        case ND_GVAR: gen_lvar(node); break;
         case ND_ASSIGN: gen_assign(node); break;
         case ND_NUM: gen_num(node); break;
         case ND_RETURN: gen_return(node); break;
@@ -73,6 +74,7 @@ static void gen_index_addr(Node* node) {
 static void gen_lval(Node* node) {
     if (node->kind == ND_GVAR) {
         printf("  lea rax, [rip + %.*s]\n", node->len, node->name);
+        printf("  push rax\n");
         return;
     }
     if (node->kind == ND_LVAR) {
