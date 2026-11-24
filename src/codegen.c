@@ -97,7 +97,7 @@ void codegen(Function* prog) {
     if (globals) {
         printf(".bss\n");
         for (LVar* var = globals; var; var = var->next) {
-            printf("%.*s:\n", globals->len, globals->name);
+            printf("%.*s:\n", var->len, var->name);
             printf("  .zero 8\n");
         }
         printf(".text\n");
