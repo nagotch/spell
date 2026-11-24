@@ -15,6 +15,7 @@ static void gen_for(Node* node);
 static void gen_block(Node* node);
 static void gen_funcall(Node* node);
 static void gen_member(Node* node);
+static void gen_mcall(Node* node);
 static void gen_binop(Node* node);
 
 static int max_label = 0;
@@ -48,6 +49,7 @@ static void gen(Node* node) {
         case ND_BLOCK: gen_block(node); break;
         case ND_FUNCALL: gen_funcall(node); break;
         case ND_MEMBER: gen_member(node); break;
+        case ND_MCALL: gen_mcall(node); break;
         case ND_BINOP: gen_binop(node); break;
         case ND_BREAK:
             if (break_label < 0) {
@@ -448,6 +450,24 @@ static void gen_member(Node* node) {
     gen(node->left_child);
     printf("  pop rax\n");
     printf("  mov rax, [rax + %d]\n", node->offset);
+    printf("  push rax\n");
+}
+
+static void gen_mcall(Node* node) {
+    gen(node->left_child);
+    int args_cnt = 0;
+    for (Node* arg = node->args; arg; arg = arg->next) {
+        gen(arg);
+        args_cnt++;
+    }
+    if (args_cnt > 5) {
+        error_plain("メソッドに渡せる引数は5個までですが、%d個が指定されています", args_cnt);
+    }
+    for (int k = args_cnt - 1; k >= 0; k++) {
+        printf("  pop %s\n", resister[k + 1]);
+    }
+    printf("  pop rdi\n");
+    call_method(max_label++, node->func);
     printf("  push rax\n");
 }
 
