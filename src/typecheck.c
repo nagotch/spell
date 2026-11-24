@@ -205,6 +205,15 @@ static Type* check_node(Node* node) {
                 }
             } else {
                 check_node(lhs);
+                if (lhs->kind == ND_LEN) {
+                    error_plain("`len`には代入できません");
+                }
+                if (lhs->kind == ND_MEMBER && lhs->func) {
+                    error_plain("メソッド`%.*s`には代入できません", lhs->len, lhs->name);
+                }
+                if (lhs->kind == ND_MCALL || lhs->kind == ND_FUNCALL) {
+                    error_plain("呼び出しの結果には代入できません");
+                }
             }
             result = rhs;
             break;
@@ -350,13 +359,24 @@ static Type* check_node(Node* node) {
         case ND_MEMBER: {
             Type* obj = check_node(node->left_child);
             if (obj->kind == TY_UNKNOWN) {
-                result = &ty_unknown;
+                if (node->len == 3 && !memcmp(node->name, "len", 3)) {
+                    node->kind = ND_LEN;
+                    result = &ty_int;
+                } else {
+                    result = &ty_unknown;
+                }
+                break;
+            }
+            if (obj->kind == TY_ARRAY && node->len == 3 && !memcmp(node->name, "len", 3)) {
+                node->kind = ND_LEN;
+                result = &ty_int;
                 break;
             }
             if (obj->kind != TY_CLASS) {
                 error_plain("`%s`型の値にフィールドは使えません", type_text(obj));
             }
             Class* klass = obj->klass;
+            node->klass = klass;
             Field* field = NULL;
             for (Field* f = klass->fields; f; f = f->next) {
                 if (f->len == node->len && !memcmp(f->name, node->name, f->len)) {
@@ -364,12 +384,21 @@ static Type* check_node(Node* node) {
                     break;
                 }
             }
-            if (!field) {
-                error_plain("クラス`%.*s`にフィールド`%.*s`は定義されていません", klass->len, klass->name, node->len, node->name);
+            if (field) {
+                node->offset = field->offset;
+                result = field->type;
+                break;
             }
-            node->offset = field->offset;
-            node->klass = klass;
-            result = field->type;
+            Function* method = find_method(klass, node->name, node->len);
+            if (method) {
+                if (method->nparams > 1) {
+                    error_plain("メソッド`%.*s`には引数が必要ですが、括弧なしで使われています", node->len, node->name);
+                }
+                node->func = method;
+                result = method->return_type ? method->return_type : &ty_unknown;
+                break;
+            }
+            error_plain("クラス`%.*s`にフィールド`%.*s`は定義されていません", klass->len, klass->name, node->len, node->name);
             break;
         }
         case ND_MCALL:
