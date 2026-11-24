@@ -61,6 +61,9 @@ static void gen(Node* node) {
             }
             printf("  jmp .Lcont%d\n", continue_label);
             break;
+        default:
+            error_internal("コード生成で想定外の形式を検出しました");
+            break;
     }
 }
 
