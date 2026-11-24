@@ -87,6 +87,20 @@ Type* array_type(Type* elem) {
     return t;
 }
 
+static Type* adopt_type(Type* anno, Type* rhs) {
+    if (rhs->kind == TY_UNKNOWN) {
+        return anno;
+    }
+    if (anno->kind == TY_ARRAY && rhs->kind == TY_ARRAY) {
+        Type* elem = adopt_type(anno->elem, rhs->elem);
+        if (elem == rhs->elem) {
+            return rhs;
+        }
+        return array_type(elem);
+    }
+    return rhs;
+}
+
 static Type* check_node(Node* node) {
     if (!node) {
         return &ty_unknown;
@@ -116,6 +130,9 @@ static Type* check_node(Node* node) {
         case ND_ASSIGN:
             ;
             Type* rhs = check_node(node->right_child);
+            if (node->anno) {
+                rhs = adopt_type(node->anno, rhs);
+            }
             Node* lhs = node->left_child;
             if (lhs->kind == ND_LVAR) {
                 Type* recorded = local_types[lhs->offset / 8];
