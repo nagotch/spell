@@ -94,6 +94,12 @@ static void gen_lval(Node* node) {
 }
 
 void codegen(Function* prog) {
+    bool has_init = false;
+    for (Function* fn = prog; fn; fn = fn->next) {
+        if (fn->len == 12 && !memcmp(fn->name, "__spell_init", 12)) {
+            has_init = true;
+        }
+    }
     if (globals) {
         printf(".bss\n");
         for (LVar* var = globals; var; var = var->next) {
@@ -108,6 +114,9 @@ void codegen(Function* prog) {
         printf("  push rbp\n");
         printf("  mov rbp, rsp\n");
         printf("  sub rsp, %d\n", prog->stack_size);
+        if (has_init && prog->len == 4 && memcmp(prog->name, "main", 4) == 0) {
+            printf("  call __spell_init\n");
+        }
         for (int i = 0; i < prog->nparams; i++) {
             printf("  mov [rbp-%d], %s\n", (i+1)*8, resister[i]);
         }
