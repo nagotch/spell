@@ -371,6 +371,9 @@ static void gen_funcall(Node* node) {
         printf("  pop %s\n", resister[i]);
     }
     call(label, node->len, node->name);
+    if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
+        printf("  movsxd rax, eax\n");
+    }
     printf("  push rax\n");
 }
 
