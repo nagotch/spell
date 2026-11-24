@@ -140,7 +140,7 @@ static Type* check_node(Node* node) {
                     strcpy(expected, type_text(node->anno));
                     error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
                 }
-                if (recorded && rhs->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(recorded, rhs)) {
+                if (recorded->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(recorded, rhs)) {
                     char expected[256];
                     strcpy(expected, type_text(recorded));
                     error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
