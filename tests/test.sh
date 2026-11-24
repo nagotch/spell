@@ -22,6 +22,11 @@ error_tests=(
     "def main() { x = 1; x = 1 < 2; return 0; }|が代入されています"
     "def main() { x: foo = 1; return 0; }|は定義されていません"
     "def main() { (1 + 2): int = 3; return 0; }|型注釈は変数にだけ付けられます"
+    "def main() { a = [1, 1 < 2]; return 0; }|が含まれています"
+    "def main() { x = 5; return x[0]; }|添え字は使えません"
+    "def main() { a = [1, 2]; return a[1 < 2]; }|添え字には\`int\`が必要ですが"
+    "def main() { a = [1, 2]; a[0] = 1 < 2; return 0; }|配列の要素は\`int\`ですが"
+    "def main() { a = [0; 1 < 2]; return 0; }|長さには\`int\`が必要ですが"
 )
 
 cc -c -o funcs.o funcs.c
