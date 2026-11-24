@@ -22,7 +22,7 @@ static Function* functions;
 
 static Function* find_function(Node* node) {
     for (Function* fn = functions; fn; fn = fn->next) {
-        if (fn->len == node->len && !memcmp(fn->name, node->name, fn->len)) {
+        if (!fn->klass && fn->len == node->len && !memcmp(fn->name, node->name, fn->len)) {
             return fn;
         }
     }
@@ -38,6 +38,9 @@ static bool type_equals(Type* a, Type* b) {
     }
     if (a->kind == TY_ARRAY) {
         return type_equals(a->elem, b->elem);
+    }
+    if (a->kind == TY_CLASS) {
+        return a->klass == b->klass;
     }
     return true;
 }
@@ -60,6 +63,9 @@ static char* type_text_write(Type* type, char* p) {
             break;
         case TY_UNKNOWN:
             p += sprintf(p, "unknown");
+            break;
+        case TY_CLASS:
+            p += sprintf(p, "%.*s", type->klass->len, type->klass->name);
             break;
     }
     return p;
