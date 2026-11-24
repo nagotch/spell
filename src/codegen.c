@@ -448,6 +448,12 @@ static void gen_funcall(Node* node) {
 
 static void gen_member(Node* node) {
     gen(node->left_child);
+    if (node->func) {
+        printf("  pop rdi\n");
+        call_method(max_label++, node->func);
+        printf("  push rax\n");
+        return;
+    }
     printf("  pop rax\n");
     printf("  mov rax, [rax + %d]\n", node->offset);
     printf("  push rax\n");
