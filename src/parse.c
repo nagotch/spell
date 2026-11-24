@@ -377,7 +377,7 @@ static Type* parse_type() {
         }
         error_at(token_start(token), token_end(token), "型名が必要ですが、%sが見つかりました", token_text(token));
     }
-    Type* anno;
+    Type* anno = NULL;
     char* type_name[] = {
         "int",
         "bool",
