@@ -134,18 +134,18 @@ static Type* check_node(Node* node) {
                 }
                 lhs->type = local_types[lhs->offset / 8];
             } else if (lhs->kind == ND_GVAR) {
-                Type* recorded = local_types[lhs->offset / 8];
+                Type* recorded = find_global_type(lhs);
                 if (node->anno && rhs->kind != TY_UNKNOWN && !type_equals(node->anno, rhs)) {
                     char expected[256];
                     strcpy(expected, type_text(node->anno));
                     error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
                 }
-                if (recorded && rhs->kind != TY_UNKNOWN && !type_equals(recorded, rhs)) {
+                if (recorded && rhs->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(recorded, rhs)) {
                     char expected[256];
                     strcpy(expected, type_text(recorded));
                     error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
                 }
-                if (!recorded) {
+                if (recorded->kind == TY_UNKNOWN) {
                     record_global_type(lhs, node->anno ? node->anno : rhs);
                 }
                 lhs->type = find_global_type(lhs);
