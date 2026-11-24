@@ -31,6 +31,7 @@ def t030() { i = 0; while (1) { i += 1; if (i == 5) { break; } } return i; }
 def t031() { i = 0; s = 0; while (i < 10) { i += 1; if (i == 5) { continue; } s += i; } return s; }
 def t032() { s = 0; for (i = 0; i < 5; i += 1) { if (i == 2) { continue; } s += i; } return s; }
 def t033() { total = 0; for (i = 0; i < 3; i += 1) { for (j = 0; j < 10; j += 1) { if (j == 2) { break; } total += 1; } } return total; }
+def t034() { x: int = 40; x = x + 2; return x; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -78,6 +79,7 @@ def main() {
     mark(31); fails=fails+check(t031(), 50);
     mark(32); fails=fails+check(t032(), 8);
     mark(33); fails=fails+check(t033(), 6);
+    mark(34); fails=fails+check(t034(), 42);
 
     print_str("done"); putchar(10);
     return fails > 0;
