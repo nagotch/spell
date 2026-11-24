@@ -90,6 +90,13 @@ static void gen_lval(Node* node) {
 }
 
 void codegen(Function* prog) {
+    if (!globals) {
+        printf(".bss\n");
+    }
+    for (LVar* var = globals; globals; var = var->next) {
+        printf("%.*s:\n", globals->len, globals->name);
+        printf("  .zero 8\n");
+    }
     while (prog) {
         printf(".global %.*s\n", prog -> len, prog -> name);
         printf("%.*s:\n", prog -> len, prog -> name);
