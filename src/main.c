@@ -29,6 +29,7 @@ int main(int argc, char **argv) {
 
     Function* prog = program();
     desugar(prog);
+    typecheck(prog);
 
     char assembly_output_name[256];
     snprintf(assembly_output_name, 256, "%s.s", output_name);
