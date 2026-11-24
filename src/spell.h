@@ -14,6 +14,7 @@ typedef enum {
     KW_FOR,
     KW_BREAK,
     KW_CONTINUE,
+    KW_DEF,
 } Keyword;
 
 typedef enum {
