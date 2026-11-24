@@ -149,6 +149,15 @@ static Type* check_node(Node* node) {
                     record_global_type(lhs, node->anno ? node->anno : rhs);
                 }
                 lhs->type = find_global_type(lhs);
+            } else if (lhs->kind == ND_INDEX) {
+                Type* elem = check_node(lhs);
+                if (elem->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(elem, rhs)) {
+                    char expected[256];
+                    strcpy(expected, type_text(elem));
+                    error_plain("配列の要素は`%s`ですが、`%s`が代入されています", expected, type_text(rhs));
+                }
+            } else {
+                check_node(lhs);
             }
             result = rhs;
             break;
