@@ -30,6 +30,7 @@ def t027() { s = "hello"; c = 0; for (i = 0; i < s.len; i = i + 1) if (s[i] == 1
 def t028() { s = "hi"; putchar(s[0]); putchar(s[1]); return 0; }
 def t029() { s = ""; return s.len; }
 def t030() { a = [1,2,3]; a[1] += 10; return a[1]; }
+def t031() { a: [int] = []; a = [7, 8]; return a.len + a[1]; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -74,6 +75,7 @@ def main() {
     mark(28); fails=fails+check(t028(), 0);
     mark(29); fails=fails+check(t029(), 0);
     mark(30); fails=fails+check(t030(), 12);
+    mark(31); fails=fails+check(t031(), 10);
 
     print_str("done"); putchar(10);
     return fails > 0;
