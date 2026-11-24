@@ -413,6 +413,14 @@ static Type* check_node(Node* node) {
                 }
                 nargs++;
             }
+            if (node->len == 3 && !memcmp(node->name, "len", 3) && (obj->kind == TY_ARRAY || obj->kind == TY_UNKNOWN)) {
+                if (nargs != 0) {
+                    error_plain("`len`の引数は0個ですが、%d個が指定されています", nargs);
+                }
+                node->kind = ND_LEN;
+                result = &ty_int;
+                break;
+            }
             if (obj->kind == TY_UNKNOWN) {
                 result = &ty_unknown;
                 break;
