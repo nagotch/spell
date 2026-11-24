@@ -408,13 +408,6 @@ static Node* assign() {
         if (node->kind != ND_LVAR && node->kind != ND_GVAR) {
             error_at(token_start(error_token), token_end(error_token), "型注釈は変数にだけ付けられます");
         }
-        Token* ident = consume_ident();
-        if (!ident) {
-            if (token->kind == TK_EOF) {
-                error_at(token_start(token), token_end(token), "型名が必要ですが、ファイルの末尾に達しました");
-            }
-            error_at(token_start(token), token_end(token), "型名が必要ですが、%sが見つかりました", token_text(token));
-        }
         assign_node->anno = parse_type();
         expect("=");
         assign_node->left_child = node;
