@@ -136,6 +136,24 @@ struct LVar {
     int array_len;
 };
 
+typedef struct Field Field;
+struct Field {
+    Field* next;
+    char* name;
+    int len;
+    Type* type;
+    int offset;
+};
+
+typedef struct Class Class;
+struct Class {
+    Class* next;
+    char* name;
+    int len;
+    Field* fields;
+    Type* type;
+};
+
 extern Token* token;
 extern LVar* locals;
 extern LVar* globals;
