@@ -3,7 +3,7 @@
 Type ty_int = { TY_INT, NULL };
 Type ty_bool = { TY_BOOL, NULL };
 Type ty_char = { TY_CHAR, NULL };
-Type ty_arary = { TY_ARRAY, NULL };
+Type ty_array = { TY_ARRAY, NULL };
 Type ty_unknown = { TY_UNKNOWN, NULL };
 
 static Type* local_types[1024];
@@ -27,25 +27,32 @@ static bool type_equals(Type* a, Type* b) {
     return true;
 }
 
-char* type_text(Type* type) {
-    static char buf[256];
+static char* type_text_write(Type* type, char* p) {
     switch (type->kind) {
-        case TY_UNKNOWN:
-            snprintf(buf, sizeof(buf), "型`unknown`");
-            break;
         case TY_INT:
-            snprintf(buf, sizeof(buf), "型`int`");
+            p += sprintf(p, "int");
             break;
         case TY_BOOL:
-            snprintf(buf, sizeof(buf), "型`bool`");
+            p += sprintf(p, "bool");
             break;
         case TY_CHAR:
-            snprintf(buf, sizeof(buf), "型`char`");
+            p += sprintf(p, "char");
             break;
         case TY_ARRAY:
-            snprintf(buf, sizeof(buf), "型`array`");
+            p += sprintf(p, "[");
+            p = type_text_write(type->elem, p);
+            p += sprintf(p, "]");
+            break;
+        case TY_UNKNOWN:
+            p += sprintf(p, "unknown");
             break;
     }
+    return p;
+}
+
+char* type_text(Type* type) {
+    static char buf[256];
+    type_text_write(type, buf);
     return buf;
 }
 
@@ -111,13 +118,21 @@ static Type* check_node(Node* node) {
             Type* rhs = check_node(node->right_child);
             Node* lhs = node->left_child;
             if (lhs->kind == ND_LVAR) {
-                local_types[lhs->offset / 8] = rhs;
-                lhs->type = rhs;
-            } else if (lhs->kind == ND_GVAR) {
-                record_global_type(lhs, rhs);
-                lhs->type = rhs;
-            } else {
-                check_node(lhs);
+                Type* recorded = local_types[lhs->offset / 8];
+                if (node->anno && rhs->kind != TY_UNKNOWN && !type_equals(node->anno, rhs)) {
+                    char expected[256];
+                    strcpy(expected, type_text(node->anno));
+                    error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
+                }
+                if (recorded && rhs->kind != TY_UNKNOWN && !type_equals(recorded, rhs)) {
+                    char expected[256];
+                    strcpy(expected, type_text(recorded));
+                    error_plain("変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, expected, type_text(rhs));
+                }
+                if (!recorded) {
+                    local_types[lhs->offset / 8] = node->anno ? node->anno : rhs;
+                }
+                lhs->type = local_types[lhs->offset / 8];
             }
             result = rhs;
             break;
