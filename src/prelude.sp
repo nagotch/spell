@@ -5,7 +5,7 @@ class str {
         self.chars = [0] * chars.len;
         i = 0;
         while (i < chars.len) {
-            self.char[i] = chars[i];
+            self.chars[i] = chars[i];
             i += 1;
         }
     }
