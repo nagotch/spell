@@ -194,6 +194,34 @@ static Type* rewrite_to_mcall(Node* node, Type* lt, Type* rt, const char* name, 
     return method->return_type ? method->return_type : &ty_unknown;
 }
 
+static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index, Type* it, Type* rhs) {
+    Function* method = find_method(klass, "__setitem__", 11);
+    if (!method) {
+        error_plain("クラス`%.*s`に`__setitem__`は定義されていません", klass->len, klass->name);
+    }
+    if (method->nparams != 3) {
+        error_plain("クラス`%.*s`のメソッド`__setitem__`の引数は2個ですが、%d個が定義されています", klass->len, klass->name, method->nparams - 1);
+    }
+    if (method->param_types[1] && it->kind != TY_UNKNOWN && !type_equals(method->param_types[1], it)) {
+        char buf[256];
+        strcpy(buf, type_text(method->param_types[1]));
+        error_plain("クラス`%.*s`のメソッド`__setitem__`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, buf, type_text(it));
+    }
+    if (method->param_types[2] && rhs->kind != TY_UNKNOWN && !type_equals(method->param_types[2], rhs)) {
+        char buf[256];
+        strcpy(buf, type_text(method->param_types[2]));
+        error_plain("クラス`%.*s`のメソッド`__setitem__`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, buf, type_text(rhs));
+    }
+    index->next = node->right_child;
+    node->kind = ND_MCALL;
+    node->name = "__setitem__";
+    node->len = 11;
+    node->func = method;
+    node->klass = klass;
+    node->left_child = base;
+    node->args = index;
+}
+
 static Type* check_node(Node* node) {
     if (!node) {
         return &ty_unknown;
@@ -268,13 +296,17 @@ static Type* check_node(Node* node) {
             result = &ty_bool;
             break;
         }
-        case ND_ASSIGN:
-            ;
+        case ND_ASSIGN: {
             Type* rhs = check_node(node->right_child);
             if (node->anno) {
                 rhs = adopt_type(node->anno, rhs);
             }
             Node* lhs = node->left_child;
+            if (lhs->kind == ND_MCALL && node->right_child->kind == ND_BINOP && node->right_child->left_child == lhs) {
+                rewrite_to_setitem(node, lhs->klass, lhs->left_child, lhs->args, lhs->args->type, rhs);
+                    result = rhs;
+                    break;
+            }
             if (lhs->kind == ND_LVAR) {
                 Type* recorded = local_types[lhs->offset / 8];
                 if (node->anno && rhs->kind != TY_UNKNOWN && !type_equals(node->anno, rhs)) {
@@ -328,6 +360,7 @@ static Type* check_node(Node* node) {
             }
             result = rhs;
             break;
+        }
         case ND_GVAR:
             result = find_global_type(node);
             break;
@@ -420,6 +453,14 @@ static Type* check_node(Node* node) {
             ;
             Type* lt = check_node(node->left_child);
             Type* it = check_node(node->right_child);
+            if (lt->kind == TY_CLASS) {
+                Function* method = find_method(lt->klass, "__getitem__", 11);
+                if (!method) {
+                    error_plain("`%s`型の値に添え字は使えません", type_text(lt));
+                }
+                result = rewrite_to_mcall(node, lt, it, "__getitem__", 11, method);
+                break;
+            }
             if (lt->kind != TY_UNKNOWN && lt->kind != TY_ARRAY) {
                 error_plain("`%s`型の値に添え字は使えません", type_text(lt));
             }
