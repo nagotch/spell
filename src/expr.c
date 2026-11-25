@@ -279,8 +279,6 @@ static Node* array_literal() {
     return node;
 }
 
-Type ty_var = { TY_VAR, NULL };
-
 Type* parse_type() {
     if (consume("[")) {
         Type* elem = parse_type();
@@ -294,12 +292,12 @@ Type* parse_type() {
         }
         error_at(token_start(token), token_end(token), "型名が必要ですが、%sが見つかりました", token_text(token));
     }
-    if (parsing_klass->tparam_len == ident->len && !memcmp(ident->str, parsing_klass->tparam, ident->len)) {
-        return &ty_var;
-    }
-    if (ident->kind == TY_CLASS && consume("<")) {
-        return parse_type();
-        expect(">");
+    if (parsing_klass && parsing_klass->tparam_len == ident->len && !memcmp(ident->str, parsing_klass->tparam, ident->len)) {
+        Type* var = calloc(1, sizeof(Type));
+        var->kind = TY_VAR;
+        var->name = ident->str;
+        var->len = ident->len;
+        return var;
     }
     Type* anno = NULL;
     char* type_name[] = {
@@ -317,6 +315,14 @@ Type* parse_type() {
     if (!anno) {
         Class* klass = find_class(ident->str, ident->len);
         if (klass) {
+            if (consume("<")) {
+                Type* applied = calloc(1, sizeof(Type));
+                applied->kind = TY_CLASS;
+                applied->klass = klass;
+                applied->targ = parse_type();
+                expect(">");
+                return applied;
+            }
             anno = klass->type;
         }
     }

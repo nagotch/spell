@@ -399,6 +399,7 @@ static void class_decl(Function** cur) {
             consume(";");
         }
     }
+    parsing_klass = NULL;
 }
 
 Function* program() {
