@@ -500,6 +500,86 @@ static Type* check_return(Node* node) {
     return rt;
 }
 
+static Node* iter_slot_node(Node* for_node) {
+    Node* slot = create_node(ND_LVAR);
+    slot->offset = for_node->offset;
+    return slot;
+}
+
+static Node* make_mcall(Node* receiver, Class* klass, Function* fn, const char* name, int len) {
+    Node* call = create_node(ND_MCALL);
+    call->left_child = receiver;
+    call->klass = klass;
+    call->func = fn;
+    call->name = (char*)name;
+    call->len = len;
+    return call;
+}
+
+// for 文を「イテレータ取得 → while (__has_next__) { 変数 = __next__(); 本体 }」に書き換える。
+// プロトコルは Java 式（__iter__ / __has_next__ / __next__）。
+static Type* check_for(Node* node) {
+    Type* iterable = check_node(node->init);
+    if (iterable->kind == TY_UNKNOWN) {
+        error_plain("型が分からない値は反復できません");
+    }
+    Class* klass = class_of(iterable);
+    Function* iter_fn = find_callable(klass, "__iter__", 8);
+    if (!iter_fn) {
+        error_plain("`%s`型の値は反復できません", type_text(iterable));
+    }
+    Type* iter_type = iter_fn->return_type;
+    if (!iter_type || iter_type->kind != TY_CLASS) {
+        error_plain("クラス`%.*s`の`__iter__`はイテレータを返す必要があります", klass->len, klass->name);
+    }
+    Class* iklass = class_of(iter_type);
+    Function* has_next_fn = find_callable(iklass, "__has_next__", 12);
+    Function* next_fn = find_callable(iklass, "__next__", 8);
+    if (!has_next_fn || !next_fn) {
+        error_plain("クラス`%.*s`には`__has_next__`と`__next__`が必要です", iklass->len, iklass->name);
+    }
+    Type* elem = next_fn->return_type ? next_fn->return_type : &ty_unknown;
+
+    Node* get_iter = create_node(ND_ASSIGN);
+    get_iter->left_child = iter_slot_node(node);
+    get_iter->right_child = make_mcall(node->init, klass, iter_fn, "__iter__", 8);
+
+    Node* set_var = create_node(ND_ASSIGN);
+    set_var->left_child = node->left_child;
+    set_var->right_child = make_mcall(iter_slot_node(node), iklass, next_fn, "__next__", 8);
+    set_var->next = node->then;
+
+    Node* loop_body = create_node(ND_BLOCK);
+    loop_body->body = set_var;
+
+    Node* loop = create_node(ND_WHILE);
+    loop->cond = make_mcall(iter_slot_node(node), iklass, has_next_fn, "__has_next__", 12);
+    loop->then = loop_body;
+
+    Node* var = node->left_child;
+    if (var->kind == ND_LVAR) {
+        Type* recorded = local_types[var->offset / 8];
+        check_assign_type(var, recorded, elem);
+        if (!recorded && elem->kind != TY_UNKNOWN) {
+            local_types[var->offset / 8] = elem;
+        }
+        var->type = local_types[var->offset / 8];
+    } else if (var->kind == ND_GVAR) {
+        Type* recorded = find_global_type(var);
+        check_assign_type(var, recorded, elem);
+        if (recorded->kind == TY_UNKNOWN) {
+            record_global_type(var, elem);
+        }
+        var->type = find_global_type(var);
+    }
+    check_node(node->then);
+
+    node->kind = ND_BLOCK;
+    node->body = get_iter;
+    get_iter->next = loop;
+    return &ty_unknown;
+}
+
 static Type* check_node(Node* node) {
     if (!node) {
         return &ty_unknown;
@@ -567,10 +647,7 @@ static Type* check_node(Node* node) {
             check_node(node->then);
             break;
         case ND_FOR:
-            check_node(node->init);
-            check_node(node->cond);
-            check_node(node->then);
-            check_node(node->inc);
+            result = check_for(node);
             break;
         case ND_RETURN:
             result = check_return(node);
@@ -643,15 +720,6 @@ static bool check_init_stmt(Node* n, Class* klass, bool* assigned, int nfields) 
         case ND_IF:
             return check_init_if(n, klass, assigned, nfields);
         case ND_WHILE: {
-            bool* body_set = copy_assigned(assigned, nfields);
-            check_init_stmts(n->body, klass, body_set, nfields);
-            free(body_set);
-            return false;
-        }
-        case ND_FOR: {
-            if (n->init) {
-                check_init_stmt(n->init, klass, assigned, nfields);
-            }
             bool* body_set = copy_assigned(assigned, nfields);
             check_init_stmts(n->body, klass, body_set, nfields);
             free(body_set);

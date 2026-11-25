@@ -33,6 +33,10 @@ class str {
     def __str__(self) -> str {
         return self;
     }
+
+    def __iter__(self) -> ArrayIter<int> {
+        return self.chars.__iter__();
+    }
 }
 
 class int {
@@ -45,6 +49,10 @@ class int {
     def __ne__(self, o: int) -> bool { return self != o; }
     def __lt__(self, o: int) -> bool { return self < o; }
     def __le__(self, o: int) -> bool { return self <= o; }
+
+    def __iter__(self) -> RangeIter {
+        return RangeIter(0, self);
+    }
     def __str__(self) -> str {
         n = self;
         if (n == 0) {
@@ -135,6 +143,10 @@ class array<T> {
         return r;
     }
 
+    def __iter__(self) -> ArrayIter<T> {
+        return ArrayIter(self);
+    }
+
     def __str__(self) -> str {
         r = "";
         i = 0;
@@ -147,6 +159,60 @@ class array<T> {
     }
 }
 
+class RangeIter {
+    cur: int;
+    hi: int;
+
+    def __init__(self, lo: int, hi: int) {
+        self.cur = lo;
+        self.hi = hi;
+    }
+
+    def __has_next__(self) -> bool {
+        return self.cur < self.hi;
+    }
+
+    def __next__(self) -> int {
+        v = self.cur;
+        self.cur = self.cur + 1;
+        return v;
+    }
+}
+
+class Range {
+    lo: int;
+    hi: int;
+
+    def __init__(self, lo: int, hi: int) {
+        self.lo = lo;
+        self.hi = hi;
+    }
+
+    def __iter__(self) -> RangeIter {
+        return RangeIter(self.lo, self.hi);
+    }
+}
+
+class ArrayIter<T> {
+    arr: [T];
+    i: int;
+
+    def __init__(self, arr: [T]) {
+        self.arr = arr;
+        self.i = 0;
+    }
+
+    def __has_next__(self) -> bool {
+        return self.i < self.arr.len;
+    }
+
+    def __next__(self) -> T {
+        v = self.arr[self.i];
+        self.i = self.i + 1;
+        return v;
+    }
+}
+
 def read_int() -> int {
     char = getchar();
     ret=0;
@@ -155,7 +221,7 @@ def read_int() -> int {
         is_negative = 1;
         char = getchar();
     }
-    for (i = 0; 48 <= char && char <= 57; i = i + 1) {
+    while (48 <= char && char <= 57) {
         ret = ret * 10 + char - 48;
         char = getchar();
     }
@@ -173,7 +239,7 @@ def read_str() -> str {
     while (char != -1) {
         if (n == cap) {
             bigger = [0; cap * 2];
-            for (i=0; i<n; i=i+1) { bigger[i] = str[i]; }
+            for i in n { bigger[i] = str[i]; }
             str = bigger;
             cap = cap * 2;
         }
@@ -182,7 +248,7 @@ def read_str() -> str {
         n=n+1;
     }
     r_str = [0; n];
-    for (i=0; i<n; i=i+1) {
+    for i in n {
         r_str[i]=str[i];
     }
     return str(r_str);
@@ -194,8 +260,8 @@ def print_int(n: int) {
 }
 
 def print_str(s: str) {
-    for (i=0; i<s.len; i=i+1) {
-        putchar(s[i]);
+    for c in s {
+        putchar(c);
     }
 }
 

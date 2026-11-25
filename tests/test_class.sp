@@ -154,6 +154,21 @@ def t016() {
     return arr[0] * 100 + arr[1];
 }
 
+class CountIter {
+    n: int;
+    def __init__(self, n: int) { self.n = n; }
+    def __has_next__(self) -> bool { return self.n > 0; }
+    def __next__(self) -> int { self.n = self.n - 1; return self.n; }
+}
+
+class Countdown {
+    n: int;
+    def __init__(self, n: int) { self.n = n; }
+    def __iter__(self) -> CountIter { return CountIter(self.n); }
+}
+
+def t023() { s = 0; for i in Countdown(4) { s = s + i; } return s; }
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -266,6 +281,7 @@ def main() {
     mark(20); fails=fails+check(t020(), 20);
     mark(21); fails=fails+check(t021(), 9);
     mark(22); fails=fails+check(t022(), 4);
+    mark(23); fails=fails+check(t023(), 6);
 
     print_str("done"); putchar(10);
     return fails > 0;
