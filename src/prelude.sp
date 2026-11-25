@@ -102,18 +102,17 @@ class array {
     }
 
     def __eq__(self, o) -> bool {
-        if (self.len != o.len) { return 0; }
+        if (self.len != o.len) { return 1==0; }
         i = 0;
         while (i < self.len) {
-            if (self[i] != o[i]) { return 0; }
+            if (self[i] != o[i]) { return 1==0; }
             i = i + 1;
         }
-        return 1;
+        return 1==1;
     }
 
     def __ne__(self, o) -> bool {
-        if (self.__eq__(o)) { return 0; }
-        return 1;
+        return !(self == o);
     }
 
     def __mul__(self, n) {
