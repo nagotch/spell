@@ -180,8 +180,14 @@ void unify_type(Type* pat, Type* arg, Class* tmpl, Type* gtargs[]) {
         return;
     }
     if (pat->kind == TY_CLASS && arg->kind == TY_CLASS && pat->targ_count == arg->targ_count) {
-        for (int i = 0; i < pat->targ_count; i++) {
-            unify_type(pat->targs[i], arg->targs[i], tmpl, gtargs);
+        // 型引数への再帰は、同じクラス（実体化なら同じ origin）のときだけ。
+        // 違うクラスの型引数から推論してはいけない
+        Class* pk = pat->klass->origin ? pat->klass->origin : pat->klass;
+        Class* ak = arg->klass->origin ? arg->klass->origin : arg->klass;
+        if (pk == ak) {
+            for (int i = 0; i < pat->targ_count; i++) {
+                unify_type(pat->targs[i], arg->targs[i], tmpl, gtargs);
+            }
         }
     }
 }

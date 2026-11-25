@@ -568,7 +568,9 @@ Function* program() {
                     }
                     u = u->next;
                 }
-                klass->tparam_count = count < MAX_TPARAMS ? count : MAX_TPARAMS;
+                // 個数は丸めずに記録する。上限超えの宣言では、注釈側の個数検証で
+                // 隠さず class_decl 側の上限エラーを出させるため
+                klass->tparam_count = count;
             }
         }
     }
