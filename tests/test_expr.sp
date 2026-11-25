@@ -65,6 +65,8 @@ def t064() { (0-7)/2*2 + (0-7)%2; }
 def t065() { 7/(0-2)*(0-2) + 7%(0-2); }
 def t066() { a = 0-7; a /= 2; return a; }
 def t067() { a = 0-7; a %= 2; return a; }
+def t068() { (0-6)/(0-2); }
+def t069() { (0-6)%(0-2); }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -146,6 +148,8 @@ def main() {
     mark(65); fails=fails+check(t065(), 7);
     mark(66); fails=fails+check(t066(), -4);
     mark(67); fails=fails+check(t067(), 1);
+    mark(68); fails=fails+check(t068(), 3);
+    mark(69); fails=fails+check(t069(), 0);
 
     print_str("done"); putchar(10);
     return fails > 0;
