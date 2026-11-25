@@ -19,9 +19,13 @@ static void error_node(Node* node, char* fmt, ...) {
     va_start(ap, fmt);
     Token* tok = node ? node->tok : NULL;
     if (tok && tok->str && src) {
-        long src_len = (long)strlen(src);
-        if (tok->str >= src && tok->str + tok->len <= src + src_len) {
-            long start = tok->str - src;
+        // 別バッファを指すトークンとの比較になるため、ポインタのままではなく
+        // 整数化してから範囲を判定する
+        uintptr_t p = (uintptr_t)tok->str;
+        uintptr_t lo = (uintptr_t)src;
+        uintptr_t hi = lo + (uintptr_t)strlen(src);
+        if (p >= lo && p + (uintptr_t)tok->len <= hi) {
+            long start = (long)(p - lo);
             error_at_v(start, start + tok->len, fmt, ap);
         }
     }
