@@ -9,6 +9,23 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in
     {
+      # spell 本体と spell-lsp。prelude.sp は実行ファイル相対で探すため、
+      # バイナリと同じ $out/bin へ一緒に入れる。
+      packages.${system}.default = pkgs.stdenv.mkDerivation {
+        pname = "spell";
+        version = "0.1.0";
+        src = ./.;
+
+        buildPhase = ''
+          make -C src
+        '';
+
+        installPhase = ''
+          mkdir -p $out/bin
+          cp src/spell src/spell-lsp src/prelude.sp $out/bin/
+        '';
+      };
+
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
           gcc
