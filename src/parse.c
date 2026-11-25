@@ -486,9 +486,25 @@ static void class_decl(Function** cur) {
     }
     Class* klass = register_class(tok->str, tok->len);
     if (consume("<")) {
-        Token* tparam = consume_ident();
-        klass->tparam = tparam->str;
-        klass->tparam_len = tparam->len;
+        int count = 0;
+        Token* extra = NULL;
+        do {
+            Token* tparam = consume_ident();
+            if (!tparam) {
+                error_at(token_start(token), token_end(token), "型パラメータ名が必要ですが、%sが見つかりました", token_text(token));
+            }
+            if (count < MAX_TPARAMS) {
+                klass->tparams[count] = tparam->str;
+                klass->tparam_lens[count] = tparam->len;
+            } else if (!extra) {
+                extra = tparam;
+            }
+            count++;
+        } while (consume(","));
+        klass->tparam_count = count < MAX_TPARAMS ? count : MAX_TPARAMS;
+        if (count > MAX_TPARAMS) {
+            error_at(token_start(extra), token_end(extra), "型パラメータは%d個までですが、%d個が指定されています", MAX_TPARAMS, count);
+        }
         expect(">");
     }
     expect("{");
@@ -523,12 +539,37 @@ static void class_decl(Function** cur) {
     parsing_klass = NULL;
 }
 
+static bool token_is_symbol(Token* t, char* symbol) {
+    int len = strlen(symbol);
+    return t->kind == TK_SYMBOL && t->len == len && !memcmp(symbol, t->str, t->len);
+}
+
 Function* program() {
     top_max_offset = 0;
     Token* head_t = token;
     for (Token* t = head_t; t->kind != TK_EOF; t = t->next) {
         if (t->kind == TK_KEYWORD && t->keyword == KW_CLASS && t->next->kind == TK_IDENT) {
-            register_class(t->next->str, t->next->len);
+            Class* klass = register_class(t->next->str, t->next->len);
+            // 型パラメータも先に登録しておく。宣言より前の注釈（前方参照）でも
+            // 型引数の個数を検証できるようにするため
+            Token* u = t->next->next;
+            if (u && token_is_symbol(u, "<")) {
+                int count = 0;
+                u = u->next;
+                while (u && u->kind == TK_IDENT) {
+                    if (count < MAX_TPARAMS) {
+                        klass->tparams[count] = u->str;
+                        klass->tparam_lens[count] = u->len;
+                    }
+                    count++;
+                    u = u->next;
+                    if (!u || !token_is_symbol(u, ",")) {
+                        break;
+                    }
+                    u = u->next;
+                }
+                klass->tparam_count = count < MAX_TPARAMS ? count : MAX_TPARAMS;
+            }
         }
     }
     token = head_t;

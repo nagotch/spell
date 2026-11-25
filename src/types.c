@@ -31,13 +31,15 @@ static bool type_cmp(Type* a, Type* b, bool strict) {
         if (ka != kb) {
             return false;
         }
-        if (!a->targ && !b->targ) {
-            return true;
-        }
-        if (!a->targ || !b->targ) {
+        if (a->targ_count != b->targ_count) {
             return false;
         }
-        return type_cmp(a->targ, b->targ, strict);
+        for (int i = 0; i < a->targ_count; i++) {
+            if (!type_cmp(a->targs[i], b->targs[i], strict)) {
+                return false;
+            }
+        }
+        return true;
     }
     if (a->kind == TY_VAR) {
         return a->len == b->len && !memcmp(a->name, b->name, a->len);
@@ -68,9 +70,14 @@ static char* type_text_write(Type* type, char* p) {
             break;
         case TY_CLASS:
             p += sprintf(p, "%.*s", type->klass->len, type->klass->name);
-            if (type->targ) {
+            if (type->targ_count > 0) {
                 p += sprintf(p, "<");
-                p = type_text_write(type->targ, p);
+                for (int i = 0; i < type->targ_count; i++) {
+                    if (i > 0) {
+                        p += sprintf(p, ", ");
+                    }
+                    p = type_text_write(type->targs[i], p);
+                }
                 p += sprintf(p, ">");
             }
             break;
@@ -132,21 +139,30 @@ Type* array_type(Type* elem) {
     return t;
 }
 
-Type* subst_type(Type* t, Type* targ) {
+// tmpl の型パラメータ名と targs を位置で対応させて置換する
+Type* subst_type(Type* t, Class* tmpl, Type* targs[]) {
     if (!t) {
         return NULL;
     }
     switch (t->kind) {
         case TY_VAR:
-            return targ;
+            for (int i = 0; i < tmpl->tparam_count; i++) {
+                if (t->len == tmpl->tparam_lens[i] && !memcmp(t->name, tmpl->tparams[i], t->len)) {
+                    return targs[i];
+                }
+            }
+            return t;
         case TY_ARRAY:
-            return array_type(subst_type(t->elem, targ));
+            return array_type(subst_type(t->elem, tmpl, targs));
         case TY_CLASS:
-            if (t->targ) {
+            if (t->targ_count > 0) {
                 Type* nt = calloc(1, sizeof(Type));
                 nt->kind = TY_CLASS;
                 nt->klass = t->klass;
-                nt->targ = subst_type(t->targ, targ);
+                nt->targ_count = t->targ_count;
+                for (int i = 0; i < t->targ_count; i++) {
+                    nt->targs[i] = subst_type(t->targs[i], tmpl, targs);
+                }
                 return nt;
             }
             return t;
@@ -165,7 +181,12 @@ bool type_has_unknown(Type* t) {
         case TY_ARRAY:
             return type_has_unknown(t->elem);
         case TY_CLASS:
-            return type_has_unknown(t->targ);
+            for (int i = 0; i < t->targ_count; i++) {
+                if (type_has_unknown(t->targs[i])) {
+                    return true;
+                }
+            }
+            return false;
         default:
             return false;
     }
