@@ -21,6 +21,7 @@ typedef enum {
     KW_DEF,
     KW_CLASS,
     KW_IN,
+    KW_ELIF,
 } Keyword;
 
 typedef enum {

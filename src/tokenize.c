@@ -61,7 +61,10 @@ Token* tokenize(char* s) {
             "/=",
             "%=",
             "->",
+            "..=",
             "..",
+            "++",
+            "--",
             "+",
             "-",
             "*",
@@ -82,6 +85,8 @@ Token* tokenize(char* s) {
             "%",
             "!",
             ":",
+            "@",
+            "^",
         };
         size_t targets_size = sizeof(targets) / sizeof(targets[0]);
         for (int i = 0; i < targets_size; i++) {
@@ -121,6 +126,7 @@ Token* tokenize(char* s) {
             "def",
             "class",
             "in",
+            "elif",
         };
         Keyword kinds[] = {
             KW_RETURN,
@@ -133,6 +139,7 @@ Token* tokenize(char* s) {
             KW_DEF,
             KW_CLASS,
             KW_IN,
+            KW_ELIF,
         };
         bool is_keyword = false;
         size_t keywords_size = sizeof(keywords) / sizeof(keywords[0]);
