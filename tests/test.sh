@@ -13,6 +13,7 @@ tests=(
 )
 
 error_tests=(
+    "class I { def __has_next__(self) -> bool { return 1 == 1; } def __next__(self, x: int) -> int { return x; } } class B { def __iter__(self) -> I { return I(); } } def main() { for i in B() { } return 0; }|\`__next__\`は引数を取れません"
     "class Q { a: int; def __init__(self, a: int) { self.a = a; } } def main() { for i in Q(1) { } return 0; }|型の値は反復できません"
     "def main() { a = [1,2,3]; return a.5; }|数値\`5\`が指定されています"
     "def main() { return 1; } /*|コメントを閉じる"
