@@ -340,7 +340,6 @@ static Type* check_node(Node* node) {
                 }
                 lhs->type = find_global_type(lhs);
             } else if (lhs->kind == ND_INDEX) {
-            } else if (lhs->kind == ND_INDEX) {
                 Type* bt = check_node(lhs->left_child);
                 if (bt->kind == TY_CLASS) {
                     Type* it = check_node(lhs->right_child);
