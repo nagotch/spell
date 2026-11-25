@@ -202,6 +202,8 @@ one_io_test "def main() { < \"hi\"; return 0; }" "" "hi\n"
 one_io_test "def main() { put 1, 2; return 0; }" "" "1 2\n"
 one_io_test "def main() { yn 1 < 2; yn 1 > 2; return 0; }" "" "Yes\nNo\n"
 one_io_test "def main() { a- = in[3]; print(a); return 0; }" "1 2 3\n" "0 1 2\n"
+one_io_test "def main() { print_int(0 - 10); putchar(10); print_int(0 - 100); putchar(10); print_int(0 - 1); putchar(10); return 0; }" "" "-10\n-100\n-1\n"
+one_io_test "def main() { x = in; print_int(x); putchar(10); return 0; }" "-9223372036854775808\n" "-9223372036854775808\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
