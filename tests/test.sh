@@ -44,7 +44,8 @@ error_tests=(
     "class P { x: int; x: int; } def main() { return 0; }|フィールド\`x\`は既に定義されています"
     "class P { x: int; } def f(p: P) -> int { return 1; } def main() { return f(0); }|引数には\`P\`が必要ですが"
     "class P { x: int; } def main() { v: P = 1; return 0; }|変数\`v\`の型は\`P\`ですが"
-    "class P { x: int; ; } def main() { return 0; }|フィールド名が必要ですが"
+    "def main() { x = 1 y = 2; return 0; }|文の終わりには\`;\`か改行が必要です"
+    "class P { x: int y: int; } def main() { return 0; }|フィールドの終わりには\`;\`か改行が必要です"
     "class P { def f() { return 1; } } def main() { return 0; }|最初の引数\`self\`が必要です"
     "class P { x: int; } def f(p: P) { return p.y; } def main() { return 0; }|フィールド\`y\`は定義されていません"
     "def main() { x = 5; return x.foo; }|クラス\`int\`にフィールド\`foo\`は定義されていません"
@@ -213,6 +214,13 @@ one_io_test "def main() { s = in_str; print(s); return 0; }" "hello world\n" "he
 one_io_test "def main() { s = in_str[2]; print(s[1]); return 0; }" "aa bb\n" "bb\n"
 one_io_test "def main() { s = in_line; print(s); return 0; }" "hello world\n" "hello world\n"
 one_io_test "def main() { >> x; << x; return 0; }" "9\n" "9\n"
+one_io_test "def main() {
+    >> x
+    << x
+    put x, x
+    yn x == 9
+    return 0
+}" "9\n" "9\n9 9\nYes\n"
 one_io_test "def main() { < \"hi\"; return 0; }" "" "hi\n"
 one_io_test "def main() { put 1, 2; return 0; }" "" "1 2\n"
 one_io_test "def main() { yn 1 < 2; yn 1 > 2; return 0; }" "" "Yes\nNo\n"

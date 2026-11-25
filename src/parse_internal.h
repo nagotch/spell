@@ -17,6 +17,9 @@ void register_any();
 Node* expr();
 Node* parse_put_args();
 Type* parse_type();
+// 式の括弧・角括弧の入れ子深さ。0 の場所では改行をまたいで式を
+// 継続しない（step 55）。parse.c の if/while 条件括弧からも増減する
+extern int expr_depth;
 
 // parse.c（ラムダ）
 Node* parse_lambda(bool arrow, Token* kw);

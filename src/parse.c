@@ -380,8 +380,46 @@ static Node* stmt_for(Token* kw);
 static Node* make_for_iter(Token* var, Node* init, Token* kw);
 static Node* make_for_count(Node* count, Token* kw);
 
+// 文（やフィールド）の終わり。`;` があれば消費する。なければ、次の
+// トークンが改行の後か、`}` か、ファイル末尾でなければならない
+// （step 55: `;` は省略できるが、その場合は改行が区切りになる）
+static void expect_stmt_end(const char* subject) {
+    if (consume(";")) {
+        return;
+    }
+    if (token->kind == TK_EOF
+            || (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '}')) {
+        return;
+    }
+    if (token->prev && token->line > token->prev->line) {
+        return;
+    }
+    char* actual = token_text(token);
+    if (actual) {
+        error_at(token_start(token), token_end(token), "%sの終わりには`;`か改行が必要ですが、%sが見つかりました", subject, actual);
+    } else {
+        error_at(token_start(token), token_end(token), "%sの終わりには`;`か改行が必要ですが、ファイルの末尾に達しました", subject);
+    }
+}
+
 static Node* stmt() {
     Token* start = token;
+    // 空文（余分な `;`）は読み飛ばす。1つ以上読み飛ばした直後が
+    // ブロックの閉じ `}` なら空文として扱う（`}` は呼び出し側の
+    // ループが消費する）。それ以外の止まり方は通常の解析に任せて
+    // エラーにする（リスト文脈で消費せずに戻ると無限ループに
+    // なるため。また `;` が無いのに文が無い場合まで許すと、
+    // 以前はエラーだった `if (1) }` のような形を受け付けてしまう）
+    bool skipped_semi = false;
+    while (consume(";")) {
+        skipped_semi = true;
+    }
+    if (skipped_semi && !is_top_level
+            && token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '}') {
+        Node* node = create_node(ND_BLOCK);
+        node->tok = start;
+        return node;
+    }
     if (consume("{")) {
         return stmt_block();
     } else if (consume_keyword(KW_RETURN)) {
@@ -393,18 +431,22 @@ static Node* stmt() {
     } else if (consume_keyword(KW_FOR)) {
         return stmt_for(start);
     } else if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '!'
-               && token->next->kind == TK_SYMBOL && token->next->len == 1 && token->next->str[0] == ';') {
-        // `!;` は break の省略形
+               && (token->next->kind == TK_EOF
+                   || (token->next->kind == TK_SYMBOL && token->next->len == 1
+                       && (token->next->str[0] == ';' || token->next->str[0] == '}'))
+                   || token->next->line > token->line)) {
+        // `!` の直後が文の終わり（`;`・改行・`}`・ファイル末尾）なら
+        // break の省略形。それ以外は単項 `!` の式文として扱う
         consume("!");
         consume(";");
         Node* node = create_node(ND_BREAK);
         node->tok = start;
         return node;
     } else if (consume("^")) {
-        // `^;` は continue の省略形
+        // `^` は continue の省略形（式の先頭には現れないため曖昧さはない）
         Node* node = create_node(ND_CONTINUE);
         node->tok = start;
-        expect(";");
+        expect_stmt_end("文");
         return node;
     } else if (consume("@")) {
         return make_for_count(expr(), start);
@@ -419,12 +461,12 @@ static Node* stmt() {
         node->len = 5;
         node->tok = start;
         node->args = expr();
-        expect(";");
+        expect_stmt_end("文");
         return node;
     } else if (consume(">>")) {
         // 入力の省略形: >> 対象
         Node* target = bind_target_node(expr());
-        expect(";");
+        expect_stmt_end("文");
         Node* input = create_node(ND_INPUT);
         input->val = 0;
         input->tok = start;
@@ -437,7 +479,7 @@ static Node* stmt() {
         Node* node = create_node(ND_PUT);
         node->tok = start;
         node->args = parse_put_args();
-        expect(";");
+        expect_stmt_end("文");
         return node;
     } else if (consume_keyword(KW_YN)) {
         Node* node = create_node(ND_FUNCALL);
@@ -445,7 +487,7 @@ static Node* stmt() {
         node->len = 8;
         node->tok = start;
         node->args = expr();
-        expect(";");
+        expect_stmt_end("文");
         return node;
     } else if (token->kind == TK_IDENT && token->next->kind == TK_SYMBOL && token->next->len == 1 && token->next->str[0] == '-'
                && token->next->next->kind == TK_SYMBOL && token->next->next->len == 1 && token->next->next->str[0] == '=') {
@@ -460,7 +502,7 @@ static Node* stmt() {
         expect("[");
         Node* n = expr();
         expect("]");
-        expect(";");
+        expect_stmt_end("文");
         Node* call = create_node(ND_FUNCALL);
         call->name = "read_ints_dec";
         call->len = 13;
@@ -473,18 +515,41 @@ static Node* stmt() {
     } else if (consume_keyword(KW_BREAK)) {
         Node* node = create_node(ND_BREAK);
         node->tok = start;
-        expect(";");
+        expect_stmt_end("文");
         return node;
     } else if (consume_keyword(KW_CONTINUE)) {
         Node* node = create_node(ND_CONTINUE);
         node->tok = start;
-        expect(";");
+        expect_stmt_end("文");
         return node;
     } else {
         Node* node = expr();
-        expect(";");
+        expect_stmt_end("文");
         return node;
     }
+}
+
+// 分岐位置（if/while/for の本体）専用の文読み取り。区切り（`;`）だけが
+// あって本体が空の場合（`if (c) ; else ...` など）は空ブロックを返す。
+// リスト文脈では使わない: `}`・else・elif・末尾で消費せずに戻すのは、
+// それらを消費できる呼び出し側（stmt_if 等）がいる場所だけにする
+static Node* stmt_branch() {
+    Token* t = token;
+    bool skipped_semi = false;
+    while (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == ';') {
+        t = t->next;
+        skipped_semi = true;
+    }
+    if (skipped_semi
+            && (t->kind == TK_EOF
+                || (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == '}')
+                || (t->kind == TK_KEYWORD && (t->keyword == KW_ELSE || t->keyword == KW_ELIF)))) {
+        token = t;
+        Node* node = create_node(ND_BLOCK);
+        node->tok = t;
+        return node;
+    }
+    return stmt();
 }
 
 static bool token_is_char(Token* t, char c) {
@@ -545,6 +610,7 @@ static Node* parse_stmt_list() {
         LVar* saved_locals = locals;
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
+        int saved_depth = expr_depth;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             Node* s = stmt();
@@ -556,6 +622,7 @@ static Node* parse_stmt_list() {
             locals = saved_locals;
             globals = saved_globals;
             lambda_stack = saved_lambda;
+            expr_depth = saved_depth;
             if (at_eof()) {
                 break;
             }
@@ -577,7 +644,7 @@ static Node* stmt_return(Token* kw) {
     node = create_node(ND_RETURN);
     node->tok = kw;
     node->left_child = expr();
-    expect(";");
+    expect_stmt_end("文");
     return node;
 }
 
@@ -586,11 +653,13 @@ static Node* stmt_if(Token* kw) {
     node = create_node(ND_IF);
     node->tok = kw;
     expect("(");
+    expr_depth++;
     node->cond = expr();
+    expr_depth--;
     expect(")");
-    node->then = stmt();
+    node->then = stmt_branch();
     if (consume_keyword(KW_ELSE)) {
-        node->els = stmt();
+        node->els = stmt_branch();
     } else if (token->kind == TK_KEYWORD && token->keyword == KW_ELIF) {
         Token* elif_tok = token;
         token = token->next;
@@ -604,9 +673,11 @@ static Node* stmt_while(Token* kw) {
     node = create_node(ND_WHILE);
     node->tok = kw;
     expect("(");
+    expr_depth++;
     node->cond = expr();
+    expr_depth--;
     expect(")");
-    node->then = stmt();
+    node->then = stmt_branch();
     return node;
 }
 
@@ -617,11 +688,11 @@ static Node* make_for_iter(Token* var, Node* init, Token* kw) {
     register_any();
     node->offset = locals->offset;
     node->left_child = bind_target_node(create_ident_node(var));
-    node->then = stmt();
+    node->then = stmt_branch();
     if (consume_keyword(KW_ELSE)) {
         register_any();
         node->val = locals->offset;
-        node->els = stmt();
+        node->els = stmt_branch();
     }
     return node;
 }
@@ -641,11 +712,11 @@ static Node* make_for_count(Node* count, Token* kw) {
     Node* var = create_node(ND_LVAR);
     var->offset = locals->offset;
     node->left_child = var;
-    node->then = stmt();
+    node->then = stmt_branch();
     if (consume_keyword(KW_ELSE)) {
         register_any();
         node->val = locals->offset;
-        node->els = stmt();
+        node->els = stmt_branch();
     }
     return node;
 }
@@ -930,6 +1001,7 @@ static void class_decl(Function** cur) {
         LVar* saved_locals = locals;
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
+        int saved_depth = expr_depth;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             class_member(cur, klass, &offset);
@@ -939,6 +1011,7 @@ static void class_decl(Function** cur) {
             locals = saved_locals;
             globals = saved_globals;
             lambda_stack = saved_lambda;
+            expr_depth = saved_depth;
             if (at_eof()) {
                 break;
             }
@@ -950,6 +1023,12 @@ static void class_decl(Function** cur) {
 
 // クラス本体のメンバを1つ読む（メソッド定義またはフィールド宣言）
 static void class_member(Function** cur, Class* klass, int* offset) {
+    // 空の区切り（余分な `;`）は読み飛ばす。`}` は class_decl 側が消費する
+    while (consume(";")) {
+    }
+    if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '}') {
+        return;
+    }
     if (token->kind == TK_KEYWORD && token->keyword == KW_DEF) {
         (*cur)->next = function(klass);
         *cur = (*cur)->next;
@@ -973,7 +1052,7 @@ static void class_member(Function** cur, Class* klass, int* offset) {
     *offset += 8;
     field->next = klass->fields;
     klass->fields = field;
-    consume(";");
+    expect_stmt_end("フィールド");
 }
 
 static bool token_is_symbol(Token* t, char* symbol) {
@@ -1076,6 +1155,7 @@ Function* program() {
         LVar* saved_locals = locals;
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
+        int saved_depth = expr_depth;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             parse_top_item(&cur, &stmt_cur);
@@ -1085,6 +1165,7 @@ Function* program() {
             locals = saved_locals;
             globals = saved_globals;
             lambda_stack = saved_lambda;
+            expr_depth = saved_depth;
             is_top_level = false;
             if (at_eof()) {
                 break;

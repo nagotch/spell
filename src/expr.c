@@ -6,22 +6,36 @@ static Node* array_literal();
 // 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数なしなら NULL
 static bool suppress_multi = false;
 
+int expr_depth = 0;
+
+// 深さ0で、次のトークンが前のトークンより後の行にあれば、式はそこで
+// 終わり（文の終わりは改行でもよい: step 55）。演算子の後など、式が
+// 未完の位置ではこの判定を使わないため、被演算子は次の行に置ける
+static bool at_expr_line_break() {
+    return expr_depth == 0 && token->prev && token->line > token->prev->line;
+}
+
 static Node* parse_args() {
+    expr_depth++;
+    Node* result;
     if (consume(")")) {
-        return NULL;
+        result = NULL;
+    } else {
+        Node head;
+        head.next = NULL;
+        Node* cur = &head;
+        bool saved = suppress_multi;
+        suppress_multi = true;
+        do {
+            cur->next = expr();
+            cur = cur->next;
+        } while (consume(","));
+        suppress_multi = saved;
+        expect(")");
+        result = head.next;
     }
-    Node head;
-    head.next = NULL;
-    Node* cur = &head;
-    bool saved = suppress_multi;
-    suppress_multi = true;
-    do {
-        cur->next = expr();
-        cur = cur->next;
-    } while (consume(","));
-    suppress_multi = saved;
-    expect(")");
-    return head.next;
+    expr_depth--;
+    return result;
 }
 
 // put 文の引数列（括弧なし、カンマ区切り）を読む
@@ -56,7 +70,9 @@ static Node* primary() {
         Node** tail = &args;
         int nb = 0;
         while (consume("[")) {
+            expr_depth++;
             Node* elem = expr();
+            expr_depth--;
             expect("]");
             *tail = elem;
             tail = &elem->next;
@@ -98,7 +114,9 @@ static Node* primary() {
     } else if (ident_token) {
         node = create_ident_node(ident_token);
     } else if (consume("(")) {
+        expr_depth++;
         node = expr();
+        expr_depth--;
         expect(")");
     } else {
         Token* num_tok = token;
@@ -108,6 +126,9 @@ static Node* primary() {
     }
     while (true) {
         Token* postfix_tok = token;
+        if (at_expr_line_break()) {
+            break;
+        }
         if (consume("(")) {
             // 値経由の呼び出し: 関数値・ラムダ・括弧つき式などの直後の `(`
             Node* call = create_node(ND_VCALL);
@@ -128,7 +149,9 @@ static Node* primary() {
             continue;
         }
         if (consume("[")) {
+            expr_depth++;
             Node* right_child = expr();
+            expr_depth--;
             expect("]");
             Node* new_node = create_node(ND_INDEX);
             new_node->tok = postfix_tok;
@@ -155,7 +178,7 @@ static Node* primary() {
         new_node->len = member_token->len;
         new_node->tok = member_token;
         node = new_node;
-        if (consume("(")) {
+        if (!at_expr_line_break() && consume("(")) {
             new_node->kind = ND_MCALL;
             new_node->args = parse_args();
         }
@@ -197,6 +220,9 @@ static Node* mul() {
     Node* node = unary();
     while (true) {
         Token* op_tok = token;
+        if (at_expr_line_break()) {
+            break;
+        }
         if (consume("*")) {
             node = create_binary_operation_node(OP_MUL, node, unary());
             node->tok = op_tok;
@@ -217,6 +243,9 @@ static Node* add() {
     Node* node = mul();
     while (true) {
         Token* op_tok = token;
+        if (at_expr_line_break()) {
+            break;
+        }
         if (consume("+")) {
             node = create_binary_operation_node(OP_ADD, node, mul());
             node->tok = op_tok;
@@ -232,6 +261,9 @@ static Node* add() {
 
 // 関係演算子を1つ読む。> / >= は左右を入れ替えて < / <= にそろえる
 static bool read_rel_op(BinOp* op, bool* swapped) {
+    if (at_expr_line_break()) {
+        return false;
+    }
     if (consume("<=")) {
         *op = OP_LE;
         *swapped = false;
@@ -301,6 +333,9 @@ static Node* relational() {
 }
 
 static bool read_eq_op(BinOp* op) {
+    if (at_expr_line_break()) {
+        return false;
+    }
     if (consume("==")) {
         *op = OP_EQ;
     } else if (consume("!=")) {
@@ -341,7 +376,7 @@ static Node* equality() {
 static Node* and() {
     Node* node = equality();
     Token* op_tok = token;
-    if (consume("&&")) {
+    if (!at_expr_line_break() && consume("&&")) {
         node = create_binary_operation_node(OP_AND, node, and());
         node->tok = op_tok;
     }
@@ -351,7 +386,7 @@ static Node* and() {
 static Node* or() {
     Node* node = and();
     Token* op_tok = token;
-    if (consume("||")) {
+    if (!at_expr_line_break() && consume("||")) {
         node = create_binary_operation_node(OP_OR, node, or());
         node->tok = op_tok;
     }
@@ -362,6 +397,9 @@ static Node* range() {
     Node* node = or();
     Token* op_tok = token;
     int incl;
+    if (at_expr_line_break()) {
+        return node;
+    }
     if (consume("..=")) {
         incl = 1;
     } else if (consume("..")) {
@@ -509,12 +547,14 @@ Node* expr() {
 
 static Node* array_literal() {
     Node* node;
+    expr_depth++;
     if (consume("]")) {
         node = create_node(ND_ARRAY);
         register_array(0);
         node->array_len = 0;
         node->body = NULL;
         node->offset = locals->offset;
+        expr_depth--;
         return node;
     }
     bool saved = suppress_multi;
@@ -544,6 +584,7 @@ static Node* array_literal() {
     }
     suppress_multi = saved;
     expect("]");
+    expr_depth--;
     return node;
 }
 

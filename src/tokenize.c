@@ -2,10 +2,16 @@
 
 Token* token = NULL;
 
+// 字句解析中の現在の行番号。new_token が各トークンへ記録する（step 55:
+// 文の終わりを改行で判定するために使う）
+static int cur_line = 1;
+
 static Token* new_token(TokenKind token_kind, Token* pre_token_ptr) {
     Token* next_token_ptr = calloc(1, sizeof(Token));
     pre_token_ptr->next = next_token_ptr;
     next_token_ptr->kind = token_kind;
+    next_token_ptr->line = cur_line;
+    next_token_ptr->prev = pre_token_ptr;
     return next_token_ptr;
 }
 
@@ -23,10 +29,14 @@ Token* tokenize(char* s) {
     Token first_token;
     first_token.next = NULL;
     Token* last_token_ptr = &first_token;
+    cur_line = 1;
 
     char** endptr = &s;
     while (**endptr != '\0') {
         if (isspace(**endptr)) {
+            if (**endptr == '\n') {
+                cur_line++;
+            }
             (*endptr)++;
             continue;
         }
@@ -42,6 +52,11 @@ Token* tokenize(char* s) {
             char* q = strstr(*endptr + 2, "*/");
             if (!q) {
                 error_at(*endptr - src, *endptr - src + 2, "コメントを閉じる`*/`がないまま、ファイルの末尾に達しました");
+            }
+            for (char* p = *endptr; p < q + 2; p++) {
+                if (*p == '\n') {
+                    cur_line++;
+                }
             }
             *endptr = q + 2;
             continue;
@@ -193,6 +208,8 @@ Token* tokenize(char* s) {
     }
     last_token_ptr = new_token(TK_EOF, last_token_ptr);
     last_token_ptr->str = *endptr;
+    // 先頭トークンの prev は、スタック上のダミーを指したままにしない
+    first_token.next->prev = NULL;
     return first_token.next;
 }
 

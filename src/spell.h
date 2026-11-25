@@ -47,6 +47,8 @@ struct Token {
     long val;
     char* str;
     int len;
+    int line;
+    Token* prev;
     Token *next;
 };
 
