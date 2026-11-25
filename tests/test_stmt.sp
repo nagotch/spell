@@ -17,21 +17,25 @@ def t016() { if (1) return 1; else return 2; }
 def t017() { a=0; if (1) a=1; return a; }
 def t018() { a=0; if (0) a=1; return a; }
 def t019() { a=0; while (a<10) a=a+1; return a; }
-def t020() { s=0; for (i=0; i<10; i=i+1) s=s+i; return s; }
-def t021() { for (;;) return 3; }
-def t022() { a=0; for (; a<3;) a=a+1; return a; }
+def t020() { s=0; for i in 10 s=s+i; return s; }
+def t021() { while (1) return 3; }
+def t022() { a=0; while (a<3) a=a+1; return a; }
 def t023() { a=0; { a=1; a=2; } return a; }
 def t024() { a=0; if (1) { a=1; a=2; } return a; }
 def t025() { a=0; if (0) { a=1; } else { a=2; } return a; }
 def t026() { a=0; while (a<3) { a=a+1; a=a+1; } return a; }
-def t027() { s=0; for (i=0; i<3; i=i+1) { s=s+i; s=s+1; } return s; }
+def t027() { s=0; for i in 3 { s=s+i; s=s+1; } return s; }
 def t028() { a=0; { a=1; { a=2; } } return a; }
 def t029() { a=5; {} return a; }
 def t030() { i = 0; while (1) { i += 1; if (i == 5) { break; } } return i; }
 def t031() { i = 0; s = 0; while (i < 10) { i += 1; if (i == 5) { continue; } s += i; } return s; }
-def t032() { s = 0; for (i = 0; i < 5; i += 1) { if (i == 2) { continue; } s += i; } return s; }
-def t033() { total = 0; for (i = 0; i < 3; i += 1) { for (j = 0; j < 10; j += 1) { if (j == 2) { break; } total += 1; } } return total; }
+def t032() { s = 0; for i in 5 { if (i == 2) { continue; } s += i; } return s; }
+def t033() { total = 0; for i in 3 { for j in 10 { if (j == 2) { break; } total += 1; } } return total; }
 def t034() { x: int = 40; x = x + 2; return x; }
+def t035() { s = 0; for i in 1..5 { s = s + i; } return s; }
+def t036() { s = 0; for 4 { s = s + 3; } return s; }
+def t037() { for i in 3 { } return i; }
+def t038() { s = 0; for i in 3 { i = 99; s = s + 1; } return s; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -80,6 +84,10 @@ def main() {
     mark(32); fails=fails+check(t032(), 8);
     mark(33); fails=fails+check(t033(), 6);
     mark(34); fails=fails+check(t034(), 42);
+    mark(35); fails=fails+check(t035(), 10);
+    mark(36); fails=fails+check(t036(), 12);
+    mark(37); fails=fails+check(t037(), 2);
+    mark(38); fails=fails+check(t038(), 3);
 
     print_str("done"); putchar(10);
     return fails > 0;

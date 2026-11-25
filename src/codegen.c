@@ -279,36 +279,6 @@ static void gen_while(Node* node) {
     printf("  push 0\n");
 }
 
-static void gen_for(Node* node) {
-    int label = new_label();
-    int saved_break = break_label;
-    int saved_continue = continue_label;
-    break_label = label;
-    continue_label = label;
-    if (node->init) {
-        gen(node->init);
-        printf("  pop rax\n");
-    }
-    printf(".Lbegin%d:\n", label);
-    if (node->cond) {
-        gen(node->cond);
-        printf("  pop rax\n");
-        printf("  cmp rax, 0\n");
-        printf("  je .Lend%d\n", label);
-    }
-    gen(node->then);
-    printf("  pop rax\n");
-    break_label = saved_break;
-    continue_label = saved_continue;
-    printf(".Lcont%d:\n", label);
-    if (node->inc) {
-        gen(node->inc);
-        printf("  pop rax\n");
-    }
-    printf("  jmp .Lbegin%d\n", label);
-    printf(".Lend%d:\n", label);
-    printf("  push 0\n");
-}
 
 static void gen_block(Node* node) {
     Node* block_head = node->body;
@@ -500,7 +470,6 @@ static void gen(Node* node) {
         case ND_NEWARRAY: gen_newarray(node); break;
         case ND_IF: gen_if(node); break;
         case ND_WHILE: gen_while(node); break;
-        case ND_FOR: gen_for(node); break;
         case ND_BLOCK: gen_block(node); break;
         case ND_FUNCALL: gen_funcall(node); break;
         case ND_MEMBER: gen_member(node); break;

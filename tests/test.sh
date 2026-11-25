@@ -7,12 +7,13 @@ SPELL=../src/spell
 
 tests=(
     "def main() { i = 0; while (i < 1000000) i = i + 1; return 0; }|0"
-    "def main() { s = 0; for (i = 0; i < 1000000; i = i + 1) s = s + 1; return 0; }|0"
+    "def main() { s = 0; for i in 1000000 { s = s + 1; } return 0; }|0"
     "x = 30; y = 12; return x + y;|42"
     "class P { x: int; def one(self) -> int { return 1; } } def main() { return 42; }|42"
 )
 
 error_tests=(
+    "class Q { a: int; def __init__(self, a: int) { self.a = a; } } def main() { for i in Q(1) { } return 0; }|型の値は反復できません"
     "def main() { a = [1,2,3]; return a.5; }|数値\`5\`が指定されています"
     "def main() { return 1; } /*|コメントを閉じる"
     "def main() { return #; }|ここでは文字\`#\`を使えません"
@@ -185,6 +186,7 @@ one_io_test "def main() { print(1 < 2); return 0; }" "" "true\n"
 one_io_test "def main() { print([\"a\", \"b\"]); return 0; }" "" "a b\\n"
 one_io_test "def main() { print([1 < 2, 2 < 3]); return 0; }" "" "true true\\n"
 one_io_test "def main() { print([\"x\", \"y\"] == [\"x\", \"y\"]); return 0; }" "" "true\\n"
+one_io_test "def main() { for x in [1, 2, 3] { print(x); } return 0; }" "" "1\n2\n3\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
