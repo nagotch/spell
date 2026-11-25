@@ -99,7 +99,7 @@ one_error_test() {
 }
 
 run_suite() {
-    cat io.sp $1 > suite_all.sp
+    cp $1 suite_all.sp
     "$SPELL" -S -o suite suite_all.sp
     cc -o suite suite.s funcs.o
     ./suite > suite.out
@@ -114,7 +114,7 @@ run_suite() {
 }
 
 run_selfcheck() {
-    cat io.sp test_selfcheck.sp > suite_all.sp
+    cp test_selfcheck.sp suite_all.sp
     "$SPELL" -S -o suite suite_all.sp
     cc -o suite suite.s funcs.o
     ./suite > suite.out
@@ -129,7 +129,7 @@ run_selfcheck() {
 }
 
 one_io_test() {
-    cat io.sp > io_all.sp
+    : > io_all.sp
     echo "$1" >> io_all.sp
     "$SPELL" -S -o io_prog io_all.sp
     cc -o io_prog io_prog.s funcs.o
