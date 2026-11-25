@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>エディタ連携 — spell</title>
+<meta name="description" content="spell の言語サーバー spell-lsp と、NeoVim での使い方です。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="index.html">概要</a>
+    <a href="guide.html">言語ツアー</a>
+    <a href="reference.html">リファレンス</a>
+    <a href="editor.html" class="here">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+
+<h1 class="page">エディタ連携</h1>
+<p class="lede">
+  言語サーバー <code>spell-lsp</code> が、コンパイラの診断をエディタへ返します。
+  現在の対応範囲は診断だけです。補完・ホバー・定義ジャンプはまだありません。
+</p>
+
+<h2><span class="no">01</span>spell-lsp</h2>
+<p>
+  <code>spell-lsp</code> はコンパイラと一緒にビルドされる言語サーバーです。
+  ファイルを開く・編集するたびに全文をチェックし、構文エラーと型エラーのうち最初の1件を
+  <code>publishDiagnostics</code> で返します（コンパイラ自体が最初のエラーで止まる設計のため）。
+  位置情報のあるエラーは該当箇所に、無いものはファイルの先頭に出ます。
+  チェックは変更のたびに子プロセスで実行されます（コンパイラの状態を持ち越さないため）。
+</p>
+<p>
+  配置で大事なのは1点だけです。<code>spell-lsp</code> は <code>prelude.sp</code> を
+  実行ファイルと同じフォルダから探すので、2つを並べて PATH の通った場所へ置いてください。
+</p>
+
+<pre class="plain">make -C src                       # spell と spell-lsp ができる
+cp src/spell-lsp src/prelude.sp ~/.local/bin/</pre>
+
+<h2><span class="no">02</span>NeoVim の設定</h2>
+<p>
+  リポジトリの <code>tools/neovim/</code> に、ファイルタイプ検出とシンタックスハイライト、
+  サーバー起動のスニペットが入っています。起動スニペットの中身はこれだけです。
+  この中身を <code>init.lua</code> 等へ貼って使います。
+</p>
+
+<figure class="code">
+  <figcaption>SPELL-LSP.LUA</figcaption>
+<pre>vim.filetype.add({
+  extension = {
+    sp = 'spell',
+  },
+})
+
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'spell',
+  callback = function(args)
+    vim.lsp.start({
+      name = 'spell-lsp',
+      cmd = { 'spell-lsp' },
+      root_dir = vim.fs.root(0, { '.git' }) or vim.fn.getcwd(),
+    }, { bufnr = args.buf })
+  end,
+})</pre>
+</figure>
+
+<p class="note">
+  <code>*.sp</code> は NeoVim 本体が回路シミュレーションの Spice 用に使っている拡張子と重なるため、
+  spell 側の検出は上書きで登録しています（<code>tools/neovim/ftdetect/spell.vim</code>）。
+  シンタックスハイライトは <code>tools/neovim/syntax/spell.vim</code> にあります。
+</p>
+
+<h2><span class="no">03</span>制限事項</h2>
+<ul>
+  <li>診断は最初の1件のみです。</li>
+  <li>ドキュメント同期は全文送信（Full）です。</li>
+  <li>位置の列は文字（コードポイント）単位で返します。日本語を含む BMP の文字では LSP 標準の UTF-16 単位と一致しますが、BMP 外の文字がエラー位置より前にある行では、列がずれることがあります。</li>
+</ul>
+
+<p class="note">
+  サーバーの動作確認には <code>python3 tools/neovim/lsp_smoke.py</code> が使えます。
+  起動して JSON-RPC を流し、正常系・型エラー・構文エラー・修正で診断が消えること・終了処理を確認します。
+</p>
+
+<footer>
+  <span class="fname">spell.</span><br>
+  個人プロジェクトとして開発中です。このドキュメントのコード例は、すべて現在のコンパイラでコンパイルと実行を確認しています。<br>
+  <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a>
+</footer>
+
+</div>
+</body>
+</html>

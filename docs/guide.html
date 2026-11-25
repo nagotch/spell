@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>言語ツアー — spell</title>
+<meta name="description" content="spell の文法を、実行できる例とともに一通りたどります。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="index.html">概要</a>
+    <a href="guide.html" class="here">言語ツアー</a>
+    <a href="reference.html">リファレンス</a>
+    <a href="editor.html">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+
+<h1 class="page">言語ツアー</h1>
+<p class="lede">
+  文法を基礎から一通りたどります。出てくる例はすべて、現在のコンパイラで実行して出力を確かめたものです。
+</p>
+
+<h2><span class="no">01</span>文と出力</h2>
+<p>
+  プログラムはトップレベルに文を並べて書きます。文は <code>;</code> で終えます（ブロック <code>{ }</code> の直後は要りません）。
+  出力の基本は <code>put</code> で、複数の値を空白区切りで1行に出します。
+  糖衣として、文頭の <code>&lt;</code> と <code>&lt;&lt;</code> も同じ出力です。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>put 1, 2, 3;
+&lt;&lt; "moji";
+&lt; 40 + 2;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1 2 3
+moji
+42</pre>
+</figure>
+
+<p class="note">
+  上の3行はいずれも「値を文字列化して改行つきで出す」動きで、数値は10進、<code>bool</code> は <code>true</code> / <code>false</code>、
+  配列は要素を空白区切りで並べた形になります。
+</p>
+
+<h2><span class="no">02</span>変数と型</h2>
+<p>
+  変数は代入で生まれます。型は初期値から推論されるのが基本で、必要なら <code>x: int = 式</code> のように
+  注釈を付けられます。注釈はキャストではなく制約で、合わない値を入れようとすると型エラーになります。
+  基本の型は <code>int</code>（64ビット整数）、<code>bool</code>、<code>str</code>、そして配列 <code>[T]</code> です。
+  複数の変数への同時代入もでき、右辺をすべて評価してから代入するので交換がそのまま書けます。
+</p>
+
+<figure class="code">
+  <figcaption>例 — 交換</figcaption>
+<pre>a = 1;
+b = 2;
+a, b = b, a;
+put a, b;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2 1</pre>
+</figure>
+
+<h2><span class="no">03</span>数と演算</h2>
+<p>
+  四則演算と剰余があり、除算と剰余は Python と同じ床除算です
+  （<code>a == (a / b) * b + a % b</code> が常に成り立ちます）。
+  比較は連鎖でき、<code>0 &lt; x &lt; 10</code> は「<code>0 &lt; x</code> かつ <code>x &lt; 10</code>」で、
+  真ん中の式は1回だけ評価されます。論理演算は <code>&amp;&amp;</code>、<code>||</code>、<code>!</code> で、短絡評価します。
+  複合代入 <code>+=</code> などと、後置の <code>++</code> / <code>--</code> もあります。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>put -7 / 2, -7 % 2;
+put 2 + 3 * 4, (2 + 3) * 4;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>-4 1
+14 20</pre>
+</figure>
+
+<h2><span class="no">04</span>分岐とループ</h2>
+<p>
+  <code>if</code> / <code>elif</code> / <code>else</code> と <code>while</code> があります。
+  <code>for</code> は反復対象を <code>in</code> の後に書く形で、整数なら「0 から その数−1」、
+  範囲なら <code>1..=20</code> のような区間、配列や文字列ならその要素をたどります。
+  範囲は <code>a..b</code> が半開区間、<code>a..=b</code> が終端を含み、始点が終点より大きければ自動で降順になります。
+  <code>break</code> しなかったときだけ実行される <code>for ... else</code> も Python と同じ意味です。
+</p>
+
+<figure class="code">
+  <figcaption>例 — FizzBuzz</figcaption>
+<pre>for i in 1..=20 {
+    if (i % 15 == 0) { put "FizzBuzz"; }
+    elif (i % 3 == 0) { put "Fizz"; }
+    elif (i % 5 == 0) { put "Buzz"; }
+    else { put i; }
+}</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力（抜粋）</figcaption>
+<pre>1
+2
+Fizz
+4
+Buzz
+Fizz
+7
+8
+Fizz
+Buzz</pre>
+</figure>
+
+<figure class="code">
+  <figcaption>例 — 連鎖比較と for...else</figcaption>
+<pre>x = 5;
+if (0 &lt; x &lt; 10) { put "in range"; }
+for i in 5 {
+    if (i == 9) { break; }
+} else {
+    put "not found";
+}</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>in range
+not found</pre>
+</figure>
+
+<h3>短縮形</h3>
+<p>
+  ループには <code>@</code> を使った短縮形があります。<code>i@n { }</code> は <code>for i in n { }</code>、
+  <code>@n { }</code> は変数なしの n 回繰り返しです。また <code>break</code> は <code>!;</code>、
+  <code>continue</code> は <code>^;</code> とも書けます。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>i = 0;
+while (1 == 1) {
+    i += 1;
+    if (i == 3) { !; }
+}
+put i;
+s = 0;
+for k in 6 {
+    if (k % 2 == 1) { ^; }
+    s += k;
+}
+put s;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3
+6</pre>
+</figure>
+
+<p>
+  降順の範囲もそのまま書けます。<code>3..0</code> は集合としては <code>0..3</code> と同じで、順序だけが逆になります。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>for i in 3..0 { put i; }</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2
+1
+0</pre>
+</figure>
+
+<h2><span class="no">05</span>配列と文字列</h2>
+<p>
+  配列は <code>[3, 1, 4]</code> のようなリテラルと、<code>[0; 5]</code> のような「値と長さ」の形で作れます。
+  長さは <code>a.len</code>、逆順のコピーは <code>a.rev</code> です。<code>+</code> は連結、<code>*</code> は繰り返し、
+  <code>==</code> は中身の比較になります。これらはコンパイラの特殊扱いではなく、
+  prelude の <code>array</code> クラスのメソッドとして定義されています。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>a = [3, 1, 4, 1, 5];
+s = 0;
+for x in a { s += x; }
+put s;
+put a.len;
+put a.rev;
+b = [0; 5];
+b[2] = 7;
+put b;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>14
+5
+5 1 4 1 3
+0 0 7 0 0</pre>
+</figure>
+
+<figure class="code">
+  <figcaption>例 — 連結と繰り返し</figcaption>
+<pre>put [1, 2] + [3];
+put [7] * 3;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1 2 3
+7 7 7</pre>
+</figure>
+
+<p>
+  文字列 <code>str</code> も同じ作りで、<code>+</code> で連結、<code>==</code> で比較、<code>.len</code> と <code>.rev</code> を持ちます。
+  添字で取り出すと文字コード（<code>int</code>）が返ります。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>&lt;&lt; "abc".rev;
+put "A"[0];</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>cba
+65</pre>
+</figure>
+
+<h2><span class="no">06</span>関数</h2>
+<p>
+  関数は <code>def</code> で定義します。引数と戻り値の型注釈は任意ですが、書けば検査されます。
+  関数名は値として扱え、引数は6個までです。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>def fib(n: int) -&gt; int {
+    if (n &lt; 2) { return n; }
+    return fib(n - 1) + fib(n - 2);
+}
+put fib(20);</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>6765</pre>
+</figure>
+
+<h2><span class="no">07</span>クラス</h2>
+<p>
+  クラスは、フィールドを本体で型つきで宣言し、メソッドを <code>def</code> で書く形です。
+  継承はありません。<code>self</code> は明示します。コンストラクタは <code>__init__</code> で、
+  正常に終わるすべての経路で全フィールドが初期化されていることがコンパイラに検査されます。
+  引数を取らないメソッドは、<code>obj.m</code> のように括弧を省略して呼べます
+  （フィールドと同名のメソッドは置けません）。<code>__str__</code> を定義すれば、出力の際の文字列化に使われます。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>class Rect {
+    w: int;
+    h: int;
+    def __init__(self, w: int, h: int) {
+        self.w = w;
+        self.h = h;
+    }
+    def area(self) -&gt; int { return self.w * self.h; }
+    def __str__(self) -&gt; str {
+        return self.w.__str__() + "x" + self.h.__str__();
+    }
+}
+r = Rect(3, 4);
+put r.area();
+&lt;&lt; r;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>12
+3x4</pre>
+</figure>
+
+<p>
+  添字や演算子も、対応するダンダーメソッドを定義すれば自作クラスに持たせられます。
+  <code>a[i]</code> は <code>__getitem__</code>、<code>a[i] = v</code> は <code>__setitem__</code>、
+  <code>for x in a</code> は <code>__iter__</code> の返すイテレータの <code>__has_next__</code> / <code>__next__</code>、
+  という具合です。<code>__eq__</code> を持たないクラスの <code>==</code> は同一性比較になります。
+</p>
+
+<h2><span class="no">08</span>ジェネリクス</h2>
+<p>
+  クラスには型パラメータを最大4つまで付けられます。生成のときの型引数は、
+  コンストラクタの引数と、束縛先の注釈から推論されます。実装は単相化で、
+  使われた型の組み合わせごとに専用のクラスが生成されます。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>class Box&lt;T&gt; {
+    v: T;
+    def __init__(self, v: T) { self.v = v; }
+    def get(self) -&gt; T { return self.v; }
+}
+b: Box&lt;int&gt; = Box(42);
+put b.get();
+s: Box&lt;str&gt; = Box("spell");
+&lt;&lt; s.get();</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>42
+spell</pre>
+</figure>
+
+<h2><span class="no">09</span>関数値とクロージャ</h2>
+<p>
+  関数は第一級の値です。型は <code>fn(int) -&gt; int</code> のように書きます。
+  無名関数は <code>fn(x: int) -&gt; int { }</code> の形と、式だけの <code>x -&gt; x * x</code> という矢印形があります。
+  外側の変数は値で捕捉され、クロージャになります。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>def apply(f: fn(int) -&gt; int, x: int) -&gt; int { return f(x); }
+put apply(x -&gt; x * x, 7);
+base = 10;
+add = fn(y: int) -&gt; int { return y + base; };
+put add(5);</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>49
+15</pre>
+</figure>
+
+<h2><span class="no">10</span>辞書</h2>
+<p>
+  <code>Dict&lt;K, V&gt;</code> は prelude のクラスです。キーは <code>__hash__</code> と <code>__eq__</code> を持つ型なら何でも使えます。
+  読み取り <code>d[k]</code> は、キーが無ければ「構築時に渡したファクトリが作る既定値」を登録してから返す、
+  いわゆる defaultdict 式です。数え上げがそのまま書けます。
+  既定値ファクトリはキーごとに呼ばれるので、値が共有されることはありません。
+  反復はキーを挿入順にたどります。
+</p>
+
+<figure class="code">
+  <figcaption>例 — 単語の数え上げ</figcaption>
+<pre>ws = ["a", "b", "a", "c", "b", "a"];
+cnt: Dict&lt;str, int&gt; = Dict(zero_int);
+for w in ws { cnt[w] += 1; }
+for k in cnt { put k, cnt[k]; }
+put cnt.len;
+put cnt.has("z");</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>a 3
+b 2
+c 1
+3
+false</pre>
+</figure>
+
+<p class="note">
+  <code>zero_int</code>、<code>zero_bool</code>、<code>zero_str</code> は prelude が用意する既定値ファクトリです。
+  配列のような値は <code>Dict(fn() -&gt; [int] { return []; })</code> のようにラムダで渡します。
+  生成には型の手がかり（注釈など）が要ります。辞書自体に文字列化は無いので、そのまま <code>put</code> には渡せません。
+</p>
+
+<h2><span class="no">11</span>入力</h2>
+<p>
+  標準入力は代入の右辺で <code>in</code> と書きます。<code>in[n]</code> は整数を n 個読んで配列にし、
+  <code>in[h][w]</code> は h 行 × w 個の二次元配列にします。文字列は <code>in_str</code>（空白区切りのトークン）、
+  <code>in_line</code>（行全体）です。入力が1始まりのときは <code>a- = in[n]</code> と書くと、
+  読みながら各要素から1を引いてくれます。糖衣として <code>&gt;&gt; x;</code> という入力の形もあります。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>n = in;
+a = in[n];
+s = 0;
+for x in a { s += x; }
+put s;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>入力</figcaption>
+<pre>5
+1 2 3 4 5</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>15</pre>
+</figure>
+
+<figure class="code">
+  <figcaption>例 — 1始まりの入力</figcaption>
+<pre>n = in;
+a- = in[n];
+put a;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>入力が「3 / 1 2 3」のときの出力</figcaption>
+<pre>0 1 2</pre>
+</figure>
+
+<p>
+  Yes / No の出力には <code>yn</code> があります。<code>yn 条件;</code> で、真なら <code>Yes</code>、偽なら <code>No</code> を出します。
+</p>
+
+<h2><span class="no">12</span>エラー</h2>
+<p>
+  コンパイルエラーは日本語で、位置と理由を示します。型の不一致、未定義の名前、構文の誤りが対象で、
+  最初のエラーで処理が止まります。下の例は、<code>bool</code> を <code>int</code> の変数へ入れようとしたときの実際の表示です。
+</p>
+
+<figure class="code">
+  <figcaption>ERR.SP</figcaption>
+<pre>x: int = 1 &lt; 2;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>コンパイラの出力</figcaption>
+<pre>err.sp:1:1: エラー: 変数`x`の型は`int`ですが、`bool`が代入されています
+1 | x: int = 1 &lt; 2;
+  | ^</pre>
+</figure>
+
+<p class="note">
+  言語サーバー <code>spell-lsp</code> を使えば、この診断はエディタの中にもそのまま出ます（<a href="editor.html">エディタ連携</a>）。
+</p>
+
+<footer>
+  <span class="fname">spell.</span><br>
+  個人プロジェクトとして開発中です。このドキュメントのコード例は、すべて現在のコンパイラでコンパイルと実行を確認しています。<br>
+  <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a>
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spell — 自作プログラミング言語</title>
+<meta name="description" content="spell は競技プログラミングのために作っている小さなコンパイル言語です。Python 風の読みやすさ、記号糖衣の短さ、ネイティブコードの速さを目指しています。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="index.html" class="here">概要</a>
+    <a href="guide.html">言語ツアー</a>
+    <a href="reference.html">リファレンス</a>
+    <a href="editor.html">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+
+<p class="eyebrow">自作プログラミング言語</p>
+<h1 class="title">spell</h1>
+<p class="lede">
+  spell は、競技プログラミングのために作っている小さなコンパイル言語です。
+  Python に似た読みやすい基本構文に、頻出する処理を一文字で書ける記号糖衣を重ね、
+  C で書かれたコンパイラが x86-64 のアセンブリへ直接コンパイルします。
+  インタプリタではありません。実行ファイルになるので、スクリプト言語より速く動きます。
+</p>
+
+<dl class="spec">
+  <div><dt>コンパイラ</dt><dd>C で実装</dd></div>
+  <div><dt>出力</dt><dd>x86-64 アセンブリ</dd></div>
+  <div><dt>型</dt><dd>静的型付け・推論あり</dd></div>
+  <div><dt>主な用途</dt><dd>競技プログラミング</dd></div>
+</dl>
+
+<h2><span class="no">01</span>最初のプログラム</h2>
+<p>
+  文頭の <code>&lt;</code> は「式を評価して1行で出す」出力の糖衣です。
+  プログラムはトップレベルに文を並べるだけで書けます。<code>main</code> 関数は要りません。
+</p>
+
+<figure class="code">
+  <figcaption>HELLO.SP</figcaption>
+<pre>&lt; "hello, world";</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>hello, world</pre>
+</figure>
+
+<p>ビルドは2段です。コンパイラがアセンブリを出し、小さな C のランタイムと一緒にリンクします。</p>
+
+<pre class="plain">spell -S -o hello hello.sp   # hello.s ができる
+cc -o hello hello.s tests/funcs.c
+./hello</pre>
+
+<p class="note">
+  コンパイラ自体のビルドは <code>make -C src</code> です（<code>spell</code> と言語サーバー <code>spell-lsp</code> ができます）。
+  Nix ではリポジトリの flake がパッケージを用意しているので、<code>nix build</code> でも同じものが得られます。
+</p>
+
+<h2><span class="no">02</span>どんな言語か</h2>
+
+<h3>意味論は Python 式</h3>
+<p>
+  迷うところは Python に寄せてあります。除算は床除算で、<code>-7 / 2</code> は <code>-4</code>、
+  <code>-7 % 2</code> は <code>1</code> です。比較は <code>0 &lt; x &lt; 10</code> と連鎖でき、
+  <code>for</code> には <code>else</code> が付き、反復はイテレータプロトコルで統一されています。
+</p>
+
+<h3>記号糖衣は、必ず正規形を持つ</h3>
+<p>
+  入力は <code>&gt;&gt; x;</code>、出力は <code>&lt;&lt; x;</code>、繰り返しは <code>i@n { }</code> のように短く書けます。
+  ただし糖衣は見た目の遊びではなく、すべて通常の構文へ一意に展開できるものだけを採用しています。
+  頻度が低い記号は、慣れが効かないので入れません。
+</p>
+
+<h3>コンパイラは最小限、豊かさはライブラリで</h3>
+<p>
+  配列・文字列・辞書の振る舞いは、コンパイラの特殊扱いではなく、起動時に読み込まれる
+  <code>prelude</code> のクラス定義として書かれています。添字や演算子は
+  <code>__getitem__</code> や <code>__add__</code> のようなダンダーメソッドへの展開で統一され、
+  利用者定義のクラスも同じ規約で演算子を持てます。ジェネリクスは単相化で、
+  <code>Dict&lt;str, int&gt;</code> のような型ごとに専用のコードを生成します。
+</p>
+
+<h3>エラーは日本語で、場所を示す</h3>
+<p>
+  型エラーや構文エラーは、ファイル名・行・列と、問題の範囲への下線つきで報告されます。
+  最初のエラーで止まるので、直す順番に迷いません。
+</p>
+
+<figure class="out">
+  <figcaption>実際のエラー表示</figcaption>
+<pre>err.sp:1:1: エラー: 変数`x`の型は`int`ですが、`bool`が代入されています
+1 | x: int = 1 &lt; 2;
+  | ^</pre>
+</figure>
+
+<h3>速さについて</h3>
+<p>
+  参考値として、作者の環境（2026年11月）での単純なベンチマークでは、ループ加算・再帰・配列走査で
+  CPython のおよそ2倍から18倍の速度でした。ネイティブコードになる以上、桁はスクリプト言語と変わります。
+  最適化はまだ最小限で、C の最適化なし（<code>-O0</code>）と比べて数倍の差があります。
+</p>
+
+<h2><span class="no">03</span>目次</h2>
+<div class="toc">
+  <a href="guide.html">
+    <span class="tno">A</span>
+    <span class="tt">言語ツアー</span>
+    <span class="td">文・型・分岐とループから、クラス、ジェネリクス、クロージャ、辞書、入出力まで。例はすべて実行確認済みです。</span>
+  </a>
+  <a href="reference.html">
+    <span class="tno">B</span>
+    <span class="tt">リファレンス</span>
+    <span class="td">演算子と糖衣構文の対応表、組み込み型とメソッド、入出力の形の一覧です。</span>
+  </a>
+  <a href="editor.html">
+    <span class="tno">C</span>
+    <span class="tt">エディタ連携</span>
+    <span class="td">言語サーバー spell-lsp と NeoVim の設定。診断が編集のたびに返ります。</span>
+  </a>
+  <a href="https://github.com/nagotch/spell/blob/main/docs/language-design.md">
+    <span class="tno">D</span>
+    <span class="tt">設計メモ</span>
+    <span class="td">言語設計の決定事項とその理由の記録です。仕様の背景を知りたいときに。</span>
+  </a>
+</div>
+
+<footer>
+  <span class="fname">spell.</span><br>
+  個人プロジェクトとして開発中です。このドキュメントのコード例は、すべて現在のコンパイラでコンパイルと実行を確認しています。<br>
+  <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a>
+</footer>
+
+</div>
+</body>
+</html>
