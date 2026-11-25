@@ -165,6 +165,8 @@ struct Class {
     Type* type;
     char* tparam;
     int tparam_len;
+    Class* origin;
+    Type* targ;
 };
 
 extern Token* token;

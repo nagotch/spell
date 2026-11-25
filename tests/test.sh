@@ -66,6 +66,7 @@ error_tests=(
     "class Q { x: int; } def main() { print(Q()); return 0; }|型の値は print できません"
     "def main() { x = int(42); return 0; }|はクラスではありません"
     "def main() { print(1, 2); return 0; }|引数は1個ですが、2個が指定されています"
+    "class P<T> { a: T; } def main() { p = P(); return 0; }|型引数を推論できません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -181,6 +182,9 @@ one_io_test "def main() { print(42); return 0; }" "" "42\n"
 one_io_test "def main() { print(\"abc\"); return 0; }" "" "abc\n"
 one_io_test "def main() { print([1, 2, 3]); return 0; }" "" "1 2 3\n"
 one_io_test "def main() { print(1 < 2); return 0; }" "" "true\n"
+one_io_test "def main() { print([\"a\", \"b\"]); return 0; }" "" "a b\\n"
+one_io_test "def main() { print([1 < 2, 2 < 3]); return 0; }" "" "true true\\n"
+one_io_test "def main() { print([\"x\", \"y\"] == [\"x\", \"y\"]); return 0; }" "" "true\\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

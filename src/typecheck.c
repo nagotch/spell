@@ -17,103 +17,7 @@ static GVarType* global_types;
 static Function* current_fn;
 static Type* current_return;
 static Function* functions;
-
-static Class* instancecs = NULL;
-
-static Type* subst_type(Type* t, Type* targ) {
-    if (!t) return NULL;
-    switch (t->kind) {
-        case TY_VAR: return targ;
-        case TY_ARRAY: return array_type(subst_type(t->elem, targ));
-        case TY_CLASS:
-            if (t->targ) {
-                Type* nt = calloc(1, sizeof(Type));
-                nt->kind = TY_CLASS;
-                nt->klass = t->klass;
-                nt->targ = subst_type(t->targ, targ);
-                return nt;
-            }
-            return t;
-        default: return t;
-    }
-}
-
-#define CLONE_MEMO_MAX 8192
-static Node* memo_orig[CLONE_MEMO_MAX];
-static Node* memo_copy[CLONE_MEMO_MAX];
-static int memo_n = 0;
-
-static Node* clone_node(Node* n, Type* targ) {
-    if (!n) { return NULL; }
-    for (int i = 0; i < memo_n; i++) {
-        if (memo_orig[i] == n) { return memo_copy[i]; }
-    }
-    Node* c = calloc(1, sizeof(Node));
-    *c = *n;
-    memo_orig[memo_n] = n;
-    memo_copy[memo_n] = c;
-    memo_n++;
-    c->type = NULL;
-    c->func = NULL;
-    c->klass = NULL;
-    c->anno = subst_type(n->anno, targ);
-    c->left_child = clone_node(n->left_child, targ);
-    c->right_child = clone_node(n->right_child, targ);
-    c->cond = clone_node(n->cond, targ);
-    c->then = clone_node(n->then, targ);
-    c->els = clone_node(n->els, targ);
-    c->init = clone_node(n->init, targ);
-    c->inc = clone_node(n->inc, targ);
-    c->body = clone_node(n->body, targ);
-    c->args = clone_node(n->args, targ);
-    c->next = clone_node(n->next, targ);
-    return c;
-}
-
-static Class* instantiate(Class* tmpl, Type* targ) {
-    for (Class* c = instances; c; c = c->next) {
-        if (c->origin == tmpl && type_equals(c->type->targ, targ)) { return c; }
-    }
-    Class* inst = calloc(1, sizeof(Class));
-    inst->name = tmpl->name;
-    inst->len = tmpl->len;
-    inst->origin = tmpl;
-    inst->type = calloc(1, sizeof(Type));
-    inst->type->kind = TY_CLASS;
-    inst->type->klass = inst;
-    inst->type->targ = targ;
-    Field* ftail = NULL;
-    for (Field* f = tmpl->fields; f; f = f->next) {
-        Field* nf = calloc(1, sizeof(Field));
-        nf->name = f->name;
-        nf->len = f->len;
-        nf->offset = f->offset;
-        nf->type = subst_type(f->type, targ);
-        if (ftail) { ftail->next = nf; } else { inst->fields = nf; }
-        ftail = nf;
-    }
-    inst->next = instances;
-    instances = inst;
-    Function* tail = functions;
-    while (tail->next) { tail = tail->next; }
-    for (Function* fn = functions; fn; fn = fn->next) {
-        if (fn->klass != tmpl) { continue; }
-        Function* nf = calloc(1, sizeof(Function));
-        *nf = *fn;
-        nf->klass = inst;
-        nf->next = NULL;
-        for (int i = 0; i < 6; i++) {
-            nf->param_types[i] = subst_type(fn->param_types[i], targ);
-        }
-        nf->param_types[0] = inst->type;
-        nf->return_type = subst_type(fn->return_type, targ);
-        memo_n = 0;
-        nf->body = clone_node(fn->body, targ);
-        tail->next = nf;
-        tail = nf;
-    }
-    return inst;
-}
+static Class* instantiate(Class* tmpl, Type* targ);
 
 static Class* class_of(Type* t) {
     switch (t->kind) {
@@ -126,7 +30,13 @@ static Class* class_of(Type* t) {
             }
             return t->klass;
         case TY_INT: return find_class("int", 3);
-        case TY_ARRAY: return find_class("array", 5);
+        case TY_ARRAY: {
+            Class* arr = find_class("array", 5);
+            if (arr && arr->tparam) {
+                return instantiate(arr, t->elem);
+            }
+            return arr;
+        }
         default: return NULL;
     }
 }
@@ -179,7 +89,18 @@ static bool type_equals(Type* a, Type* b) {
         return type_equals(a->elem, b->elem);
     }
     if (a->kind == TY_CLASS) {
-        return a->klass == b->klass;
+        Class* ka = a->klass->origin ? a->klass->origin : a->klass;
+        Class* kb = b->klass->origin ? b->klass->origin : b->klass;
+        if (ka != kb) {
+            return false;
+        }
+        if (!a->targ && !b->targ) {
+            return true;
+        }
+        if (!a->targ || !b->targ) {
+            return false;
+        }
+        return type_equals(a->targ, b->targ);
     }
     return true;
 }
@@ -240,6 +161,146 @@ static void record_global_type(Node* node, Type* type) {
     g->type = type;
     g->next = global_types;
     global_types = g;
+}
+
+static Type* subst_type(Type* t, Type* targ) {
+    if (!t) {
+        return NULL;
+    }
+    switch (t->kind) {
+        case TY_VAR:
+            return targ;
+        case TY_ARRAY:
+            return array_type(subst_type(t->elem, targ));
+        case TY_CLASS:
+            if (t->targ) {
+                Type* nt = calloc(1, sizeof(Type));
+                nt->kind = TY_CLASS;
+                nt->klass = t->klass;
+                nt->targ = subst_type(t->targ, targ);
+                return nt;
+            }
+            return t;
+        default:
+            return t;
+    }
+}
+
+#define CLONE_MEMO_MAX 8192
+static Node* memo_orig[CLONE_MEMO_MAX];
+static Node* memo_copy[CLONE_MEMO_MAX];
+static int memo_n = 0;
+
+static Node* clone_node(Node* n, Type* targ) {
+    if (!n) {
+        return NULL;
+    }
+    for (int i = 0; i < memo_n; i++) {
+        if (memo_orig[i] == n) {
+            return memo_copy[i];
+        }
+    }
+    Node* c = calloc(1, sizeof(Node));
+    *c = *n;
+    memo_orig[memo_n] = n;
+    memo_copy[memo_n] = c;
+    memo_n++;
+    c->type = NULL;
+    c->func = NULL;
+    c->klass = NULL;
+    c->anno = subst_type(n->anno, targ);
+    c->left_child = clone_node(n->left_child, targ);
+    c->right_child = clone_node(n->right_child, targ);
+    c->cond = clone_node(n->cond, targ);
+    c->then = clone_node(n->then, targ);
+    c->els = clone_node(n->els, targ);
+    c->init = clone_node(n->init, targ);
+    c->inc = clone_node(n->inc, targ);
+    c->body = clone_node(n->body, targ);
+    c->args = clone_node(n->args, targ);
+    c->next = clone_node(n->next, targ);
+    return c;
+}
+
+static Class* instances = NULL;
+
+static Class* instantiate(Class* tmpl, Type* targ) {
+    for (Class* c = instances; c; c = c->next) {
+        if (c->origin == tmpl && type_equals(c->targ, targ)) {
+            return c;
+        }
+    }
+    Class* inst = calloc(1, sizeof(Class));
+    inst->name = tmpl->name;
+    inst->len = tmpl->len;
+    inst->origin = tmpl;
+    inst->targ = targ;
+    if (tmpl->type->kind == TY_ARRAY) {
+        inst->type = array_type(targ);
+    } else {
+        inst->type = calloc(1, sizeof(Type));
+        inst->type->kind = TY_CLASS;
+        inst->type->klass = inst;
+        inst->type->targ = targ;
+    }
+    Field* ftail = NULL;
+    for (Field* f = tmpl->fields; f; f = f->next) {
+        Field* nf = calloc(1, sizeof(Field));
+        nf->name = f->name;
+        nf->len = f->len;
+        nf->offset = f->offset;
+        nf->type = subst_type(f->type, targ);
+        if (ftail) {
+            ftail->next = nf;
+        } else {
+            inst->fields = nf;
+        }
+        ftail = nf;
+    }
+    inst->next = instances;
+    instances = inst;
+    Function* tail = functions;
+    while (tail->next) {
+        tail = tail->next;
+    }
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->klass != tmpl) {
+            continue;
+        }
+        Function* nf = calloc(1, sizeof(Function));
+        *nf = *fn;
+        nf->klass = inst;
+        nf->next = NULL;
+        for (int i = 0; i < 6; i++) {
+            nf->param_types[i] = subst_type(fn->param_types[i], targ);
+        }
+        nf->param_types[0] = inst->type;
+        nf->return_type = subst_type(fn->return_type, targ);
+        memo_n = 0;
+        nf->body = clone_node(fn->body, targ);
+        tail->next = nf;
+        tail = nf;
+    }
+    return inst;
+}
+
+static Type* unify_type(Type* pat, Type* arg, Type* cur) {
+    if (!pat || !arg) {
+        return cur;
+    }
+    if (pat->kind == TY_VAR) {
+        if (cur && !type_equals(cur, arg)) {
+            error_plain("型引数を推論できません");
+        }
+        return arg;
+    }
+    if (pat->kind == TY_ARRAY && arg->kind == TY_ARRAY) {
+        return unify_type(pat->elem, arg->elem, cur);
+    }
+    if (pat->kind == TY_CLASS && pat->targ && arg->kind == TY_CLASS && arg->targ) {
+        return unify_type(pat->targ, arg->targ, cur);
+    }
+    return cur;
 }
 
 Type* array_type(Type* elem) {
@@ -390,7 +451,7 @@ static Type* check_node(Node* node) {
             const char* dunder = arith_dunder(node->op.binop);
             if (dunder) {
                 if (lt->kind == TY_CLASS) {
-                    Function* method = find_method(lt->klass, (char*)dunder, 7);
+                    Function* method = find_method(class_of(lt), (char*)dunder, 7);
                     if (!method) {
                         error_plain("クラス`%.*s`に演算子`%s`は定義されていません", lt->klass->len, lt->klass->name, op_text(node->op.binop));
                     }
@@ -438,7 +499,7 @@ static Type* check_node(Node* node) {
             const char* cdunder = cmp_dunder(node->op.binop);
             if (cdunder) {
                 if (lt->kind == TY_CLASS) {
-                    Function* method = find_method(lt->klass, (char*)cdunder, 6);
+                    Function* method = find_method(class_of(lt), (char*)cdunder, 6);
                     if (method) {
                         result = rewrite_to_mcall(node, lt, rt, cdunder, 6, method);
                         break;
@@ -610,6 +671,19 @@ static Type* check_node(Node* node) {
                     if (klass->type->kind != TY_CLASS) {
                         error_plain("`%.*s`はクラスではありません", klass->len, klass->name);
                     }
+                    if (klass->tparam) {
+                        Function* ginit = find_method(klass, "__init__", 8);
+                        Type* gtarg = NULL;
+                        if (ginit) {
+                            for (int i = 0; i < nargs && i + 1 < ginit->nparams; i++) {
+                                gtarg = unify_type(ginit->param_types[i + 1], arg_types[i], gtarg);
+                            }
+                        }
+                        if (!gtarg) {
+                            error_plain("クラス`%.*s`の型引数を推論できません", klass->len, klass->name);
+                        }
+                        klass = instantiate(klass, gtarg);
+                    }
                     node->klass = klass;
                     Function* init = find_method(klass, "__init__", 8);
                     node->func = init;
@@ -681,7 +755,7 @@ static Type* check_node(Node* node) {
             Type* lt = check_node(node->left_child);
             Type* it = check_node(node->right_child);
             if (lt->kind == TY_CLASS) {
-                Function* method = find_method(lt->klass, "__getitem__", 11);
+                Function* method = find_method(class_of(lt), "__getitem__", 11);
                 if (!method) {
                     error_plain("`%s`型の値に添え字は使えません", type_text(lt));
                 }
@@ -923,9 +997,6 @@ static void check_init(Function* fn) {
 
 static bool check_init_stmts(Node* stmt, Class* klass, bool* assigned, int nfields) {
     for (Node* n = stmt; n; n = n->next) {
-        if (klass->tparam) {
-            continue;
-        }
         if (check_init_stmt(n, klass, assigned, nfields)) {
             return true;
         }
@@ -936,6 +1007,9 @@ static bool check_init_stmts(Node* stmt, Class* klass, bool* assigned, int nfiel
 void typecheck(Function* prog) {
     functions = prog;
     for (Function* fn = prog; fn; fn = fn->next) {
+        if (fn->klass && fn->klass->tparam) {
+            continue;
+        }
         memset(local_types, 0, sizeof(local_types));
         current_fn = fn;
         current_return = fn->return_type;
@@ -950,6 +1024,9 @@ void typecheck(Function* prog) {
     }
 
     for (Function* fn = prog; fn; fn = fn->next) {
+        if (fn->klass && fn->klass->tparam) {
+            continue;
+        }
         if (fn->klass && fn->len == 8 && !memcmp(fn->name, "__init__", 8)) {
             check_init(fn);
         }
