@@ -295,11 +295,9 @@ Type* parse_type() {
     Type* anno = NULL;
     char* type_name[] = {
         "int",
-        "bool",
     };
     Type* types[] = {
         &ty_int,
-        &ty_bool,
     };
     for (int i = 0; i < sizeof(type_name) / sizeof(type_name[0]); i++) {
         int len = strlen(type_name[i]);
