@@ -447,6 +447,34 @@ def t040() {
     return d[1 == 1] * 100 + d[1 == 0] * 10 + d.len + a[[1, 2]] * 1000 + a.len * 10000;
 }
 
+class NoSemi {
+    a: int
+    b: int
+    def __init__(self, a: int, b: int) {
+        self.a = a
+        self.b = b
+    }
+    def sum(self) -> int {
+        return self.a + self.b
+    }
+}
+def t041() {
+    p = NoSemi(3, 4)
+    return p.sum()
+}
+
+class SemiMix {
+    a: int;
+    ;
+    b: int
+    def __init__(self) { self.a = 1; self.b = 2; }
+    def sum(self) -> int { return self.a + self.b; }
+}
+def t042() {
+    p = SemiMix()
+    return p.sum()
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -494,6 +522,8 @@ def main() {
     mark(38); fails=fails+check(t038(), 110);
     mark(39); fails=fails+check(t039(), 500);
     mark(40); fails=fails+check(t040(), 26342);
+    mark(41); fails=fails+check(t041(), 7);
+    mark(42); fails=fails+check(t042(), 3);
 
     print_str("done"); putchar(10);
     return fails > 0;
