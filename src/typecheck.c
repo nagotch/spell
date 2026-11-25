@@ -578,9 +578,6 @@ static Type* check_node(Node* node) {
                 result = &ty_int;
                 break;
             }
-            if (obj->kind != TY_CLASS) {
-                error_plain("`%s`型の値にフィールドは使えません", type_text(obj));
-            }
             Class* klass = class_of(obj);
             if (!klass) {
                 error_plain("`%s`型の値にフィールドは使えません", type_text(obj));
@@ -634,12 +631,9 @@ static Type* check_node(Node* node) {
                 result = &ty_unknown;
                 break;
             }
-            if (obj->kind != TY_CLASS) {
-                error_plain("`%s`型の値にメソッドは使えません", type_text(obj));
-            }
             Class* klass = class_of(obj);
             if (!klass) {
-                error_plain("`%s`型の値にフィールドは使えません", type_text(obj));
+                error_plain("`%s`型の値にメソッドは使えません", type_text(obj));
             }
             Function* method = find_method(klass, node->name, node->len);
             if (!method) {
