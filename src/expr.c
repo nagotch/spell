@@ -45,6 +45,15 @@ static Node* primary() {
         node = create_number_node(num);
     }
     while (true) {
+        bool inc = consume("++");
+        if (inc || consume("--")) {
+            Node* assign_node = create_node(ND_OPASSIGN);
+            assign_node->op.binop = inc ? OP_ADD : OP_SUB;
+            assign_node->left_child = node;
+            assign_node->right_child = create_number_node(1);
+            node = assign_node;
+            continue;
+        }
         if (consume("[")) {
             Node* right_child = expr();
             expect("]");
@@ -184,16 +193,22 @@ static Node* or() {
 
 static Node* range() {
     Node* node = or();
-    if (consume("..")) {
-        Node* rhs = or();
-        Node* call = create_node(ND_FUNCALL);
-        call->name = "Range";
-        call->len = 5;
-        node->next = rhs;
-        call->args = node;
-        return call;
+    int incl;
+    if (consume("..=")) {
+        incl = 1;
+    } else if (consume("..")) {
+        incl = 0;
+    } else {
+        return node;
     }
-    return node;
+    Node* rhs = or();
+    Node* call = create_node(ND_FUNCALL);
+    call->name = "Range";
+    call->len = 5;
+    node->next = rhs;
+    rhs->next = create_number_node(incl);
+    call->args = node;
+    return call;
 }
 
 static Node* assign() {

@@ -37,6 +37,10 @@ class str {
     def __iter__(self) -> ArrayIter<int> {
         return self.chars.__iter__();
     }
+
+    def rev(self) -> str {
+        return str(self.chars.rev);
+    }
 }
 
 class int {
@@ -51,7 +55,7 @@ class int {
     def __le__(self, o: int) -> bool { return self <= o; }
 
     def __iter__(self) -> RangeIter {
-        return RangeIter(0, self);
+        return RangeIter(0, self, 1);
     }
     def __str__(self) -> str {
         n = self;
@@ -147,6 +151,17 @@ class array<T> {
         return ArrayIter(self);
     }
 
+    def rev(self) -> [T] {
+        if (self.len == 0) { return []; }
+        r = [self[0]; self.len];
+        i = 0;
+        while (i < self.len) {
+            r[i] = self[self.len - 1 - i];
+            i = i + 1;
+        }
+        return r;
+    }
+
     def __str__(self) -> str {
         r = "";
         i = 0;
@@ -161,35 +176,51 @@ class array<T> {
 
 class RangeIter {
     cur: int;
-    hi: int;
+    end: int;
+    step: int;
 
-    def __init__(self, lo: int, hi: int) {
-        self.cur = lo;
-        self.hi = hi;
+    def __init__(self, cur: int, end: int, step: int) {
+        self.cur = cur;
+        self.end = end;
+        self.step = step;
     }
 
     def __has_next__(self) -> bool {
-        return self.cur < self.hi;
+        if (self.step > 0) { return self.cur < self.end; }
+        return self.cur > self.end;
     }
 
     def __next__(self) -> int {
-        v = self.cur;
-        self.cur = self.cur + 1;
-        return v;
+        if (self.step > 0) {
+            v = self.cur;
+            self.cur = self.cur + 1;
+            return v;
+        }
+        self.cur = self.cur - 1;
+        return self.cur;
     }
 }
 
 class Range {
     lo: int;
     hi: int;
+    incl: int;
 
-    def __init__(self, lo: int, hi: int) {
+    def __init__(self, lo: int, hi: int, incl: int) {
         self.lo = lo;
         self.hi = hi;
+        self.incl = incl;
     }
 
     def __iter__(self) -> RangeIter {
-        return RangeIter(self.lo, self.hi);
+        if (self.lo <= self.hi) {
+            return RangeIter(self.lo, self.hi + self.incl, 1);
+        }
+        return RangeIter(self.lo + self.incl, self.hi, -1);
+    }
+
+    def rev(self) -> Range {
+        return Range(self.hi, self.lo, self.incl);
     }
 }
 

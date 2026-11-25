@@ -182,6 +182,8 @@ static Node* stmt_return();
 static Node* stmt_if();
 static Node* stmt_while();
 static Node* stmt_for();
+static Node* make_for_iter(Token* var, Node* init);
+static Node* make_for_count(Node* count);
 
 static Node* stmt() {
     if (consume("{")) {
@@ -194,6 +196,24 @@ static Node* stmt() {
         return stmt_while();
     } else if (consume_keyword(KW_FOR)) {
         return stmt_for();
+    } else if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '!'
+               && token->next->kind == TK_SYMBOL && token->next->len == 1 && token->next->str[0] == ';') {
+        // `!;` は break の省略形
+        consume("!");
+        consume(";");
+        Node* node = create_node(ND_BREAK);
+        return node;
+    } else if (consume("^")) {
+        // `^;` は continue の省略形
+        Node* node = create_node(ND_CONTINUE);
+        expect(";");
+        return node;
+    } else if (consume("@")) {
+        return make_for_count(expr());
+    } else if (token->kind == TK_IDENT && token->next->kind == TK_SYMBOL && token->next->len == 1 && token->next->str[0] == '@') {
+        Token* var = consume_ident();
+        consume("@");
+        return make_for_iter(var, expr());
     } else if (consume_keyword(KW_BREAK)) {
         Node* node = create_node(ND_BREAK);
         expect(";");
@@ -245,6 +265,8 @@ static Node* stmt_if() {
     node->then = stmt();
     if (consume_keyword(KW_ELSE)) {
         node->els = stmt();
+    } else if (consume_keyword(KW_ELIF)) {
+        node->els = stmt_if();
     }
     return node;
 }
@@ -259,35 +281,45 @@ static Node* stmt_while() {
     return node;
 }
 
+static Node* make_for_iter(Token* var, Node* init) {
+    Node* node = create_node(ND_FOR);
+    node->init = init;
+    register_any();
+    node->offset = locals->offset;
+    node->left_child = create_ident_node(var);
+    node->then = stmt();
+    return node;
+}
+
+static Node* make_for_count(Node* count) {
+    // 束縛なしの回数リピートは Range(0, n) の要素走査として扱う
+    Node* node = create_node(ND_FOR);
+    Node* range_call = create_node(ND_FUNCALL);
+    range_call->name = "Range";
+    range_call->len = 5;
+    Node* zero = create_number_node(0);
+    Node* incl = create_number_node(0);
+    zero->next = count;
+    count->next = incl;
+    range_call->args = zero;
+    node->init = range_call;
+    register_any();
+    node->offset = locals->offset;
+    register_any();
+    Node* var = create_node(ND_LVAR);
+    var->offset = locals->offset;
+    node->left_child = var;
+    node->then = stmt();
+    return node;
+}
+
 static Node* stmt_for() {
-    Node* node;
-    node = create_node(ND_FOR);
     if (token->kind == TK_IDENT && token->next->kind == TK_KEYWORD && token->next->keyword == KW_IN) {
         Token* var = consume_ident();
         consume_keyword(KW_IN);
-        node->init = expr();
-        register_any();
-        node->offset = locals->offset;
-        node->left_child = create_ident_node(var);
-    } else {
-        // 束縛なしの回数リピート（for n:）は Range(0, n) の要素走査として扱う
-        Node* count = expr();
-        Node* range_call = create_node(ND_FUNCALL);
-        range_call->name = "Range";
-        range_call->len = 5;
-        Node* zero = create_number_node(0);
-        zero->next = count;
-        range_call->args = zero;
-        node->init = range_call;
-        register_any();
-        node->offset = locals->offset;
-        register_any();
-        Node* var = create_node(ND_LVAR);
-        var->offset = locals->offset;
-        node->left_child = var;
+        return make_for_iter(var, expr());
     }
-    node->then = stmt();
-    return node;
+    return make_for_count(expr());
 }
 
 // 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数の数を返す
