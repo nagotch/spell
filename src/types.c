@@ -44,6 +44,21 @@ static bool type_cmp(Type* a, Type* b, bool strict) {
     if (a->kind == TY_VAR) {
         return a->len == b->len && !memcmp(a->name, b->name, a->len);
     }
+    if (a->kind == TY_FUNC) {
+        if (a->func_nparams != b->func_nparams) {
+            return false;
+        }
+        for (int i = 0; i < a->func_nparams; i++) {
+            Type* pa = a->func_params[i] ? a->func_params[i] : &ty_unknown;
+            Type* pb = b->func_params[i] ? b->func_params[i] : &ty_unknown;
+            if (!type_cmp(pa, pb, strict)) {
+                return false;
+            }
+        }
+        Type* ra = a->func_ret ? a->func_ret : &ty_unknown;
+        Type* rb = b->func_ret ? b->func_ret : &ty_unknown;
+        return type_cmp(ra, rb, strict);
+    }
     return true;
 }
 
@@ -83,6 +98,17 @@ static char* type_text_write(Type* type, char* p) {
             break;
         case TY_VAR:
             p += sprintf(p, "%.*s", type->len, type->name);
+            break;
+        case TY_FUNC:
+            p += sprintf(p, "fn(");
+            for (int i = 0; i < type->func_nparams; i++) {
+                if (i > 0) {
+                    p += sprintf(p, ", ");
+                }
+                p = type_text_write(type->func_params[i] ? type->func_params[i] : &ty_unknown, p);
+            }
+            p += sprintf(p, ") -> ");
+            p = type_text_write(type->func_ret ? type->func_ret : &ty_unknown, p);
             break;
     }
     return p;
@@ -139,6 +165,17 @@ Type* array_type(Type* elem) {
     return t;
 }
 
+Type* func_type(Type* params[], int nparams, Type* ret) {
+    Type* t = calloc(1, sizeof(Type));
+    t->kind = TY_FUNC;
+    t->func_nparams = nparams;
+    for (int i = 0; i < nparams && i < 6; i++) {
+        t->func_params[i] = params[i];
+    }
+    t->func_ret = ret;
+    return t;
+}
+
 // tmpl の型パラメータ名と targs を位置で対応させて置換する
 Type* subst_type(Type* t, Class* tmpl, Type* targs[]) {
     if (!t) {
@@ -166,6 +203,16 @@ Type* subst_type(Type* t, Class* tmpl, Type* targs[]) {
                 return nt;
             }
             return t;
+        case TY_FUNC: {
+            Type* nt = calloc(1, sizeof(Type));
+            nt->kind = TY_FUNC;
+            nt->func_nparams = t->func_nparams;
+            for (int i = 0; i < t->func_nparams; i++) {
+                nt->func_params[i] = subst_type(t->func_params[i], tmpl, targs);
+            }
+            nt->func_ret = subst_type(t->func_ret, tmpl, targs);
+            return nt;
+        }
         default:
             return t;
     }
@@ -187,6 +234,13 @@ bool type_has_unknown(Type* t) {
                 }
             }
             return false;
+        case TY_FUNC:
+            for (int i = 0; i < t->func_nparams; i++) {
+                if (type_has_unknown(t->func_params[i])) {
+                    return true;
+                }
+            }
+            return type_has_unknown(t->func_ret);
         default:
             return false;
     }

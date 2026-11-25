@@ -361,23 +361,23 @@ def read_int() -> int {
 
 def read_str() -> str {
     cap = 64;
-    str = [0; cap];
+    buf = [0; cap];
     n = 0;
     char = getchar();
     while (char != -1) {
         if (n == cap) {
             bigger = [0; cap * 2];
-            for i in n { bigger[i] = str[i]; }
-            str = bigger;
+            for i in n { bigger[i] = buf[i]; }
+            buf = bigger;
             cap = cap * 2;
         }
-        str[n] = char;
+        buf[n] = char;
         char = getchar();
         n=n+1;
     }
     r_str = [0; n];
     for i in n {
-        r_str[i]=str[i];
+        r_str[i]=buf[i];
     }
     return str(r_str);
 }

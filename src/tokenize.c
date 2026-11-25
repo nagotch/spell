@@ -133,6 +133,7 @@ Token* tokenize(char* s) {
             "in_line",
             "put",
             "yn",
+            "fn",
         };
         Keyword kinds[] = {
             KW_RETURN,
@@ -150,6 +151,7 @@ Token* tokenize(char* s) {
             KW_IN_LINE,
             KW_PUT,
             KW_YN,
+            KW_FN,
         };
         bool is_keyword = false;
         size_t keywords_size = sizeof(keywords) / sizeof(keywords[0]);
