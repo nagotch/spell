@@ -13,31 +13,69 @@ static long char_width(long cp);
 // false で、以下の分岐はすべて素通りする
 static bool capture_enabled;
 static jmp_buf capture_jmp;
-char error_captured_message[4096];
-long error_captured_start;
-long error_captured_end;
-bool error_captured_has_pos;
-char* error_captured_src;
+// parse 中の文単位のリカバリ先。typecheck 等の間は NULL
+static jmp_buf* capture_recover;
+// 継続モード（typecheck 等）: 記録したら呼び出し側へ戻り、検査を続ける
+static bool capture_continue;
+ErrorDiag error_diags[ERROR_DIAG_MAX];
+int error_diag_count;
 
 jmp_buf* error_capture_begin(void) {
     capture_enabled = true;
+    capture_recover = NULL;
+    capture_continue = false;
+    error_diag_count = 0;
     return &capture_jmp;
 }
 
 void error_capture_end(void) {
     capture_enabled = false;
+    capture_recover = NULL;
+    capture_continue = false;
 }
 
-// 注意: ここから longjmp するため、呼び出し側（error_at 等）の
-// va_end は実行されない。対象環境（gcc/glibc）では va_end は
+bool error_capture_enabled(void) {
+    return capture_enabled;
+}
+
+void error_capture_set_continue(bool enabled) {
+    capture_continue = enabled;
+}
+
+jmp_buf* error_capture_set_recover(jmp_buf* jb) {
+    jmp_buf* prev = capture_recover;
+    capture_recover = jb;
+    return prev;
+}
+
+static void record_diag(long start, long end, bool has_pos, char* fmt, va_list ap) {
+    if (error_diag_count >= ERROR_DIAG_MAX) {
+        return;
+    }
+    ErrorDiag* d = &error_diags[error_diag_count++];
+    vsnprintf(d->message, sizeof(d->message), fmt, ap);
+    d->start = start;
+    d->end = end;
+    d->has_pos = has_pos;
+    d->src = src;
+}
+
+// 注意: ここから longjmp することがあるため、呼び出し側（error_at 等）の
+// va_end は実行されない場合がある。対象環境（gcc/glibc）では va_end は
 // 無処理なので実害はないが、規格厳密には未定義寄りの使い方
 static void capture_error(long start, long end, bool has_pos, char* fmt, va_list ap) {
-    vsnprintf(error_captured_message, sizeof(error_captured_message), fmt, ap);
-    error_captured_start = start;
-    error_captured_end = end;
-    error_captured_has_pos = has_pos;
-    error_captured_src = src;
-    longjmp(capture_jmp, 1);
+    record_diag(start, end, has_pos, fmt, ap);
+    if (error_diag_count >= ERROR_DIAG_MAX) {
+        // 上限に達したら暴走を防ぐためチェック全体を打ち切る
+        longjmp(capture_jmp, 1);
+    }
+    if (capture_recover) {
+        longjmp(*capture_recover, 1);
+    }
+    if (!capture_continue) {
+        longjmp(capture_jmp, 1);
+    }
+    // 継続モードでは記録だけして呼び出し側へ戻る
 }
 
 void error_at(long start, long end, char* fmt, ...) {
@@ -50,6 +88,9 @@ void error_at(long start, long end, char* fmt, ...) {
 void error_at_v(long start, long end, char* fmt, va_list ap) {
     if (capture_enabled) {
         capture_error(start, end, true, fmt, ap);
+        // 継続モードでは capture_error から戻ってくる。その場合は
+        // 表示も exit もせず、そのまま呼び出し側へ戻る
+        return;
     }
     long line = 1;
     long line_start = 0;
@@ -153,6 +194,7 @@ void error_plain(char* fmt, ...) {
 void error_plain_v(char* fmt, va_list ap) {
     if (capture_enabled) {
         capture_error(0, 0, false, fmt, ap);
+        return;
     }
     fprintf(stderr, "エラー: ");
     vfprintf(stderr, fmt, ap);
@@ -164,7 +206,10 @@ void error_internal(char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     if (capture_enabled) {
-        capture_error(0, 0, false, fmt, ap);
+        // 内部エラーはどのモードでも致命的。診断として記録してから
+        // チェック全体を打ち切る
+        record_diag(0, 0, false, fmt, ap);
+        longjmp(capture_jmp, 1);
     }
     fprintf(stderr, "内部エラー: ");
     vfprintf(stderr, fmt, ap);

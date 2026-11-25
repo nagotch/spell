@@ -487,14 +487,80 @@ static Node* stmt() {
     }
 }
 
+static bool token_is_char(Token* t, char c) {
+    return t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == c;
+}
+
+// キャプチャ有効時（LSP）の文単位リカバリ用: 失敗した文の残りを
+// 読み飛ばし、次の文の先頭に token を合わせる。次の `;`（現在の
+// 入れ子深さで）まで進めるか、失敗した文の中で開いたブロックの
+// 閉じ `}` を消費したところで止まる。ブロック自身の閉じ `}` は
+// 消費しない（呼び出し側のループが消費する）。consume_close が
+// 真なら、深さ0の `}` も消費して止まる（トップレベル用: 失敗した
+// 関数・クラス定義の閉じ括弧を片付ける）
+static void skip_to_stmt_boundary(bool consume_close) {
+    int depth = 0;
+    while (token->kind != TK_EOF) {
+        if (token_is_char(token, '{')) {
+            depth++;
+            token = token->next;
+            continue;
+        }
+        if (token_is_char(token, '}')) {
+            if (depth == 0) {
+                if (consume_close) {
+                    token = token->next;
+                }
+                return;
+            }
+            depth--;
+            token = token->next;
+            if (depth == 0) {
+                return;
+            }
+            continue;
+        }
+        if (depth == 0 && token_is_char(token, ';')) {
+            token = token->next;
+            return;
+        }
+        token = token->next;
+    }
+}
+
 // 「}」まで文を読み、連結リストで返す
 static Node* parse_stmt_list() {
     Node head;
     head.next = NULL;
     Node* cur = &head;
     while (!consume("}")) {
-        cur->next = stmt();
-        cur = cur->next;
+        if (!error_capture_enabled()) {
+            cur->next = stmt();
+            cur = cur->next;
+            continue;
+        }
+        // キャプチャ有効時: 文の解析に失敗したら、その文を捨てて
+        // 境界まで読み飛ばし、次の文から再開する（診断は記録済み）
+        jmp_buf jb;
+        LVar* saved_locals = locals;
+        LVar* saved_globals = globals;
+        LambdaParse* saved_lambda = lambda_stack;
+        jmp_buf* saved_recover = error_capture_set_recover(&jb);
+        if (setjmp(jb) == 0) {
+            Node* s = stmt();
+            error_capture_set_recover(saved_recover);
+            cur->next = s;
+            cur = cur->next;
+        } else {
+            error_capture_set_recover(saved_recover);
+            locals = saved_locals;
+            globals = saved_globals;
+            lambda_stack = saved_lambda;
+            if (at_eof()) {
+                break;
+            }
+            skip_to_stmt_boundary(false);
+        }
     }
     return head.next;
 }
@@ -817,6 +883,8 @@ static Class* register_class(char* name, int len) {
 
 Class* parsing_klass = NULL;
 
+static void class_member(Function** cur, Class* klass, int* offset);
+
 static void class_decl(Function** cur) {
     consume_keyword(KW_CLASS);
     Token* tok = consume_ident();
@@ -850,37 +918,82 @@ static void class_decl(Function** cur) {
     int offset = 0;
     parsing_klass = klass;
     while (!consume("}")) {
-        if (token->kind == TK_KEYWORD && token->keyword == KW_DEF) {
-            (*cur)->next = function(klass);
-            *cur = (*cur)->next;
+        if (!error_capture_enabled()) {
+            class_member(cur, klass, &offset);
+            continue;
+        }
+        // キャプチャ有効時: メンバ（フィールド・メソッド）の解析に
+        // 失敗したら、そのメンバを捨てて境界まで読み飛ばし、次の
+        // メンバから再開する。本体内の文の失敗は parse_stmt_list 側で
+        // 処理されるため、ここへ来るのは宣言部分の失敗だけ
+        jmp_buf jb;
+        LVar* saved_locals = locals;
+        LVar* saved_globals = globals;
+        LambdaParse* saved_lambda = lambda_stack;
+        jmp_buf* saved_recover = error_capture_set_recover(&jb);
+        if (setjmp(jb) == 0) {
+            class_member(cur, klass, &offset);
+            error_capture_set_recover(saved_recover);
         } else {
-            Token* field_tok = consume_ident();
-            if (!field_tok) {
-                error_at(token_start(token), token_end(token), "フィールド名が必要ですが、%sが見つかりました", token_text(token));
+            error_capture_set_recover(saved_recover);
+            locals = saved_locals;
+            globals = saved_globals;
+            lambda_stack = saved_lambda;
+            if (at_eof()) {
+                break;
             }
-            for (Field* f = klass->fields; f; f = f->next) {
-                if (f->len == field_tok->len && !memcmp(f->name, field_tok->str, f->len)) {
-                    error_at(token_start(field_tok), token_end(field_tok), "フィールド`%.*s`は既に定義されています", field_tok->len, field_tok->str);
-                }
-            }
-            expect(":");
-            Field* field = calloc(1, sizeof(Field));
-            field->name = field_tok->str;
-            field->len = field_tok->len;
-            field->type = parse_type();
-            field->offset = offset;
-            offset += 8;
-            field->next = klass->fields;
-            klass->fields = field;
-            consume(";");
+            skip_to_stmt_boundary(false);
         }
     }
     parsing_klass = NULL;
 }
 
+// クラス本体のメンバを1つ読む（メソッド定義またはフィールド宣言）
+static void class_member(Function** cur, Class* klass, int* offset) {
+    if (token->kind == TK_KEYWORD && token->keyword == KW_DEF) {
+        (*cur)->next = function(klass);
+        *cur = (*cur)->next;
+        return;
+    }
+    Token* field_tok = consume_ident();
+    if (!field_tok) {
+        error_at(token_start(token), token_end(token), "フィールド名が必要ですが、%sが見つかりました", token_text(token));
+    }
+    for (Field* f = klass->fields; f; f = f->next) {
+        if (f->len == field_tok->len && !memcmp(f->name, field_tok->str, f->len)) {
+            error_at(token_start(field_tok), token_end(field_tok), "フィールド`%.*s`は既に定義されています", field_tok->len, field_tok->str);
+        }
+    }
+    expect(":");
+    Field* field = calloc(1, sizeof(Field));
+    field->name = field_tok->str;
+    field->len = field_tok->len;
+    field->type = parse_type();
+    field->offset = *offset;
+    *offset += 8;
+    field->next = klass->fields;
+    klass->fields = field;
+    consume(";");
+}
+
 static bool token_is_symbol(Token* t, char* symbol) {
     int len = strlen(symbol);
     return t->kind == TK_SYMBOL && t->len == len && !memcmp(symbol, t->str, t->len);
+}
+
+// トップレベルの項目を1つ読む（クラス定義・関数定義・文）
+static void parse_top_item(Function** cur, Node** stmt_cur) {
+    if (token->kind == TK_KEYWORD && token->keyword == KW_CLASS) {
+        class_decl(cur);
+    } else if (token->kind == TK_KEYWORD && token->keyword == KW_DEF || consume(":")) {
+        (*cur)->next = function(NULL);
+        *cur = (*cur)->next;
+    } else {
+        is_top_level = true;
+        (*stmt_cur)->next = stmt();
+        *stmt_cur = (*stmt_cur)->next;
+        is_top_level = false;
+    }
 }
 
 Function* program() {
@@ -950,16 +1063,33 @@ Function* program() {
     stmt_head.next = NULL;
     Node* stmt_cur = &stmt_head;
     while (!at_eof()) {
-        if (token->kind == TK_KEYWORD && token->keyword == KW_CLASS) {
-            class_decl(&cur);
-        } else if (token->kind == TK_KEYWORD && token->keyword == KW_DEF || consume(":")) {
-            cur->next = function(NULL);
-            cur = cur->next;
+        if (!error_capture_enabled()) {
+            parse_top_item(&cur, &stmt_cur);
+            continue;
+        }
+        // キャプチャ有効時: トップレベルの項目（文・関数・クラス）の
+        // 解析に失敗したら、その項目を捨てて境界まで読み飛ばし、
+        // 次の項目から再開する。本体内の文の失敗は parse_stmt_list
+        // 側のリカバリで処理されるため、ここへ来るのは項目の
+        // 外側（引数リストやフィールド宣言など）の失敗だけ
+        jmp_buf jb;
+        LVar* saved_locals = locals;
+        LVar* saved_globals = globals;
+        LambdaParse* saved_lambda = lambda_stack;
+        jmp_buf* saved_recover = error_capture_set_recover(&jb);
+        if (setjmp(jb) == 0) {
+            parse_top_item(&cur, &stmt_cur);
+            error_capture_set_recover(saved_recover);
         } else {
-            is_top_level = true;
-            stmt_cur->next = stmt();
-            stmt_cur = stmt_cur->next;
+            error_capture_set_recover(saved_recover);
+            locals = saved_locals;
+            globals = saved_globals;
+            lambda_stack = saved_lambda;
             is_top_level = false;
+            if (at_eof()) {
+                break;
+            }
+            skip_to_stmt_boundary(true);
         }
     }
     // 解析中に作られたラムダを関数チェーンの末尾へ足す

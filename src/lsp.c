@@ -5,8 +5,8 @@
 // チェックは fork した子プロセスで1回使い切りにする。コンパイラ本体は
 // グローバル状態を積み上げる一回限りの設計で、プロセス内に状態を
 // 残したまま再チェックすると前回の定義が残ってしまうため。
-// 子プロセスでは error.c のキャプチャを有効にし、最初のエラーを
-// 診断としてパイプで親へ返す。codegen は実行しない。
+// 子プロセスでは error.c のキャプチャを有効にし、集まった診断を
+// すべてパイプで親へ返す。codegen は実行しない。
 #define _POSIX_C_SOURCE 200809L
 #include "spell.h"
 #include <unistd.h>
@@ -559,12 +559,16 @@ static void close_doc(const char* uri) {
 // ===== チェック（fork した子プロセスでコンパイラを回す） =====
 
 typedef struct {
-    int has_diag;
     long start_line;
     long start_char;
     long end_line;
     long end_char;
     char message[4096];
+} OneDiag;
+
+typedef struct {
+    int count;
+    OneDiag diags[ERROR_DIAG_MAX];
 } CheckResult;
 
 // バイトオフセットを行・列（0始まり、列は文字＝コードポイント単位）へ
@@ -593,7 +597,11 @@ static long utf8_len_at(const char* text, long off) {
 }
 
 // 子プロセス側: パイプラインを回し、結果をパイプへ書いて _exit する
-// is_prelude のときは組み込み prelude を読み込まず、本文だけで回す
+// is_prelude のときは組み込み prelude を読み込まず、本文だけで回す。
+// エラーは error.c のキャプチャで診断リストに集められ、parse は文単位、
+// typecheck は継続モードで可能な限り先へ進む。打ち切り（上限到達・
+// 字句解析エラー・内部エラー）では longjmp でここへ戻り、そこまでに
+// 集まった診断を返す。codegen は常に行わない
 static void run_check_child(const char* text, int out_fd, int is_prelude) {
     int devnull = open("/dev/null", O_WRONLY);
     if (devnull >= 0) {
@@ -620,17 +628,23 @@ static void run_check_child(const char* text, int out_fd, int is_prelude) {
         } else {
             prog = user_prog;
         }
+        error_capture_set_continue(true);
         desugar(prog);
         typecheck(prog);
-        error_capture_end();
-    } else {
-        res.has_diag = 1;
-        snprintf(res.message, sizeof(res.message), "%s", error_captured_message);
+        error_capture_set_continue(false);
+    }
+    error_capture_end();
+    // 集まった診断を、位置＋メッセージで重複を取り除いて結果へ移す
+    for (int i = 0; i < error_diag_count; i++) {
+        ErrorDiag* d = &error_diags[i];
+        OneDiag od;
+        memset(&od, 0, sizeof(od));
+        snprintf(od.message, sizeof(od.message), "%s", d->message);
         // 位置が利用者のソースを指している場合だけ範囲を変換する。
         // prelude 由来のエラーは先頭に出す
-        if (error_captured_has_pos && error_captured_src == copy) {
-            long so = error_captured_start;
-            long eo = error_captured_end;
+        if (d->has_pos && d->src == copy) {
+            long so = d->start;
+            long eo = d->end;
             long text_len = (long)strlen(copy);
             if (so < 0) {
                 so = 0;
@@ -644,8 +658,21 @@ static void run_check_child(const char* text, int out_fd, int is_prelude) {
             if (eo > text_len) {
                 eo = text_len;
             }
-            offset_to_pos(copy, so, &res.start_line, &res.start_char);
-            offset_to_pos(copy, eo, &res.end_line, &res.end_char);
+            offset_to_pos(copy, so, &od.start_line, &od.start_char);
+            offset_to_pos(copy, eo, &od.end_line, &od.end_char);
+        }
+        bool dup = false;
+        for (int j = 0; j < res.count; j++) {
+            OneDiag* e = &res.diags[j];
+            if (e->start_line == od.start_line && e->start_char == od.start_char
+                    && e->end_line == od.end_line && e->end_char == od.end_char
+                    && !strcmp(e->message, od.message)) {
+                dup = true;
+                break;
+            }
+        }
+        if (!dup && res.count < ERROR_DIAG_MAX) {
+            res.diags[res.count++] = od;
         }
     }
     const char* p = (const char*)&res;
@@ -666,16 +693,16 @@ static CheckResult run_check(const char* text, int is_prelude) {
     memset(&res, 0, sizeof(res));
     int fds[2];
     if (pipe(fds) < 0) {
-        res.has_diag = 1;
-        snprintf(res.message, sizeof(res.message), "言語サーバーの内部でパイプを作成できませんでした");
+        res.count = 1;
+        snprintf(res.diags[0].message, sizeof(res.diags[0].message), "言語サーバーの内部でパイプを作成できませんでした");
         return res;
     }
     pid_t pid = fork();
     if (pid < 0) {
         close(fds[0]);
         close(fds[1]);
-        res.has_diag = 1;
-        snprintf(res.message, sizeof(res.message), "言語サーバーの内部でプロセスを作成できませんでした");
+        res.count = 1;
+        snprintf(res.diags[0].message, sizeof(res.diags[0].message), "言語サーバーの内部でプロセスを作成できませんでした");
         return res;
     }
     if (pid == 0) {
@@ -700,8 +727,8 @@ static CheckResult run_check(const char* text, int is_prelude) {
     if (got < (long)sizeof(res)) {
         // 子が結果を返す前に落ちた（コンパイラのクラッシュ等）
         memset(&res, 0, sizeof(res));
-        res.has_diag = 1;
-        snprintf(res.message, sizeof(res.message), "コンパイラが異常終了しました");
+        res.count = 1;
+        snprintf(res.diags[0].message, sizeof(res.diags[0].message), "コンパイラが異常終了しました");
     }
     return res;
 }
@@ -724,10 +751,14 @@ static void publish_diagnostics(const Doc* doc) {
     buf_adds(&b, "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":");
     buf_add_json_string(&b, doc->uri);
     buf_addf(&b, ",\"version\":%ld,\"diagnostics\":[", doc->version);
-    if (r.has_diag) {
+    for (int i = 0; i < r.count; i++) {
+        OneDiag* d = &r.diags[i];
+        if (i > 0) {
+            buf_adds(&b, ",");
+        }
         buf_addf(&b, "{\"range\":{\"start\":{\"line\":%ld,\"character\":%ld},\"end\":{\"line\":%ld,\"character\":%ld}},\"severity\":1,\"source\":\"spell\",\"message\":",
-                 r.start_line, r.start_char, r.end_line, r.end_char);
-        buf_add_json_string(&b, r.message);
+                 d->start_line, d->start_char, d->end_line, d->end_char);
+        buf_add_json_string(&b, d->message);
         buf_adds(&b, "}");
     }
     buf_adds(&b, "]}}");

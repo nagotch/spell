@@ -9,6 +9,10 @@ Class* class_of(Type* t) {
             if (t->klass->tparam_count > 0) {
                 if (t->targ_count == 0) {
                     error_plain("クラス`%.*s`には型引数が必要です", t->klass->len, t->klass->name);
+                    // キャプチャ有効時（error_plain から戻る場合）は、
+                    // 型引数なしで実体化せずテンプレート自身を返す
+                    // （型変数は緩い比較で通るため、検査は続けられる）
+                    return t->klass;
                 }
                 return instantiate(t->klass, t->targs, t->targ_count);
             }
