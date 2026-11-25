@@ -26,7 +26,7 @@ def t023() { s = "hello"; return s.len; }
 def t024() { s = "hello"; return s[0]; }
 def t025() { s = "A\n"; return s[1]; }
 def t026() { s = "abc".chars; s[1] = 120; return s[1]; }
-def t027() { s = "hello"; c = 0; for ch in s if (ch == 108) c = c + 1; return c; }
+def t027() { s = "hello"; c = 0; for ch in s.chars if (ch == 108) c = c + 1; return c; }
 def t028() { s = "hi"; putchar(s[0]); putchar(s[1]); return 0; }
 def t029() { s = ""; return s.len; }
 def t030() { a = [1, 2] + [3]; return a[0] * 100 + a[1] * 10 + a[2]; }

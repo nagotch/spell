@@ -802,6 +802,101 @@ static Node* make_mcall(Node* receiver, Class* klass, Function* fn, const char* 
     return call;
 }
 
+static bool is_loop_var(Node* target, Node* var) {
+    if (!target || !var) {
+        return false;
+    }
+    if (var->kind == ND_LVAR) {
+        return target->kind == ND_LVAR && target->offset == var->offset;
+    }
+    if (var->kind == ND_GVAR) {
+        return target->kind == ND_GVAR && target->len == var->len && !memcmp(target->name, var->name, var->len);
+    }
+    return false;
+}
+
+// ループ本体の中から、ループ変数への代入（複合代入と後置 ++/-- は
+// desugar 済みで ND_ASSIGN になっている）を探し、最初に見つけた
+// 代入先ノードを返す。ラムダ本体の中は探さない（捕捉は値渡しで、
+// 中の代入は ND_CAPVAR 宛てになるため、書き戻しの対象ではない）
+static Node* find_var_assign(Node* node, Node* var) {
+    if (!node || node->kind == ND_LAMBDA) {
+        return NULL;
+    }
+    if (node->kind == ND_ASSIGN && is_loop_var(node->left_child, var)) {
+        return node->left_child;
+    }
+    if (node->kind == ND_MULTIASSIGN) {
+        for (Node* t = node->body; t; t = t->next) {
+            if (is_loop_var(t, var)) {
+                return t;
+            }
+        }
+    }
+    Node* found;
+    if ((found = find_var_assign(node->left_child, var))) return found;
+    if ((found = find_var_assign(node->right_child, var))) return found;
+    if ((found = find_var_assign(node->cond, var))) return found;
+    if ((found = find_var_assign(node->then, var))) return found;
+    if ((found = find_var_assign(node->els, var))) return found;
+    if ((found = find_var_assign(node->init, var))) return found;
+    if ((found = find_var_assign(node->inc, var))) return found;
+    if ((found = find_var_assign(node->body, var))) return found;
+    if ((found = find_var_assign(node->args, var))) return found;
+    if ((found = find_var_assign(node->next, var))) return found;
+    return NULL;
+}
+
+static Node* make_set_current_call(Node* for_node, Class* iklass, Function* set_current_fn) {
+    Node* var = for_node->left_child;
+    Node* arg = create_node(var->kind);
+    arg->offset = var->offset;
+    arg->name = var->name;
+    arg->len = var->len;
+    arg->tok = var->tok;
+    Node* call = make_mcall(iter_slot_node(for_node), iklass, set_current_fn, "__set_current__", 15);
+    call->args = arg;
+    return call;
+}
+
+// このループ宛の break / continue を「書き戻してから break / continue」に
+// 書き換える。入れ子のループ本体には入らない（その break は入れ子側の
+// もの）が、入れ子の for の else 節はこのループの外側なので対象に含める
+// （rewrite_breaks_stmt と同じ歩き方）
+static void wrap_loop_exits(Node* node, Node* for_node, Class* iklass, Function* set_current_fn) {
+    if (!node) {
+        return;
+    }
+    switch (node->kind) {
+        case ND_BREAK:
+        case ND_CONTINUE: {
+            Node* call = make_set_current_call(for_node, iklass, set_current_fn);
+            Node* orig = create_node(node->kind);
+            orig->tok = node->tok;
+            call->next = orig;
+            node->kind = ND_BLOCK;
+            node->body = call;
+            return;
+        }
+        case ND_WHILE:
+            return;
+        case ND_FOR:
+            wrap_loop_exits(node->els, for_node, iklass, set_current_fn);
+            return;
+        case ND_BLOCK:
+            for (Node* s = node->body; s; s = s->next) {
+                wrap_loop_exits(s, for_node, iklass, set_current_fn);
+            }
+            return;
+        case ND_IF:
+            wrap_loop_exits(node->then, for_node, iklass, set_current_fn);
+            wrap_loop_exits(node->els, for_node, iklass, set_current_fn);
+            return;
+        default:
+            return;
+    }
+}
+
 // for 文を「イテレータ取得 → while (__has_next__) { 変数 = __next__(); 本体 }」に書き換える。
 // プロトコルは Java 式（__iter__ / __has_next__ / __next__）。
 // for...else 用: この for 宛の break を「フラグを倒してから break」に書き換える。
@@ -854,6 +949,7 @@ static Type* check_for(Node* node) {
     Function* iter_fn = NULL;
     Function* has_next_fn = NULL;
     Function* next_fn = NULL;
+    Function* set_current_fn = NULL;
     Type* elem = &ty_unknown;
     bool protocol_ok = true;
     if (iterable->kind == TY_UNKNOWN) {
@@ -897,6 +993,17 @@ static Type* check_for(Node* node) {
             error_node(node, "クラス`%.*s`の`__has_next__`は`bool`を返す必要があります", iklass->len, iklass->name);
         }
         elem = next_fn->return_type ? next_fn->return_type : &ty_unknown;
+        // __set_current__ は任意メソッド（書き戻し用）。あれば署名だけ検査する
+        set_current_fn = find_callable(iklass, "__set_current__", 15);
+        if (set_current_fn) {
+            if (set_current_fn->nparams != 2) {
+                error_node(node, "クラス`%.*s`の`__set_current__`は引数を1つ取る必要があります", iklass->len, iklass->name);
+            }
+            Type* pt = set_current_fn->param_types[1];
+            if (pt && elem->kind != TY_UNKNOWN && !type_equals(pt, elem)) {
+                error_node(node, "クラス`%.*s`の`__set_current__`の引数は`%s`である必要があります", iklass->len, iklass->name, type_text(elem));
+            }
+        }
     }
 
     Node* get_iter = create_node(ND_ASSIGN);
@@ -930,6 +1037,24 @@ static Type* check_for(Node* node) {
             record_global_type(var, elem);
         }
         var->type = find_global_type(var);
+    }
+    // ループ変数への代入があれば、その結果を現在の要素へ書き戻す（step 58）。
+    // 書き戻しはイテレータの任意メソッド __set_current__ で行い、本体の末尾と、
+    // このループ宛の break / continue の直前に呼び出しを差し込む。
+    // ponytail: return で抜ける場合は書き戻さない（要素はもう使われない）
+    if (protocol_ok && (var->kind == ND_LVAR || var->kind == ND_GVAR)) {
+        Node* assign = find_var_assign(node->then, var);
+        if (assign && !set_current_fn) {
+            error_node(assign, "`%s`型の反復ではループ変数への代入は要素に書き戻されないため、代入できません", type_text(iterable));
+        } else if (assign) {
+            local_types[node->offset / 8] = iter_fn->return_type;
+            wrap_loop_exits(node->then, node, iklass, set_current_fn);
+            Node* tail = node->then;
+            while (tail->next) {
+                tail = tail->next;
+            }
+            tail->next = make_set_current_call(node, iklass, set_current_fn);
+        }
     }
     if (node->els) {
         rewrite_breaks_stmt(node->then, (int)node->val);

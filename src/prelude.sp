@@ -44,12 +44,40 @@ class str {
         return self;
     }
 
-    def __iter__(self) -> ArrayIter<int> {
-        return self.chars.__iter__();
+    def __iter__(self) -> StrIter {
+        return StrIter(self);
     }
 
     def rev(self) -> str {
         return str(self.chars.rev);
+    }
+}
+
+class StrIter {
+    s: str;
+    i: int;
+
+    def __init__(self, s: str) {
+        self.s = s;
+        self.i = 0;
+    }
+
+    def __has_next__(self) -> bool {
+        return self.i < self.s.len;
+    }
+
+    def __next__(self) -> str {
+        v = str([self.s.chars[self.i]]);
+        self.i = self.i + 1;
+        return v;
+    }
+
+    // 書き戻し: 現在位置の文字を、渡された文字列の先頭の文字で置き換える。
+    // 空文字列が渡された場合は何もしない
+    def __set_current__(self, v: str) {
+        if (v.len > 0) {
+            self.s.chars[self.i - 1] = v.chars[0];
+        }
     }
 }
 
@@ -289,6 +317,11 @@ class ArrayIter<T> {
         v = self.arr[self.i];
         self.i = self.i + 1;
         return v;
+    }
+
+    // 書き戻し: 直前に __next__ で返した要素を置き換える
+    def __set_current__(self, v: T) {
+        self.arr[self.i - 1] = v;
     }
 }
 
@@ -616,7 +649,7 @@ def print_int(n: int) {
 }
 
 def print_str(s: str) {
-    for c in s {
+    for c in s.chars {
         putchar(c);
     }
 }
