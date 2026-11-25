@@ -63,6 +63,9 @@ error_tests=(
     "def main() { if ([1] < [2]) { return 1; } return 0; }|型の値に演算子\`<\`は使えません"
     "def main() { a = [1]; b = a - a; return 0; }|型の値に演算子\`-\`は使えません"
     "def main() { s = \"abc\"; s[0] = 65; return 0; }|クラス\`str\`に\`__setitem__\`は定義されていません"
+    "class Q { x: int; } def main() { print(Q()); return 0; }|型の値は print できません"
+    "def main() { x = int(42); return 0; }|はクラスではありません"
+    "def main() { print(1, 2); return 0; }|引数は1個ですが、2個が指定されています"
 )
 
 cc -c -o funcs.o funcs.c
@@ -174,6 +177,10 @@ one_io_test "def main() { print_int(42); putchar(10); return 0; }" "" "42\n"
 one_io_test "def main() { print_int(0 - 42); putchar(10); return 0; }" "" "-42\n"
 one_io_test "def main() { b = read_int(); r = read_int(); print_int((30 - b) * (30 - r)); putchar(10); return 0; }" "10 20\n" "200\n"
 one_io_test "def main() { if (getchar()==-1) { print_int(1); } else { print_int(0); } putchar(10); return 0; }" "" "1\n"
+one_io_test "def main() { print(42); return 0; }" "" "42\n"
+one_io_test "def main() { print(\"abc\"); return 0; }" "" "abc\n"
+one_io_test "def main() { print([1, 2, 3]); return 0; }" "" "1 2 3\n"
+one_io_test "def main() { print(1 < 2); return 0; }" "" "true\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
