@@ -1,3 +1,31 @@
+class str {
+    chars: [char];
+
+    def __init__(self, chars: [char]) {
+        self.chars = chars;
+    }
+
+    def len(self) -> int {
+        return self.chars.len;
+    }
+
+    def __getitem__(self, i: int) -> char {
+        return self.chars[i];
+    }
+
+    def __add__(self, o: str) -> str {
+        return str(self.chars + o.chars);
+    }
+
+    def __eq__(self, o: str) -> bool {
+        return self.chars == o.chars;
+    }
+
+    def __str__(self) -> str {
+        return self;
+    }
+}
+
 class int {
     def __str__(self) -> str {
         n = self;
@@ -18,7 +46,10 @@ class int {
         }
         r = [0] * (i + neg);
         j = 0;
-        if (neg == 1) { r[0] = 45; j = 1}
+        if (neg == 1) {
+            r[0] = 45;
+            j = 1;
+        }
         while (i > 0) {
             i -= 1;
             r[j] = digits[i];
@@ -87,35 +118,7 @@ class array {
     }
 }
 
-class str {
-    chars: [char];
-
-    def __init__(self, chars: [char]) {
-        self.chars = chars;
-    }
-
-    def len(self) -> char {
-        return self.chars.len;
-    }
-
-    def __getitem__(self, i: char) -> char {
-        return self.chars[i];
-    }
-
-    def __add__(self, o: str) -> str {
-        return str(self.chars + o.chars);
-    }
-
-    def __eq__(self, o: str) -> bool {
-        return self.chars == o.chars;
-    }
-
-    def __str__(self) -> str {
-        return self;
-    }
-}
-
-def read_int() {
+def read_int() -> int {
     char = getchar();
     ret=0;
     is_negative = 0;
@@ -133,7 +136,7 @@ def read_int() {
     return ret;
 }
 
-def read_str() {
+def read_str() -> str {
     str = [0; 100];
     n = 0;
     char = getchar();
@@ -146,11 +149,15 @@ def read_str() {
     for (i=0; i<n; i=i+1) {
         r_str[i]=str[i];
     }
-    return r_str;
+    return str(r_str);
 }
 
-def print_str(x) {
-    s = x.__str__();
+def print_int(n: int) {
+    s = n.__str__();
+    print_str(s);
+}
+
+def print_str(s: str) {
     for (i=0; i<s.len; i=i+1) {
         putchar(s[i]);
     }
