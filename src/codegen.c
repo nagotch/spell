@@ -109,6 +109,36 @@ static void gen_lval(Node* node) {
     error_internal("代入の処理で想定外の形式を検出しました");
 }
 
+static void print_type_label(Type* t) {
+    switch (t->kind) {
+        case TY_INT:
+            printf("int");
+            break;
+        case TY_ARRAY:
+            printf("array$");
+            print_type_label(t->elem);
+            break;
+        case TY_CLASS:
+            printf("%.*s", t->klass->len, t->klass->name);
+            if (t->targ) {
+                printf("$");
+                print_type_label(t->targ);
+            }
+            break;
+        default:
+            printf("unknown");
+            break;
+    }
+}
+
+static void print_klass_label(Class* klass) {
+    printf("%.*s", klass->len, klass->name);
+    if (klass->origin) {
+        printf("$");
+        print_type_label(klass->targ);
+    }
+}
+
 void codegen(Function* prog) {
     bool has_init = false;
     for (Function* fn = prog; fn; fn = fn->next) {
@@ -125,9 +155,16 @@ void codegen(Function* prog) {
         printf(".text\n");
     }
     while (prog) {
+        if (prog->klass && prog->klass->tparam) {
+            prog = prog->next;
+            continue;
+        }
         if (prog->klass) {
-            printf(".global %.*s.%.*s\n", prog->klass->len, prog->klass->name, prog->len, prog->name);
-            printf("%.*s.%.*s:\n", prog->klass->len, prog->klass->name, prog->len, prog->name);
+            printf(".global ");
+            print_klass_label(prog->klass);
+            printf(".%.*s\n", prog->len, prog->name);
+            print_klass_label(prog->klass);
+            printf(".%.*s:\n", prog->len, prog->name);
         } else {
             printf(".global %.*s\n", prog->len, prog->name);
             printf("%.*s:\n", prog->len, prog->name);
@@ -256,12 +293,16 @@ static void call_method(int label, Function* fn) {
     printf("  and rax, 15\n");
     printf("  jnz .Lcall%d\n", label);
     printf("  mov rax, 0\n");
-    printf("  call %.*s.%.*s\n", fn->klass->len, fn->klass->name, fn->len, fn->name);
+    printf("  call ");
+    print_klass_label(fn->klass);
+    printf(".%.*s\n", fn->len, fn->name);
     printf("  jmp .Lend%d\n", label);
     printf(".Lcall%d:\n", label);
     printf("  sub rsp, 8\n");
     printf("  mov rax, 0\n");
-    printf("  call %.*s.%.*s\n", fn->klass->len, fn->klass->name, fn->len, fn->name);
+    printf("  call ");
+    print_klass_label(fn->klass);
+    printf(".%.*s\n", fn->len, fn->name);
     printf("  add rsp, 8\n");
     printf(".Lend%d:\n", label);
 }

@@ -85,9 +85,14 @@ class bool {
     }
 }
 
-class array {
-    def __add__(self, o) {
-        r = [0] * (self.len + o.len);
+class array<T> {
+    def __add__(self, o: [T]) -> [T] {
+        if (self.len == 0 && o.len == 0) { return []; }
+        if (self.len > 0) {
+            r = [self[0]; self.len + o.len];
+        } else {
+            r = [o[0]; self.len + o.len];
+        }
         i = 0;
         while (i < self.len) {
             r[i] = self[i];
@@ -101,7 +106,7 @@ class array {
         return r;
     }
 
-    def __eq__(self, o) -> bool {
+    def __eq__(self, o: [T]) -> bool {
         if (self.len != o.len) { return 1==0; }
         i = 0;
         while (i < self.len) {
@@ -111,12 +116,13 @@ class array {
         return 1==1;
     }
 
-    def __ne__(self, o) -> bool {
+    def __ne__(self, o: [T]) -> bool {
         return !(self == o);
     }
 
-    def __mul__(self, n) {
-        r = [0; self.len * n];
+    def __mul__(self, n: int) -> [T] {
+        if (self.len == 0) { return []; }
+        r = [self[0]; self.len * n];
         i = 0;
         while (i < n) {
             j = 0;
@@ -134,8 +140,7 @@ class array {
         i = 0;
         while (i < self.len) {
             if (i > 0) { r = r + " "; }
-            e: int = self[i];
-            r = r + e.__str__();
+            r = r + self[i].__str__();
             i = i + 1;
         }
         return r;
