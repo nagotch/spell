@@ -114,6 +114,46 @@ def t013() {
     return b.v;
 }
 
+class Vec {
+    x: int;
+    y: int;
+    def __init__(self, x: int, y: int) { self.x = x; self.y = y; }
+    def __add__(self, o: Vec) -> Vec { return Vec(self.x + o.x, self.y + o.y); }
+    def __eq__(self, o: Vec) -> bool { return self.x == o.x && self.y == o.y; }
+    def __lt__(self, o: Vec) -> bool { return self.x < o.x; }
+}
+
+class Arr {
+    a: [int];
+    def __init__(self) { self.a = [0; 3]; }
+    def __getitem__(self, i: int) -> int { return self.a[i]; }
+    def __setitem__(self, i: int, v: int) -> int { self.a[i] = v; return v; }
+}
+
+def t014() {
+    v = Vec(1, 2) + Vec(3, 4);
+    return v.x * 100 + v.y;
+}
+
+def t015() {
+    a = Vec(1, 2); b = Vec(2, 1); c = Vec(1, 2);
+    r = 0;
+    if (a < b) { r = r + 1; }
+    if (b > a) { r = r + 2; }
+    if (a == c) { r = r + 4; }
+    if (a == b) { r = r + 8; }
+    return r;
+}
+
+def t016() {
+    arr = Arr();
+    arr[1] = 42;
+    arr[1] = arr[1] + 1;
+    arr[0] = 5;
+    arr[0] += 7;
+    return arr[0] * 100 + arr[1];
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -139,6 +179,9 @@ def main() {
     mark(11); fails=fails+check(t011(), 6);
     mark(12); fails=fails+check(t012(), 1234);
     mark(13); fails=fails+check(t013(), 0);
+    mark(14); fails=fails+check(t014(), 406);
+    mark(15); fails=fails+check(t015(), 7);
+    mark(16); fails=fails+check(t016(), 1243);
 
     print_str("done"); putchar(10);
     return fails > 0;
