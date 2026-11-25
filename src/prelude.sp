@@ -56,7 +56,7 @@ class int {
         }
         digits = [0] * 20;
         i = 0;
-        while (n > 0) {
+        while (n != 0) {
             d = n % 10;
             if (d < 0) { d = -d; }
             digits[i] = 48 + d;

@@ -444,6 +444,7 @@ static Type* check_node(Node* node) {
             result = find_global_type(node);
             break;
         case ND_UNARY:
+            check_node(node->left_child);
             if (node->op.unop == OP_NOT) {
                 result = bool_type();
             }
@@ -469,11 +470,11 @@ static Type* check_node(Node* node) {
                 }
                 Class* klass = class_of(at);
                 Function* method = klass ? find_method(klass, "__str__", 7) : NULL;
-                if (method->nparams != 1 || (method->return_type && method->return_type->kind != TY_UNKNOWN && !(method->return_type->kind == TY_CLASS && method->return_type->klass == find_class("str", 3)))) {
-                    error_plain("クラス`%.*s`の`__str__`は引数を取らず、`str`を返す必要があります", klass->len, klass->name);
-                }
                 if (!method) {
                     error_plain("`%s`型の値は print できません", type_text(at));
+                }
+                if (method->nparams != 1 || (method->return_type && method->return_type->kind != TY_UNKNOWN && !(method->return_type->kind == TY_CLASS && method->return_type->klass == find_class("str", 3)))) {
+                    error_plain("クラス`%.*s`の`__str__`は引数を取らず、`str`を返す必要があります", klass->len, klass->name);
                 }
                 Node* conv = calloc(1, sizeof(Node));
                 conv->kind = ND_MCALL;
