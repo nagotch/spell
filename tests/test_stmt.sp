@@ -175,6 +175,45 @@ def t068() {
     return s * 10 + i
 }
 
+def t069() {
+    i = 0
+    s = 0
+    @ {
+        i = i + 1
+        if (i > 5)
+            break
+        s = s + i
+    }
+    return s
+}
+
+def t070() {
+    i = 0
+    s = 0
+    @ {
+        i = i + 1
+        if (i % 2 == 0)
+            continue
+        if (i >= 9)
+            !
+        s = s + i
+    }
+    return s
+}
+
+def t071() {
+    n = 0
+    t = 0
+    while (n < 3) {
+        n = n + 1
+        @ {
+            t = t + 1
+            break
+        }
+    }
+    return t * 10 + n
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -256,6 +295,9 @@ def main() {
     mark(66); fails=fails+check(t066(), 3);
     mark(67); fails=fails+check(t067(), 9);
     mark(68); fails=fails+check(t068(), 44);
+    mark(69); fails=fails+check(t069(), 15);
+    mark(70); fails=fails+check(t070(), 16);
+    mark(71); fails=fails+check(t071(), 33);
 
     print_str("done"); putchar(10);
     return fails > 0;
