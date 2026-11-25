@@ -696,7 +696,6 @@ static Type* check_multiassign(Node* node) {
 // 連鎖比較: 中間値を2つの一時置き場に交互へ退避しながら、比較を && でつなぐ
 static Type* check_chain(Node* node) {
     Node* prev_operand = node->left_child;
-    check_node(prev_operand);
     Node* combined = NULL;
     int i = 0;
     for (Node* pair = node->body; pair; pair = pair->next, i++) {
@@ -717,11 +716,13 @@ static Type* check_chain(Node* node) {
         }
         check_node(comp);
         if (combined) {
+            // && の検査は両辺の再検査と bool を返すだけなので、済んだ両辺は
+            // 再検査せず、型だけをここで確定させる（再検査による二重の書き換えを避ける）
             Node* and_node = create_node(ND_BINOP);
             and_node->op.binop = OP_AND;
             and_node->left_child = combined;
             and_node->right_child = comp;
-            check_node(and_node);
+            and_node->type = bool_type();
             combined = and_node;
         } else {
             combined = comp;
