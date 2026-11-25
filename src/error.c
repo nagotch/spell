@@ -5,6 +5,13 @@ static long utf8_read(long i, long* cp);
 static long char_width(long cp);
 
 void error_at(long start, long end, char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    error_at_v(start, end, fmt, ap);
+    va_end(ap);
+}
+
+void error_at_v(long start, long end, char* fmt, va_list ap) {
     long line = 1;
     long line_start = 0;
     for (long i = 0; i < start; i++) {
@@ -22,10 +29,7 @@ void error_at(long start, long end, char* fmt, ...) {
 
     fprintf(stderr, "%s:%ld:%ld: エラー: ", src_name, line, col);
 
-    va_list ap;
-    va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
-    va_end(ap);
     fprintf(stderr, "\n");
 
     long line_end = line_start;
@@ -101,11 +105,15 @@ void error_at(long start, long end, char* fmt, ...) {
 }
 
 void error_plain(char* fmt, ...) {
-    fprintf(stderr, "エラー: ");
     va_list ap;
     va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
+    error_plain_v(fmt, ap);
     va_end(ap);
+}
+
+void error_plain_v(char* fmt, va_list ap) {
+    fprintf(stderr, "エラー: ");
+    vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     exit(1);
 }
