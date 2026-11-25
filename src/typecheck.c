@@ -363,7 +363,7 @@ static Type* check_node(Node* node) {
                 result = scalar_cmp_result(cdunder);
                 break;
             }
-            result = &ty_int;
+            result = bool_type();
             break;
         }
         case ND_ASSIGN: {
@@ -445,7 +445,7 @@ static Type* check_node(Node* node) {
             break;
         case ND_UNARY:
             if (node->op.unop == OP_NOT) {
-                result = &ty_int;
+                result = bool_type();
             }
             break;
         case ND_FUNCALL: {
