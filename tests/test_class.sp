@@ -159,6 +159,84 @@ def mark(n) {
     return 0;
 }
 
+
+class GBox<T> {
+    v: T;
+    def __init__(self, v: T) {
+        self.v = v;
+    }
+    def get(self) -> T {
+        return self.v;
+    }
+}
+
+class GNode<T> {
+    v: T;
+    next: GNode<T>;
+    has_next: int;
+    def __init__(self, v: T) {
+        self.v = v;
+        self.next = self;
+        self.has_next = 0;
+    }
+    def link(self, n: GNode<T>) {
+        self.next = n;
+        self.has_next = 1;
+    }
+    def sum(self) -> T {
+        if (self.has_next) {
+            return self.v + self.next.sum();
+        }
+        return self.v;
+    }
+}
+
+class GArr<T> {
+    data: [T];
+    def __init__(self, d: [T]) {
+        self.data = d;
+    }
+    def __getitem__(self, i: int) -> T {
+        return self.data[i];
+    }
+}
+
+def t017() {
+    b = GBox(42);
+    return b.get();
+}
+
+def t018() {
+    a = GBox(10);
+    b = GBox(32);
+    return a.get() + b.get();
+}
+
+def t019() {
+    a = GNode(10);
+    b = GNode(20);
+    c = GNode(30);
+    b.link(c);
+    a.link(b);
+    return a.sum();
+}
+
+def t020() {
+    a = GArr([10, 20, 30]);
+    return a[1];
+}
+
+def t021() {
+    b: GBox<int> = GBox(7);
+    b.v = 9;
+    return b.v;
+}
+
+def t022() {
+    b = GBox("abcd");
+    return b.get().len;
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -182,6 +260,12 @@ def main() {
     mark(14); fails=fails+check(t014(), 406);
     mark(15); fails=fails+check(t015(), 7);
     mark(16); fails=fails+check(t016(), 1243);
+    mark(17); fails=fails+check(t017(), 42);
+    mark(18); fails=fails+check(t018(), 42);
+    mark(19); fails=fails+check(t019(), 60);
+    mark(20); fails=fails+check(t020(), 20);
+    mark(21); fails=fails+check(t021(), 9);
+    mark(22); fails=fails+check(t022(), 4);
 
     print_str("done"); putchar(10);
     return fails > 0;
