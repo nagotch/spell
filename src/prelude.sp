@@ -93,7 +93,7 @@ class array {
     }
 
     def __ne__(self, o) {
-        if (__eq__(self, o)) { return 0; }
+        if (self.__eq__(o)) { return 0; }
         return 1;
     }
 
