@@ -459,6 +459,32 @@ static Type* check_node(Node* node) {
                 nargs++;
             }
             Function* callee = find_function(node);
+            if (node->len == 5 && !memcmp(node->name, "print", 5) && !callee && !find_class(node->name, node->len)) {
+                if (nargs != 1) {
+                    error_plain("`print`の引数は1個ですが、%d個が指定されています", nargs);
+                }
+                Type* at = arg_types[0];
+                if (at->kind == TY_UNKNOWN) {
+                    error_plain("型が分からない値は print できません");
+                }
+                Class* klass = class_of(at);
+                Function* method = klass ? find_method(klass, "__str__", 7) : NULL;
+                if (!method) {
+                    error_plain("`%s`型の値は print できません", type_text(at));
+                }
+                Node* conv = calloc(1, sizeof(Node));
+                conv->kind = ND_MCALL;
+                conv->name = "__str__";
+                conv->len = 7;
+                conv->left_child = node->args;
+                conv->klass = klass;
+                conv->func = method;
+                node->args = conv;
+                node->name = "__println";
+                node->len = 9;
+                result = &ty_unknown;
+                break;
+            }
             if (!callee) {
                 Class* klass = find_class(node->name, node->len);
                 if (klass) {

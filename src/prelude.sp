@@ -119,6 +119,18 @@ class array {
         }
         return r;
     }
+
+    def __str__(self) -> str {
+        r = "";
+        i = 0;
+        while (i < self.len) {
+            if (i > 0) { r = r + " "; }
+            e: int = self[i];
+            r = r + e.__str__();
+            i = i + 1;
+        }
+        return r;
+    }
 }
 
 def read_int() -> int {
@@ -164,4 +176,9 @@ def print_str(s: str) {
     for (i=0; i<s.len; i=i+1) {
         putchar(s[i]);
     }
+}
+
+def __println(s: str) {
+    print_str(s);
+    putchar(10);
 }
