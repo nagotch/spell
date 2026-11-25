@@ -10,6 +10,8 @@
 #define _POSIX_C_SOURCE 200809L
 #include "spell.h"
 #include <unistd.h>
+#include <strings.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -33,7 +35,12 @@ struct Json {
 
 typedef struct {
     char* p;
+    int depth;
 } JParser;
+
+// これより深い入れ子は不正な入力として扱う（再帰でスタックを
+// 使い切ってサーバーごと落ちるのを防ぐ）
+#define JSON_MAX_DEPTH 100
 
 static Json* json_new(JType type) {
     Json* j = calloc(1, sizeof(Json));
@@ -160,6 +167,7 @@ static char* json_parse_string_raw(JParser* ps) {
 }
 
 static Json* json_parse_value(JParser* ps);
+static void json_free(Json* j);
 
 static void json_push(Json* parent, char* key, Json* value) {
     parent->items = realloc(parent->items, sizeof(Json*) * (parent->count + 1));
@@ -174,67 +182,54 @@ static void json_push(Json* parent, char* key, Json* value) {
 static Json* json_parse_value(JParser* ps) {
     json_skip_ws(ps);
     char c = *ps->p;
-    if (c == '{') {
-        ps->p++;
-        Json* obj = json_new(J_OBJ);
-        json_skip_ws(ps);
-        if (*ps->p == '}') {
-            ps->p++;
-            return obj;
-        }
-        while (true) {
-            json_skip_ws(ps);
-            char* key = json_parse_string_raw(ps);
-            if (!key) {
-                return NULL;
-            }
-            json_skip_ws(ps);
-            if (*ps->p != ':') {
-                free(key);
-                return NULL;
-            }
-            ps->p++;
-            Json* value = json_parse_value(ps);
-            if (!value) {
-                free(key);
-                return NULL;
-            }
-            json_push(obj, key, value);
-            json_skip_ws(ps);
-            if (*ps->p == ',') {
-                ps->p++;
-                continue;
-            }
-            if (*ps->p == '}') {
-                ps->p++;
-                return obj;
-            }
+    if (c == '{' || c == '[') {
+        if (++ps->depth > JSON_MAX_DEPTH) {
             return NULL;
         }
-    }
-    if (c == '[') {
+        Json* container = json_new(c == '{' ? J_OBJ : J_ARR);
+        char close = (c == '{') ? '}' : ']';
         ps->p++;
-        Json* arr = json_new(J_ARR);
         json_skip_ws(ps);
-        if (*ps->p == ']') {
+        if (*ps->p == close) {
             ps->p++;
-            return arr;
+            ps->depth--;
+            return container;
         }
         while (true) {
+            char* key = NULL;
+            if (container->type == J_OBJ) {
+                json_skip_ws(ps);
+                key = json_parse_string_raw(ps);
+                if (!key) {
+                    json_free(container);
+                    return NULL;
+                }
+                json_skip_ws(ps);
+                if (*ps->p != ':') {
+                    free(key);
+                    json_free(container);
+                    return NULL;
+                }
+                ps->p++;
+            }
             Json* value = json_parse_value(ps);
             if (!value) {
+                free(key);
+                json_free(container);
                 return NULL;
             }
-            json_push(arr, NULL, value);
+            json_push(container, key, value);
             json_skip_ws(ps);
             if (*ps->p == ',') {
                 ps->p++;
                 continue;
             }
-            if (*ps->p == ']') {
+            if (*ps->p == close) {
                 ps->p++;
-                return arr;
+                ps->depth--;
+                return container;
             }
+            json_free(container);
             return NULL;
         }
     }
@@ -283,6 +278,7 @@ static Json* json_parse(char* text) {
     }
     json_skip_ws(&ps);
     if (*ps.p != '\0') {
+        json_free(j);
         return NULL;
     }
     return j;
@@ -477,10 +473,14 @@ static char* read_message(Reader* r) {
             content_length = strtol(line + 15, NULL, 10);
         }
     }
-    if (content_length < 0) {
+    // 異常な長さは受け付けない（オーバーフローと巨大な確保の防止）
+    if (content_length < 0 || content_length > 64L * 1024 * 1024) {
         return NULL;
     }
     char* body = malloc(content_length + 1);
+    if (!body) {
+        return NULL;
+    }
     if (!reader_read_exact(r, body, content_length)) {
         free(body);
         return NULL;
@@ -667,6 +667,13 @@ static CheckResult run_check(const char* text) {
         return res;
     }
     pid_t pid = fork();
+    if (pid < 0) {
+        close(fds[0]);
+        close(fds[1]);
+        res.has_diag = 1;
+        snprintf(res.message, sizeof(res.message), "言語サーバーの内部でプロセスを作成できませんでした");
+        return res;
+    }
     if (pid == 0) {
         close(fds[0]);
         run_check_child(text, fds[1]);
@@ -683,7 +690,9 @@ static CheckResult run_check(const char* text) {
     }
     close(fds[0]);
     int status;
-    waitpid(pid, &status, 0);
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+        // シグナルで中断されたら待ち直す
+    }
     if (got < (long)sizeof(res)) {
         // 子が結果を返す前に落ちた（コンパイラのクラッシュ等）
         memset(&res, 0, sizeof(res));
