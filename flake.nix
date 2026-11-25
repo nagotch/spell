@@ -23,6 +23,9 @@
         installPhase = ''
           mkdir -p $out/bin
           cp src/spell src/spell-lsp src/prelude.sp $out/bin/
+          cp tools/nasm2gas.py $out/bin/
+          sed -i "1s|.*|#!${pkgs.python3}/bin/python3|" $out/bin/nasm2gas.py
+          chmod +x $out/bin/nasm2gas.py
         '';
       };
 
