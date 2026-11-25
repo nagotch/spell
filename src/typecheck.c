@@ -194,7 +194,7 @@ static Type* rewrite_to_mcall(Node* node, Type* lt, Type* rt, const char* name, 
     return method->return_type ? method->return_type : &ty_unknown;
 }
 
-static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index, Type* it, Type* rhs) {
+static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index, Type* it, Type* rhs, Node* value) {
     Function* method = find_method(klass, "__setitem__", 11);
     if (!method) {
         error_plain("クラス`%.*s`に`__setitem__`は定義されていません", klass->len, klass->name);
@@ -212,7 +212,7 @@ static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index
         strcpy(buf, type_text(method->param_types[2]));
         error_plain("クラス`%.*s`のメソッド`__setitem__`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, buf, type_text(rhs));
     }
-    index->next = node->right_child;
+    index->next = value;
     node->kind = ND_MCALL;
     node->name = "__setitem__";
     node->len = 11;
@@ -303,7 +303,7 @@ static Type* check_node(Node* node) {
             }
             Node* lhs = node->left_child;
             if (lhs->kind == ND_MCALL && node->right_child->kind == ND_BINOP && node->right_child->left_child == lhs) {
-                rewrite_to_setitem(node, lhs->klass, lhs->left_child, lhs->args, lhs->args->type, rhs);
+                rewrite_to_setitem(node, lhs->klass, lhs->left_child, lhs->args, lhs->args->type, rhs, node->right_child->right_child);
                     result = rhs;
                     break;
             }
@@ -343,7 +343,7 @@ static Type* check_node(Node* node) {
                 Type* bt = check_node(lhs->left_child);
                 if (bt->kind == TY_CLASS) {
                     Type* it = check_node(lhs->right_child);
-                    rewrite_to_setitem(node, bt->klass, lhs->left_child, lhs->right_child, it, rhs);
+                    rewrite_to_setitem(node, bt->klass, lhs->left_child, lhs->right_child, it, rhs, node->right_child);
                 } else {
                     Type* elem = check_node(lhs);
                     if (elem->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(elem, rhs)) {
