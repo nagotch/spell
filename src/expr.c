@@ -3,6 +3,22 @@
 
 static Node* array_literal();
 
+// 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数なしなら NULL
+static Node* parse_args() {
+    if (consume(")")) {
+        return NULL;
+    }
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    do {
+        cur->next = expr();
+        cur = cur->next;
+    } while (consume(","));
+    expect(")");
+    return head.next;
+}
+
 static Node* primary() {
     Node* node;
     Token* ident_token = consume_ident();
@@ -18,17 +34,7 @@ static Node* primary() {
         node = create_node(ND_FUNCALL);
         node->name = ident_token->str;
         node->len = ident_token->len;
-        if (!consume(")")) {
-            Node head;
-            head.next = NULL;
-            Node* cur = &head;
-            do {
-                cur->next = expr();
-                cur = cur->next;
-            } while (consume(","));
-            node->args = head.next;
-            expect(")");
-        }
+        node->args = parse_args();
     } else if (ident_token) {
         node = create_ident_node(ident_token);
     } else if (consume("(")) {
@@ -46,38 +52,28 @@ static Node* primary() {
             new_node->left_child = node;
             new_node->right_child = right_child;
             node = new_node;
-        } else if (consume(".")) {
-            ident_token = consume_ident();
-            if (ident_token) {
-                Node* new_node = create_node(ND_MEMBER);
-                new_node->left_child = node;
-                new_node->name = ident_token->str;
-                new_node->len = ident_token->len;
-                node = new_node;
-                if (consume("(")) {
-                    new_node->kind = ND_MCALL;
-                    if (!consume(")")) {
-                        Node head;
-                        head.next = NULL;
-                        Node* cur = &head;
-                        do {
-                            cur->next = expr();
-                            cur = cur->next;
-                        } while (consume(","));
-                        new_node->args = head.next;
-                        expect(")");
-                    }
-                }
-            } else {
-                char* actual = token_text(token);
-                if (actual) {
-                    error_at(token_start(token), token_end(token), "フィールド名が必要ですが、%sが指定されています", actual);
-                } else {
-                    error_at(token_start(token), token_end(token), "フィールド名が必要ですが、ファイルの末尾に達しました");
-                }
-            }
-        } else {
+            continue;
+        }
+        if (!consume(".")) {
             break;
+        }
+        Token* member_token = consume_ident();
+        if (!member_token) {
+            char* actual = token_text(token);
+            if (actual) {
+                error_at(token_start(token), token_end(token), "フィールド名が必要ですが、%sが指定されています", actual);
+            } else {
+                error_at(token_start(token), token_end(token), "フィールド名が必要ですが、ファイルの末尾に達しました");
+            }
+        }
+        Node* new_node = create_node(ND_MEMBER);
+        new_node->left_child = node;
+        new_node->name = member_token->str;
+        new_node->len = member_token->len;
+        node = new_node;
+        if (consume("(")) {
+            new_node->kind = ND_MCALL;
+            new_node->args = parse_args();
         }
     }
     return node;

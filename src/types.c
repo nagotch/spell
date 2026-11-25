@@ -82,7 +82,12 @@ static char* type_text_write(Type* type, char* p) {
 }
 
 char* type_text(Type* type) {
-    static char buf[256];
+    // 1つのエラーメッセージの中で複数回呼ばれても上書きし合わないよう、
+    // バッファを4つ使い回す（呼び出し側で strcpy し直す手間をなくすため）
+    static char bufs[4][256];
+    static int next = 0;
+    char* buf = bufs[next];
+    next = (next + 1) % 4;
     type_text_write(type, buf);
     return buf;
 }
