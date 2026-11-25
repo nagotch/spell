@@ -38,11 +38,11 @@ error_tests=(
     "class P { x: int; ; } def main() { return 0; }|フィールド名が必要ですが"
     "class P { def f() { return 1; } } def main() { return 0; }|最初の引数\`self\`が必要です"
     "class P { x: int; } def f(p: P) { return p.y; } def main() { return 0; }|フィールド\`y\`は定義されていません"
-    "def main() { x = 5; return x.foo; }|型の値にフィールドは使えません"
+    "def main() { x = 5; return x.foo; }|クラス\`int\`にフィールド\`foo\`は定義されていません"
     "class P { x: int; def __init__(self, x: int) { } } def main() { p = P(1, 2); return 0; }|の\`__init__\`の引数は1個ですが、2個が指定されています"
     "class P { x: int; def __init__(self, x: int) { } } def main() { p = P(1 < 2); return 0; }|の\`__init__\`の引数には\`int\`が必要ですが、\`bool\`が指定されています"
     "def f() { c: bool = getchar(); return 1; } def main() { return 0; }|の型は\`bool\`ですが、\`int\`が代入されています"
-    "def main() { x = 5; return x.foo(); }|型の値にメソッドは使えません"
+    "def main() { x = 5; return x.foo(); }|クラス\`int\`にメソッド\`foo\`は定義されていません"
     "class P { x: int; } def f(p: P) { return p.m(); } def main() { return 0; }|メソッド\`m\`は定義されていません"
     "class P { x: int; def add(self, a: int) -> int { return self.x + a; } } def f(p: P) { return p.add(1, 2); } def main() { return 0; }|メソッド\`add\`の引数は1個ですが、2個が指定されています"
     "class P { x: int; def add(self, a: int) -> int { return self.x + a; } } def f(p: P) { return p.add(1 < 2); } def main() { return 0; }|メソッド\`add\`の引数には\`int\`が必要ですが、\`bool\`が指定されています"
@@ -63,6 +63,9 @@ error_tests=(
     "def main() { if ([1] < [2]) { return 1; } return 0; }|型の値に演算子\`<\`は使えません"
     "def main() { a = [1]; b = a - a; return 0; }|型の値に演算子\`-\`は使えません"
     "def main() { s = \"abc\"; s[0] = 65; return 0; }|クラス\`str\`に\`__setitem__\`は定義されていません"
+    "class Q { x: int; } def main() { print(Q()); return 0; }|型の値は print できません"
+    "def main() { x = int(42); return 0; }|はクラスではありません"
+    "def main() { print(1, 2); return 0; }|引数は1個ですが、2個が指定されています"
 )
 
 cc -c -o funcs.o funcs.c
@@ -99,7 +102,7 @@ one_error_test() {
 }
 
 run_suite() {
-    cat io.sp $1 > suite_all.sp
+    cp $1 suite_all.sp
     "$SPELL" -S -o suite suite_all.sp
     cc -o suite suite.s funcs.o
     ./suite > suite.out
@@ -114,7 +117,7 @@ run_suite() {
 }
 
 run_selfcheck() {
-    cat io.sp test_selfcheck.sp > suite_all.sp
+    cp test_selfcheck.sp suite_all.sp
     "$SPELL" -S -o suite suite_all.sp
     cc -o suite suite.s funcs.o
     ./suite > suite.out
@@ -129,7 +132,7 @@ run_selfcheck() {
 }
 
 one_io_test() {
-    cat io.sp > io_all.sp
+    : > io_all.sp
     echo "$1" >> io_all.sp
     "$SPELL" -S -o io_prog io_all.sp
     cc -o io_prog io_prog.s funcs.o
@@ -173,7 +176,11 @@ run_selfcheck
 one_io_test "def main() { print_int(42); putchar(10); return 0; }" "" "42\n"
 one_io_test "def main() { print_int(0 - 42); putchar(10); return 0; }" "" "-42\n"
 one_io_test "def main() { b = read_int(); r = read_int(); print_int((30 - b) * (30 - r)); putchar(10); return 0; }" "10 20\n" "200\n"
-one_io_test "def main() { print_int(getchar()==-1); putchar(10); return 0; }" "" "1\n"
+one_io_test "def main() { if (getchar()==-1) { print_int(1); } else { print_int(0); } putchar(10); return 0; }" "" "1\n"
+one_io_test "def main() { print(42); return 0; }" "" "42\n"
+one_io_test "def main() { print(\"abc\"); return 0; }" "" "abc\n"
+one_io_test "def main() { print([1, 2, 3]); return 0; }" "" "1 2 3\n"
+one_io_test "def main() { print(1 < 2); return 0; }" "" "true\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
