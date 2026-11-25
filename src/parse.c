@@ -259,6 +259,25 @@ static Node* stmt_for() {
     return node;
 }
 
+// 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数の数を返す
+static int parse_params(Type* param_types[6]) {
+    int nparams = 0;
+    if (!consume(")")) {
+        do {
+            register_lvar(consume_ident());
+            if (consume(":")) {
+                Type* pt = parse_type();
+                if (nparams < 6) {
+                    param_types[nparams] = pt;
+                }
+            }
+            nparams++;
+        } while (consume(","));
+        expect(")");
+    }
+    return nparams;
+}
+
 static Function* function(Class* klass) {
     locals = NULL;
     consume_keyword(KW_DEF);
@@ -276,20 +295,7 @@ static Function* function(Class* klass) {
         expect("(");
     }
     Type* param_types[6] = {};
-    int nparams = 0;
-    if (!consume(")")) {
-        do {
-            register_lvar(consume_ident());
-            if (consume(":")) {
-                Type* pt = parse_type();
-                if (nparams < 6) {
-                    param_types[nparams] = pt;
-                }
-            }
-            nparams++;
-        } while (consume(","));
-        expect(")");
-    }
+    int nparams = parse_params(param_types);
     if (nparams > 6) {
         error_at(token_start(tok), token_end(tok), "引数は6個までですが、%d個が指定されています", nparams);
     }

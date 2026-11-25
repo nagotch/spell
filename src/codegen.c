@@ -360,7 +360,7 @@ static void gen_funcall(Node* node) {
         args_cnt++;
     }
     if (args_cnt > 6) {
-        error_plain("関数に渡せる引数は6個までですが、%ld個が指定されています", args_cnt);
+        error_plain("関数に渡せる引数は6個までですが、%d個が指定されています", args_cnt);
     }
     for (int i = args_cnt - 1; i >= 0; i--) {
         printf("  pop %s\n", arg_regs[i]);
