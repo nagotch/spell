@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>リファレンス — spell</title>
+<meta name="description" content="spell の演算子、糖衣構文、組み込み型とメソッド、入出力の形の一覧です。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="index.html">概要</a>
+    <a href="guide.html">言語ツアー</a>
+    <a href="reference.html" class="here">リファレンス</a>
+    <a href="editor.html">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+
+<h1 class="page">リファレンス</h1>
+<p class="lede">
+  演算子と糖衣構文、prelude が用意する型とメソッド、入出力の形の一覧です。
+  振る舞いの大半は prelude のクラス定義で決まります。迷ったら
+  <a href="https://github.com/nagotch/spell/blob/main/src/prelude.sp">prelude.sp</a> が正本です。
+</p>
+
+<h2><span class="no">01</span>演算子</h2>
+
+<table>
+  <tr><th>分類</th><th>演算子</th><th>備考</th></tr>
+  <tr><td>算術</td><td><code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code></td><td><code>/</code> と <code>%</code> は床除算（Python 式）。型ごとの意味はダンダーメソッドで定義される</td></tr>
+  <tr><td>比較</td><td><code>==</code> <code>!=</code> <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>連鎖できる（<code>0 &lt; x &lt; 10</code>）。配列に <code>&lt;</code> 系はない</td></tr>
+  <tr><td>論理</td><td><code>&amp;&amp;</code> <code>||</code> <code>!</code></td><td>短絡評価</td></tr>
+  <tr><td>代入</td><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code></td><td>複数代入 <code>a, b = b, a</code> も可。右辺を先に全部評価する</td></tr>
+  <tr><td>増減</td><td><code>++</code> <code>--</code></td><td>後置のみ</td></tr>
+  <tr><td>範囲</td><td><code>..</code> <code>..=</code></td><td><code>a..b</code> は半開、<code>a..=b</code> は終端を含む。降順も可</td></tr>
+  <tr><td>添字・メンバ</td><td><code>a[i]</code> <code>a.x</code> <code>a.m()</code></td><td>添字は <code>__getitem__</code> / <code>__setitem__</code> へ展開。0引数メソッドは括弧を省略できる</td></tr>
+  <tr><td>関数値</td><td><code>x -&gt; 式</code>、<code>fn(...) { }</code></td><td>矢印形は式1つの無名関数。<code>fn</code> 形は本体がブロック</td></tr>
+</table>
+
+<h2><span class="no">02</span>糖衣構文と正規形</h2>
+<p>
+  記号形はすべて、通常の構文への書き換えとして定義されています。
+</p>
+
+<table>
+  <tr><th>記号形</th><th>正規形・意味</th></tr>
+  <tr><td><code>&lt;&lt; x;</code>、文頭の <code>&lt; x;</code></td><td><code>x</code> を文字列化して1行で出す</td></tr>
+  <tr><td><code>&gt;&gt; x;</code></td><td><code>x = in;</code>（整数を1つ読んで代入）</td></tr>
+  <tr><td><code>i@n { }</code></td><td><code>for i in n { }</code>（0 から n−1）</td></tr>
+  <tr><td><code>i@a..b { }</code></td><td><code>for i in a..b { }</code></td></tr>
+  <tr><td><code>x@a { }</code></td><td><code>for x in a { }</code>（要素の走査）</td></tr>
+  <tr><td><code>@n { }</code></td><td>変数なしで n 回繰り返す</td></tr>
+  <tr><td><code>!;</code></td><td><code>break;</code></td></tr>
+  <tr><td><code>^;</code></td><td><code>continue;</code></td></tr>
+  <tr><td><code>a- = in[n];</code></td><td>整数を n 個読み、各要素から1引いた配列を代入する</td></tr>
+  <tr><td><code>x.rev</code></td><td>範囲・配列・文字列の逆順（コピーを返す）</td></tr>
+</table>
+
+<h2><span class="no">03</span>組み込み型とメソッド</h2>
+<p>
+  起動時に読み込まれる prelude が定義する型です。メソッドのうち引数を取らないものは、
+  呼び出しの括弧を省略できます（例: <code>a.len</code>）。
+</p>
+
+<table>
+  <tr><th>型</th><th>持つ操作</th><th>備考</th></tr>
+  <tr><td><code>int</code></td><td>四則演算、比較、<code>__hash__</code>、反復（<code>for i in n</code>）</td><td>64ビット整数</td></tr>
+  <tr><td><code>bool</code></td><td><code>__hash__</code>、文字列化（<code>true</code> / <code>false</code>）</td><td>条件式の型</td></tr>
+  <tr><td><code>str</code></td><td><code>+</code> 連結、<code>==</code> / <code>!=</code>、<code>len</code>、<code>rev</code>、添字（文字コードを返す）、反復、<code>__hash__</code></td><td>中身は文字コードの配列</td></tr>
+  <tr><td><code>[T]</code>（array）</td><td><code>+</code> 連結、<code>*</code> 繰り返し、<code>==</code> / <code>!=</code>（中身の比較）、<code>len</code>、<code>rev</code>、添字、反復、<code>__hash__</code></td><td><code>[値; 長さ]</code> で埋めて作れる</td></tr>
+  <tr><td><code>Range</code></td><td>反復、<code>rev</code></td><td><code>a..b</code> / <code>a..=b</code> の値</td></tr>
+  <tr><td><code>Dict&lt;K, V&gt;</code></td><td><code>d[k]</code> 読み（無ければ既定値を生やす）、<code>d[k] = v</code> 書き、<code>has(k)</code>、<code>len</code>、<code>keys()</code>、キー列挙の反復</td><td>構築時に既定値ファクトリを渡す。キーには <code>__hash__</code> が要る</td></tr>
+  <tr><td><code>fn(A) -&gt; B</code></td><td>呼び出し</td><td>関数値の型。外側の変数は値で捕捉する</td></tr>
+</table>
+
+<p class="note">
+  既定値ファクトリとして <code>zero_int</code>、<code>zero_bool</code>、<code>zero_str</code> が用意されています。
+  自作クラスが <code>__hash__</code> と <code>__eq__</code> を持てば、辞書のキーにも使えます。
+</p>
+
+<h2><span class="no">04</span>入出力の形</h2>
+
+<table>
+  <tr><th>形</th><th>意味</th></tr>
+  <tr><td><code>x = in;</code></td><td>整数を1つ読む</td></tr>
+  <tr><td><code>a, b = in;</code></td><td>整数を複数読む</td></tr>
+  <tr><td><code>a = in[n];</code></td><td>整数を n 個読んで配列にする</td></tr>
+  <tr><td><code>a = in[h][w];</code></td><td>h 行 × w 個の二次元配列として読む</td></tr>
+  <tr><td><code>s = in_str;</code>、<code>ws = in_str[n];</code></td><td>空白区切りのトークンを1つ / n 個読む</td></tr>
+  <tr><td><code>s = in_line;</code></td><td>行全体を1つ読む（空白を含む）</td></tr>
+  <tr><td><code>a- = in[n];</code></td><td>読みながら各要素から1引く（1始まり入力用）</td></tr>
+  <tr><td><code>put x;</code>、<code>put x, y;</code></td><td>値を空白区切りで1行に出す。配列は要素を並べて出し、二次元配列も平らに1行になる</td></tr>
+  <tr><td><code>yn 条件;</code></td><td>真なら <code>Yes</code>、偽なら <code>No</code> を出す</td></tr>
+</table>
+
+<h2><span class="no">05</span>キーワード</h2>
+<p>
+  <code>def</code>、<code>class</code>、<code>return</code>、<code>if</code>、<code>elif</code>、<code>else</code>、
+  <code>while</code>、<code>for</code>、<code>in</code>、<code>break</code>、<code>continue</code>、<code>fn</code>、
+  <code>put</code>、<code>yn</code>、そして入力の <code>in</code> / <code>in_str</code> / <code>in_line</code> です。
+  コメントは <code>//</code> と <code>/* */</code> が使えます。
+</p>
+
+<h2><span class="no">06</span>型注釈を書ける場所</h2>
+<ul>
+  <li>ローカル変数の初回束縛: <code>x: int = 式</code></li>
+  <li>関数の引数と戻り値: <code>def f(x: int) -&gt; int { }</code></li>
+  <li>クラスのフィールド: <code>data: [int]</code>（こちらは必須）</li>
+  <li>関数値の型: <code>f: fn(int) -&gt; int</code></li>
+</ul>
+<p class="note">
+  型パラメータはクラス定義側で明示し（最大4つ）、生成側では推論されます。
+  どちらからも決まらない場合は、注釈を求めるエラーになります。
+</p>
+
+<footer>
+  <span class="fname">spell.</span><br>
+  個人プロジェクトとして開発中です。このドキュメントのコード例は、すべて現在のコンパイラでコンパイルと実行を確認しています。<br>
+  <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a>
+</footer>
+
+</div>
+</body>
+</html>
