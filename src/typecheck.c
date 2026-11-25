@@ -455,6 +455,35 @@ static Type* check_node(Node* node) {
     return result;
 }
 
+static void check_init_stmts(Node* stmt, bool* assigned) {
+    for (Node* n = stmt; n; n = n->next) {
+        if (n->kind == ND_BLOCK) {
+            check_init_stmts(n->body, assigned);
+        } else if (n->kind == ND_ASSIGN) {
+            Node* lhs = n->left_child;
+            if (lhs->kind == ND_MEMBER && lhs->left_child->kind == ND_LVAR && lhs->left_child->offset == 8) {
+                assigned[lhs->offset / 8] = true;
+            }
+        }
+    }
+}
+
+static void check_init(Function* fn) {
+    Class* klass = fn->klass;
+    int nfields = 0;
+    for (Field* f = klass->fields; f; f = f->next) {
+        nfields++;
+    }
+    bool* assigned = calloc(nfields, sizeof(bool));
+    check_init_stmts(fn->body, assigned);
+    for (Field* f = klass->fields; f; f = f->next) {
+        if (!assigned[f->offset / 8]) {
+            error_plain("クラス`%.*s`の`__init__`で、フィールド`%.*s`が初期化されていません", klass->len, klass->name, f->len, f->name);
+        }
+    }
+    free(assigned);
+}
+
 void typecheck(Function* prog) {
     functions = prog;
     for (Function* fn = prog; fn; fn = fn->next) {
