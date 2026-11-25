@@ -216,6 +216,18 @@ static void gen_return(Node* node) {
 }
 
 static void gen_array(Node* node) {
+    if (node->array_len == 0) {
+        // 空のリテラルはヒープに置く。フレーム上に置くと、関数を抜けた
+        // 後まで保持される場合（フィールドへの代入など）に壊れる
+        int label = new_label();
+        printf("  mov rdi, 8\n");
+        emit_call(label, NULL, 6, "malloc");
+        printf("  mov rcx, 0\n");
+        printf("  mov [rax], rcx\n");
+        printf("  add rax, 8\n");
+        printf("  push rax\n");
+        return;
+    }
     printf("  mov rax, %d\n", node->array_len);
     printf("  mov [rbp-%d], rax\n", node->offset + 8 * node->array_len);
     Node* tail = node->body;
