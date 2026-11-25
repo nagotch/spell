@@ -182,8 +182,22 @@ static Node* or() {
     return node;
 }
 
-static Node* assign() {
+static Node* range() {
     Node* node = or();
+    if (consume("..")) {
+        Node* rhs = or();
+        Node* call = create_node(ND_FUNCALL);
+        call->name = "Range";
+        call->len = 5;
+        node->next = rhs;
+        call->args = node;
+        return call;
+    }
+    return node;
+}
+
+static Node* assign() {
+    Node* node = range();
     Token* error_token = token;
     if (consume(":")) {
         Node* assign_node = create_node(ND_ASSIGN);
