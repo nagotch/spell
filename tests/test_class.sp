@@ -149,6 +149,7 @@ def t016() {
     arr = Arr();
     arr[1] = 42;
     arr[1] = arr[1] + 1;
+    arr[0] = 5;
     arr[0] += 7;
     return arr[0] * 100 + arr[1];
 }
@@ -180,7 +181,7 @@ def main() {
     mark(13); fails=fails+check(t013(), 0);
     mark(14); fails=fails+check(t014(), 406);
     mark(15); fails=fails+check(t015(), 7);
-    mark(16); fails=fails+check(t016(), 743);
+    mark(16); fails=fails+check(t016(), 1243);
 
     print_str("done"); putchar(10);
     return fails > 0;
