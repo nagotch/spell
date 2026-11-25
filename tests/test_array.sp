@@ -37,6 +37,8 @@ def t034() { s = "hello"; return s[1] + s.len; }
 def t035() { t = 0; for s in ["ab", "cde"] { t = t + s.len; } return t; }
 def t036() { s = 0; for x in [1, 2, 3, 4] { if (x == 3) { break; } s = s + x; } return s; }
 def t037() { s = 0; for a in [[1, 2], [3]] { for x in a { s = s + x; } } return s; }
+def t038() { r = [1, 2, 3].rev; return r[0] * 100 + r[1] * 10 + r[2]; }
+def t039() { s = 0; for i in (1..4).rev { s = s * 10 + i; } if ("abc".rev == "cba") { s = s + 1; } return s; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -88,6 +90,8 @@ def main() {
     mark(35); fails=fails+check(t035(), 5);
     mark(36); fails=fails+check(t036(), 3);
     mark(37); fails=fails+check(t037(), 6);
+    mark(38); fails=fails+check(t038(), 321);
+    mark(39); fails=fails+check(t039(), 322);
 
     print_str("done"); putchar(10);
     return fails > 0;
