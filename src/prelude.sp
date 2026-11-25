@@ -27,36 +27,15 @@ class str {
 }
 
 class int {
-    def __str__(self) -> str {
-        n = self;
-        if (n == 0) {
-            return "0"; 
-        }
-        neg = 0;
-        if (n < 0) {
-            neg = 1;
-            n = -n;
-        }
-        digits = [0] * 20;
-        i = 0;
-        while (n > 0) {
-            digits[i] = 48 + n % 10;
-            n /= 10;
-            i += 1;
-        }
-        r = [0] * (i + neg);
-        j = 0;
-        if (neg == 1) {
-            r[0] = 45;
-            j = 1;
-        }
-        while (i > 0) {
-            i -= 1;
-            r[j] = digits[i];
-            j += 1;
-        }
-        return str(r);
-    }
+    def __add__(self, o: int) -> int { return self + o; }
+    def __sub__(self, o: int) -> int { return self - o; }
+    def __mul__(self, o: int) -> int { return self * o; }
+    def __div__(self, o: int) -> int { return self / o; }
+    def __mod__(self, o: int) -> int { return self % o; }
+    def __eq__(self, o: int) -> bool { return self == o; }
+    def __ne__(self, o: int) -> bool { return self != o; }
+    def __lt__(self, o: int) -> bool { return self < o; }
+    def __le__(self, o: int) -> bool { return self <= o; }
 }
 
 class bool {
