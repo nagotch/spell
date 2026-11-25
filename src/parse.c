@@ -101,7 +101,7 @@ static void note_top_used(int offset, int array_len) {
     }
 }
 
-static void register_any() {
+void register_any() {
     LVar* lvar = calloc(1, sizeof(LVar));
     lvar->offset = locals ? locals->offset + 8 * (locals->array_len + 1): 8;
     lvar->next = locals;
@@ -288,6 +288,11 @@ static Node* make_for_iter(Token* var, Node* init) {
     node->offset = locals->offset;
     node->left_child = create_ident_node(var);
     node->then = stmt();
+    if (consume_keyword(KW_ELSE)) {
+        register_any();
+        node->val = locals->offset;
+        node->els = stmt();
+    }
     return node;
 }
 
@@ -306,6 +311,11 @@ static Node* make_for_count(Node* count) {
     var->offset = locals->offset;
     node->left_child = var;
     node->then = stmt();
+    if (consume_keyword(KW_ELSE)) {
+        register_any();
+        node->val = locals->offset;
+        node->els = stmt();
+    }
     return node;
 }
 
