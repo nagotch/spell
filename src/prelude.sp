@@ -61,6 +61,6 @@ class str {
     }
 
     def __eq__(self, o: str) -> bool {
-        return self.charas == o.chars;
+        return self.chars == o.chars;
     }
 }
