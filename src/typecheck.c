@@ -518,6 +518,46 @@ static Node* make_mcall(Node* receiver, Class* klass, Function* fn, const char* 
 
 // for 文を「イテレータ取得 → while (__has_next__) { 変数 = __next__(); 本体 }」に書き換える。
 // プロトコルは Java 式（__iter__ / __has_next__ / __next__）。
+// for...else 用: この for 宛の break を「フラグを倒してから break」に書き換える。
+// 入れ子のループ本体には入らない（その break は入れ子側のもの）が、
+// 入れ子の for の else 節は外側のループの外側にあるので対象に含める
+static void rewrite_breaks_stmt(Node* node, int flag_offset) {
+    if (!node) {
+        return;
+    }
+    switch (node->kind) {
+        case ND_BREAK: {
+            Node* flag = create_node(ND_LVAR);
+            flag->offset = flag_offset;
+            Node* clear = create_node(ND_ASSIGN);
+            clear->left_child = flag;
+            Node* zero = create_node(ND_NUM);
+            zero->val = 0;
+            clear->right_child = zero;
+            clear->next = create_node(ND_BREAK);
+            node->kind = ND_BLOCK;
+            node->body = clear;
+            return;
+        }
+        case ND_WHILE:
+            return;
+        case ND_FOR:
+            rewrite_breaks_stmt(node->els, flag_offset);
+            return;
+        case ND_BLOCK:
+            for (Node* s = node->body; s; s = s->next) {
+                rewrite_breaks_stmt(s, flag_offset);
+            }
+            return;
+        case ND_IF:
+            rewrite_breaks_stmt(node->then, flag_offset);
+            rewrite_breaks_stmt(node->els, flag_offset);
+            return;
+        default:
+            return;
+    }
+}
+
 static Type* check_for(Node* node) {
     Type* iterable = check_node(node->init);
     if (iterable->kind == TY_UNKNOWN) {
@@ -584,12 +624,116 @@ static Type* check_for(Node* node) {
         }
         var->type = find_global_type(var);
     }
+    if (node->els) {
+        rewrite_breaks_stmt(node->then, (int)node->val);
+    }
     check_node(node->then);
+    if (node->els) {
+        check_node(node->els);
+    }
 
     node->kind = ND_BLOCK;
-    node->body = get_iter;
-    get_iter->next = loop;
+    if (node->els) {
+        // break しなかったときだけ else 節が動くよう、フラグつきでつなぐ
+        Node* flag_init = create_node(ND_ASSIGN);
+        Node* flag_var = create_node(ND_LVAR);
+        flag_var->offset = (int)node->val;
+        flag_init->left_child = flag_var;
+        Node* one = create_node(ND_NUM);
+        one->val = 1;
+        flag_init->right_child = one;
+        Node* if_node = create_node(ND_IF);
+        Node* cond = create_node(ND_LVAR);
+        cond->offset = (int)node->val;
+        if_node->cond = cond;
+        if_node->then = node->els;
+        node->body = flag_init;
+        flag_init->next = get_iter;
+        get_iter->next = loop;
+        loop->next = if_node;
+    } else {
+        node->body = get_iter;
+        get_iter->next = loop;
+    }
     return &ty_unknown;
+}
+
+// 複数代入: 値を全部評価して一時置き場へ退避し、それから対象へ1つずつ代入する
+static Type* check_multiassign(Node* node) {
+    int i = 0;
+    for (Node* v = node->args; v; v = v->next, i++) {
+        Type* vt = check_node(v);
+        local_types[(node->offset + i * 8) / 8] = vt;
+    }
+    Node* head = NULL;
+    Node** tail = &head;
+    i = 0;
+    for (Node* v = node->args; v; v = v->next, i++) {
+        Node* slot = create_node(ND_LVAR);
+        slot->offset = node->offset + i * 8;
+        Node* a = create_node(ND_ASSIGN);
+        a->left_child = slot;
+        a->right_child = v;
+        *tail = a;
+        tail = &a->next;
+    }
+    i = 0;
+    for (Node* target = node->body; target; target = target->next, i++) {
+        Node* slot = create_node(ND_LVAR);
+        slot->offset = node->offset + i * 8;
+        Node* a = create_node(ND_ASSIGN);
+        a->left_child = target;
+        a->right_child = slot;
+        check_node(a);
+        *tail = a;
+        tail = &a->next;
+    }
+    node->kind = ND_BLOCK;
+    node->body = head;
+    return &ty_unknown;
+}
+
+// 連鎖比較: 中間値を2つの一時置き場に交互へ退避しながら、比較を && でつなぐ
+static Type* check_chain(Node* node) {
+    Node* prev_operand = node->left_child;
+    check_node(prev_operand);
+    Node* combined = NULL;
+    int i = 0;
+    for (Node* pair = node->body; pair; pair = pair->next, i++) {
+        int cur_offset = node->offset + (i % 2) * 8;
+        Node* slot = create_node(ND_LVAR);
+        slot->offset = cur_offset;
+        Node* store = create_node(ND_ASSIGN);
+        store->left_child = slot;
+        store->right_child = pair->left_child;
+        Node* comp = create_node(ND_BINOP);
+        comp->op.binop = pair->op.binop;
+        if (pair->val) {
+            comp->left_child = store;
+            comp->right_child = prev_operand;
+        } else {
+            comp->left_child = prev_operand;
+            comp->right_child = store;
+        }
+        check_node(comp);
+        if (combined) {
+            Node* and_node = create_node(ND_BINOP);
+            and_node->op.binop = OP_AND;
+            and_node->left_child = combined;
+            and_node->right_child = comp;
+            check_node(and_node);
+            combined = and_node;
+        } else {
+            combined = comp;
+        }
+        Node* prev_slot = create_node(ND_LVAR);
+        prev_slot->offset = cur_offset;
+        prev_operand = prev_slot;
+    }
+    Node* nxt = node->next;
+    *node = *combined;
+    node->next = nxt;
+    return bool_type();
 }
 
 static Type* check_node(Node* node) {
@@ -660,6 +804,12 @@ static Type* check_node(Node* node) {
             break;
         case ND_FOR:
             result = check_for(node);
+            break;
+        case ND_MULTIASSIGN:
+            result = check_multiassign(node);
+            break;
+        case ND_CHAIN:
+            result = check_chain(node);
             break;
         case ND_RETURN:
             result = check_return(node);

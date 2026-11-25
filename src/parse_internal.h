@@ -10,6 +10,7 @@ long expect_number();
 Node* create_number_node(long num);
 Node* create_binary_operation_node(BinOp kind, Node* left_child, Node* right_child);
 void register_array(int array_len);
+void register_any();
 
 // expr.c
 Node* expr();
