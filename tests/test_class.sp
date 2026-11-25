@@ -95,6 +95,25 @@ def t011() {
     return a.len + a.len();
 }
 
+class Sw {
+    a: int;
+    b: int;
+    def __init__(self, c: int) {
+        if (c) { self.a = 1; self.b = 2; } else { self.a = 3; self.b = 4; }
+    }
+}
+
+def t012() {
+    s = Sw(1);
+    t = Sw(0);
+    return s.a * 1000 + s.b * 100 + t.a * 10 + t.b;
+}
+
+def t013() {
+    b = Box();
+    return b.v;
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -118,6 +137,8 @@ def main() {
     mark(9); fails=fails+check(t009(), 7);
     mark(10); fails=fails+check(t010(), 84);
     mark(11); fails=fails+check(t011(), 6);
+    mark(12); fails=fails+check(t012(), 1234);
+    mark(13); fails=fails+check(t013(), 0);
 
     print_str("done"); putchar(10);
     return fails > 0;
