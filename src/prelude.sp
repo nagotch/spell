@@ -258,6 +258,78 @@ class ArrayIter<T> {
     }
 }
 
+def read_ints(n: int) -> [int] {
+    a = [0; n];
+    for i in n { a[i] = read_int(); }
+    return a;
+}
+
+def read_ints2(h: int, w: int) -> [[int]] {
+    a = [[0]; h];
+    for i in h { a[i] = read_ints(w); }
+    return a;
+}
+
+def read_ints_dec(n: int) -> [int] {
+    a = read_ints(n);
+    for i in n { a[i] = a[i] - 1; }
+    return a;
+}
+
+def read_token() -> str {
+    cap = 64;
+    buf = [0; cap];
+    n = 0;
+    char = getchar();
+    while (char == 32 || char == 10 || char == 13 || char == 9) { char = getchar(); }
+    while (char != -1 && char != 32 && char != 10 && char != 13 && char != 9) {
+        if (n == cap) {
+            bigger = [0; cap * 2];
+            for i in n { bigger[i] = buf[i]; }
+            buf = bigger;
+            cap = cap * 2;
+        }
+        buf[n] = char;
+        n = n + 1;
+        char = getchar();
+    }
+    r = [0; n];
+    for i in n { r[i] = buf[i]; }
+    return str(r);
+}
+
+def read_tokens(n: int) -> [str] {
+    if (n == 0) { return []; }
+    a = [""; n];
+    for i in n { a[i] = read_token(); }
+    return a;
+}
+
+def read_line() -> str {
+    cap = 64;
+    buf = [0; cap];
+    n = 0;
+    char = getchar();
+    while (char != -1 && char != 10) {
+        if (n == cap) {
+            bigger = [0; cap * 2];
+            for i in n { bigger[i] = buf[i]; }
+            buf = bigger;
+            cap = cap * 2;
+        }
+        buf[n] = char;
+        n = n + 1;
+        char = getchar();
+    }
+    r = [0; n];
+    for i in n { r[i] = buf[i]; }
+    return str(r);
+}
+
+def print_yn(b: bool) {
+    if (b) { print("Yes"); } else { print("No"); }
+}
+
 def __count_range(n: int) -> Range {
     if (n < 0) { return Range(0, 0, 0); }
     return Range(0, n, 0);
