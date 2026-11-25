@@ -18,6 +18,7 @@ static Function* current_fn;
 static Type* current_return;
 static Function* functions;
 static Class* instantiate(Class* tmpl, Type* targ);
+static bool type_has_unknown(Type* t);
 
 static Class* class_of(Type* t) {
     switch (t->kind) {
@@ -33,6 +34,11 @@ static Class* class_of(Type* t) {
         case TY_ARRAY: {
             Class* arr = find_class("array", 5);
             if (arr && arr->tparam) {
+                // 要素型が不明な配列は空リテラル由来で中身を持たないため、
+                // int の実体化で代用する（不明な型引数では実体化できない）
+                if (type_has_unknown(t->elem)) {
+                    return instantiate(arr, &ty_int);
+                }
                 return instantiate(arr, t->elem);
             }
             return arr;
@@ -200,6 +206,9 @@ static Node* clone_node(Node* n, Type* targ) {
             return memo_copy[i];
         }
     }
+    if (memo_n >= CLONE_MEMO_MAX) {
+        error_internal("ジェネリックなメソッドが大きすぎます");
+    }
     Node* c = calloc(1, sizeof(Node));
     *c = *n;
     memo_orig[memo_n] = n;
@@ -222,11 +231,55 @@ static Node* clone_node(Node* n, Type* targ) {
     return c;
 }
 
+static bool type_strict_equals(Type* a, Type* b) {
+    if (a->kind != b->kind) {
+        return false;
+    }
+    switch (a->kind) {
+        case TY_ARRAY:
+            return type_strict_equals(a->elem, b->elem);
+        case TY_CLASS: {
+            Class* ka = a->klass->origin ? a->klass->origin : a->klass;
+            Class* kb = b->klass->origin ? b->klass->origin : b->klass;
+            if (ka != kb) {
+                return false;
+            }
+            if (!a->targ && !b->targ) {
+                return true;
+            }
+            if (!a->targ || !b->targ) {
+                return false;
+            }
+            return type_strict_equals(a->targ, b->targ);
+        }
+        case TY_VAR:
+            return a->len == b->len && !memcmp(a->name, b->name, a->len);
+        default:
+            return true;
+    }
+}
+
+static bool type_has_unknown(Type* t) {
+    if (!t) {
+        return false;
+    }
+    switch (t->kind) {
+        case TY_UNKNOWN:
+            return true;
+        case TY_ARRAY:
+            return type_has_unknown(t->elem);
+        case TY_CLASS:
+            return type_has_unknown(t->targ);
+        default:
+            return false;
+    }
+}
+
 static Class* instances = NULL;
 
 static Class* instantiate(Class* tmpl, Type* targ) {
     for (Class* c = instances; c; c = c->next) {
-        if (c->origin == tmpl && type_equals(c->targ, targ)) {
+        if (c->origin == tmpl && type_strict_equals(c->targ, targ)) {
             return c;
         }
     }
@@ -289,10 +342,19 @@ static Type* unify_type(Type* pat, Type* arg, Type* cur) {
         return cur;
     }
     if (pat->kind == TY_VAR) {
-        if (cur && !type_equals(cur, arg)) {
-            error_plain("型引数を推論できません");
+        if (!cur) {
+            return arg;
         }
-        return arg;
+        if (type_strict_equals(cur, arg)) {
+            return cur;
+        }
+        if (type_has_unknown(cur) && !type_has_unknown(arg)) {
+            return arg;
+        }
+        if (type_has_unknown(arg)) {
+            return cur;
+        }
+        error_plain("型引数を推論できません");
     }
     if (pat->kind == TY_ARRAY && arg->kind == TY_ARRAY) {
         return unify_type(pat->elem, arg->elem, cur);
