@@ -26,6 +26,10 @@ class str {
         return self.chars == o.chars;
     }
 
+    def __ne__(self, o: str) -> bool {
+        return !(self == o);
+    }
+
     def __str__(self) -> str {
         return self;
     }
@@ -96,7 +100,7 @@ class array {
         return r;
     }
 
-    def __eq__(self, o) {
+    def __eq__(self, o) -> bool {
         if (self.len != o.len) { return 0; }
         i = 0;
         while (i < self.len) {
@@ -106,7 +110,7 @@ class array {
         return 1;
     }
 
-    def __ne__(self, o) {
+    def __ne__(self, o) -> bool {
         if (self.__eq__(o)) { return 0; }
         return 1;
     }
