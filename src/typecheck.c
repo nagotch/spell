@@ -340,11 +340,18 @@ static Type* check_node(Node* node) {
                 }
                 lhs->type = find_global_type(lhs);
             } else if (lhs->kind == ND_INDEX) {
-                Type* elem = check_node(lhs);
-                if (elem->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(elem, rhs)) {
-                    char expected[256];
-                    strcpy(expected, type_text(elem));
-                    error_plain("配列の要素は`%s`ですが、`%s`が代入されています", expected, type_text(rhs));
+            } else if (lhs->kind == ND_INDEX) {
+                Type* bt = check_node(lhs->left_child);
+                if (bt->kind == TY_CLASS) {
+                    Type* it = check_node(lhs->right_child);
+                    rewrite_to_setitem(node, bt->klass, lhs->left_child, lhs->right_child, it, rhs);
+                } else {
+                    Type* elem = check_node(lhs);
+                    if (elem->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(elem, rhs)) {
+                        char expected[256];
+                        strcpy(expected, type_text(elem));
+                        error_plain("配列の要素は`%s`ですが、`%s`が代入されています", expected, type_text(rhs));
+                    }
                 }
             } else {
                 check_node(lhs);
