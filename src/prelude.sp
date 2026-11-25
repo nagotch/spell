@@ -41,3 +41,26 @@ def __array_mul(a, n) {
     }
     return r;
 }
+
+class str {
+    chars: [int];
+    def __init__(self, chars: [int]) {
+        self.chars = chars;
+    }
+
+    def len(self) -> int {
+        return self.chars.len;
+    }
+
+    def __getitem__(self, i: int) -> int {
+        return self.chars[i];
+    }
+
+    def __add__(self, o: str) -> str {
+        return str(self.chars + o.chars);
+    }
+
+    def __eq__(self, o: str) -> bool {
+        return self.charas == o.chars;
+    }
+}
