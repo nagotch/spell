@@ -333,20 +333,17 @@ static Function* function(Class* klass) {
     return func;
 }
 
-static void class_decl(Function** cur) {
-    consume_keyword(KW_CLASS);
-    Token* tok = consume_ident();
-    if (!tok) {
-        error_at(token_start(token), token_end(token), "クラス名が必要ですが、%sが見つかりました", token_text(token));
+static Class* register_class(char* name, int len) {
+    Class* klass = find_class(name, len);
+    if (klass) {
+        return klass;
     }
-    Class* klass = calloc(1, sizeof(Class));
-    klass->name = tok->str;
-    klass->len = tok->len;
-    if (klass->len == 3 && !memcmp(klass->name, "int", 3)) {
+    klass = calloc(1, sizeof(Class));
+    klass->name = name;
+    klass->len = len;
+    if (len == 3 && !memcmp(name, "int", 3)) {
         klass->type = &ty_int;
-    } else if (klass->len == 4 && !memcmp(klass->name, "bool", 4)) {
-        klass->type = &ty_bool;
-    } else if (klass->len == 5 && !memcmp(klass->name, "array", 5)) {
+    } else if (len == 5 && !memcmp(name, "array", 5)) {
         klass->type = array_type(&ty_unknown);
     } else {
         klass->type = calloc(1, sizeof(Type));
@@ -355,6 +352,16 @@ static void class_decl(Function** cur) {
     }
     klass->next = classes;
     classes = klass;
+    return klass;
+}
+
+static void class_decl(Function** cur) {
+    consume_keyword(KW_CLASS);
+    Token* tok = consume_ident();
+    if (!tok) {
+        error_at(token_start(token), token_end(token), "クラス名が必要ですが、%sが見つかりました", token_text(token));
+    }
+    Class* klass = register_class(tok->str, tok->len);
     expect("{");
     int offset = 0;
     while (!consume("}")) {
@@ -386,6 +393,14 @@ static void class_decl(Function** cur) {
 }
 
 Function* program() {
+    Token* head_t = token;
+    for (Token* t = head_t; t->kind != TK_EOF; t = t->next) {
+        if (t->kind == TK_KEYWORD && t->keyword == KW_CLASS && t->next->kind == TK_IDENT) {
+            register_class(t->next->str, t->next->len);
+        }
+    }
+    token = head_t;
+
     Function head;
     head.next = NULL;
     Function* cur = &head;
