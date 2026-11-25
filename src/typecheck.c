@@ -303,9 +303,12 @@ static Type* check_node(Node* node) {
             }
             Node* lhs = node->left_child;
             if (lhs->kind == ND_MCALL && node->right_child->kind == ND_BINOP && node->right_child->left_child == lhs) {
-                rewrite_to_setitem(node, lhs->klass, lhs->left_child, lhs->args, lhs->args->type, rhs, node->right_child->right_child);
-                    result = rhs;
-                    break;
+                Node* idx = malloc(sizeof(Node));
+                memcpy(idx, lhs->args, sizeof(Node));
+                idx->next = NULL;
+                rewrite_to_setitem(node, lhs->klass, lhs->left_child, idx, lhs->args->type, rhs, node->right_child);
+                result = rhs;
+                break;
             }
             if (lhs->kind == ND_LVAR) {
                 Type* recorded = local_types[lhs->offset / 8];
