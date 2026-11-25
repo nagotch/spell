@@ -1,8 +1,6 @@
 #include "spell.h"
 
 Type ty_int = { TY_INT, NULL };
-Type ty_bool = { TY_BOOL, NULL };
-Type ty_char = { TY_CHAR, NULL };
 Type ty_array = { TY_ARRAY, NULL };
 Type ty_unknown = { TY_UNKNOWN, NULL };
 
@@ -20,6 +18,15 @@ static Function* current_fn;
 static Type* current_return;
 static Function* functions;
 
+static Class* class_of(Type* t) {
+    switch (t->kind) {
+        case TY_CLASS: return t->klass;
+        case TY_INT: return find_class("int", 3);
+        case TY_ARRAY: return find_class("array", 5);
+        default: return NULL;
+    }
+}
+
 static Function* find_method(Class* klass, char* name, int len) {
     for (Function* fn = functions; fn; fn = fn->next) {
         if (fn->klass == klass && fn->len == len && !memcmp(fn->name, name, len)) {
@@ -27,6 +34,22 @@ static Function* find_method(Class* klass, char* name, int len) {
         }
     }
     return NULL;
+}
+
+static Type* bool_type() {
+    Class* klass = find_class("bool", 4);
+    return klass ? klass->type : &ty_int;
+}
+
+static Type* scalar_cmp_result(const char* dunder) {
+    Class* klass = find_class("int", 3);
+    if (klass) {
+        Function* method = find_method(klass, (char*)dunder, 6);
+        if (method && method->return_type) {
+            return method->return_type;
+        }
+    }
+    return &ty_int;
 }
 
 static Function* find_function(Node* node) {
@@ -58,12 +81,6 @@ static char* type_text_write(Type* type, char* p) {
     switch (type->kind) {
         case TY_INT:
             p += sprintf(p, "int");
-            break;
-        case TY_BOOL:
-            p += sprintf(p, "bool");
-            break;
-        case TY_CHAR:
-            p += sprintf(p, "char");
             break;
         case TY_ARRAY:
             p += sprintf(p, "[");
@@ -158,10 +175,7 @@ static const char* op_text(BinOp op) {
 }
 
 static bool scalar_compatible(Type* a, Type* b) {
-    if (a->kind == b->kind) {
-        return true;
-    }
-    return (a->kind == TY_INT || a->kind == TY_CHAR) && (b->kind == TY_INT || b->kind == TY_CHAR);
+    return a->kind == b->kind;
 }
 
 static const char* cmp_dunder(BinOp op) {
@@ -175,7 +189,7 @@ static const char* cmp_dunder(BinOp op) {
 }
 
 static Type* rewrite_to_mcall(Node* node, Type* lt, Type* rt, const char* name, int len, Function* method) {
-    Class* klass = lt->klass;
+    Class* klass = class_of(lt);
     if (method->nparams != 2) {
         error_plain("クラス`%.*s`のメソッド`%.*s`の引数は1個ですが、%d個が定義されています", klass->len, klass->name, name, method->nparams - 1);
     }
@@ -269,23 +283,34 @@ static Type* check_node(Node* node) {
                     break;
                 }
                 if (lt->kind == TY_ARRAY || rt->kind == TY_ARRAY) {
-                    Type* at = lt->kind == TY_ARRAY ? lt : rt;
                     Type* ot = lt->kind == TY_ARRAY ? rt : lt;
+                    if (lt->kind != TY_ARRAY) {
+                        Node* tn = node->left_child;
+                        node->left_child = node->right_child;
+                        node->right_child = tn;
+                        Type* tt = lt;
+                        lt = rt;
+                        rt = tt;
+                    }
                     if (node->op.binop == OP_ADD) {
                         if (ot->kind != TY_ARRAY && ot->kind != TY_UNKNOWN) {
-                            error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                            error_plain("`%s`型の値に演算子`%s`は使えません", type_text(lt), op_text(node->op.binop));
                         }
-                        result = rewrite_to_funcall(node, "__array_add", 11, at, false);
+                        Function* method = find_method(class_of(lt), "__add__", 7);
+                        result = rewrite_to_mcall(node, lt, rt, "__add__", 7, method);
+                        if (result->kind == TY_UNKNOWN) { result = lt; }
                         break;
                     }
                     if (node->op.binop == OP_MUL) {
                         if (ot->kind != TY_INT && ot->kind != TY_UNKNOWN) {
-                            error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                            error_plain("`%s`型の値に演算子`%s`は使えません", type_text(lt), op_text(node->op.binop));
                         }
-                        result = rewrite_to_funcall(node, "__array_mul", 11, at, lt->kind != TY_ARRAY);
+                        Function* method = find_method(class_of(lt), "__mul__", 7);
+                        result = rewrite_to_mcall(node, lt, rt, "__mul__", 7, method);
+                        if (result->kind == TY_UNKNOWN) { result = lt; }
                         break;
                     }
-                    error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                    error_plain("`%s`型の値に演算子`%s`は使えません", type_text(lt), op_text(node->op.binop));
                 }
                 if (lt->kind != TY_UNKNOWN && rt->kind != TY_UNKNOWN && !scalar_compatible(lt, rt)) {
                     char buf[256];
@@ -306,7 +331,7 @@ static Type* check_node(Node* node) {
                     if (node->op.binop == OP_LT || node->op.binop == OP_LE) {
                         error_plain("クラス`%.*s`に演算子`%s`は定義されていません", lt->klass->len, lt->klass->name, op_text(node->op.binop));
                     }
-                    result = &ty_bool;
+                    result = bool_type();
                     break;
                 }
                 if (lt->kind == TY_ARRAY || rt->kind == TY_ARRAY) {
@@ -317,13 +342,16 @@ static Type* check_node(Node* node) {
                     Type* ot = lt->kind == TY_ARRAY ? rt : lt;
                     if (ot->kind == TY_ARRAY || ot->kind == TY_UNKNOWN) {
                         if (node->op.binop == OP_EQ) {
-                            result = rewrite_to_funcall(node, "__array_eq", 10, &ty_bool, false);
+                            Function* method = find_method(class_of(lt), "__eq__", 6);
+                            result = rewrite_to_mcall(node, lt, rt, "__eq__", 6, method);
                         } else {
-                            result = rewrite_to_funcall(node, "__array_ne", 10, &ty_bool, false);
+                            Function* method = find_method(class_of(lt), "__ne__", 6);
+                            result = rewrite_to_mcall(node, lt, rt, "__ne__", 6, method);
                         }
+                        result = bool_type();
                         break;
                     }
-                    result = &ty_bool;
+                    result = bool_type();
                     break;
                 }
                 if ((node->op.binop == OP_LT || node->op.binop == OP_LE)
@@ -332,10 +360,10 @@ static Type* check_node(Node* node) {
                     strcpy(buf, type_text(lt));
                     error_plain("`%s`型と`%s`型の値に演算子`%s`は使えません", buf, type_text(rt), op_text(node->op.binop));
                 }
-                result = &ty_bool;
+                result = scalar_cmp_result(cdunder);
                 break;
             }
-            result = &ty_bool;
+            result = bool_type();
             break;
         }
         case ND_ASSIGN: {
@@ -416,8 +444,9 @@ static Type* check_node(Node* node) {
             result = find_global_type(node);
             break;
         case ND_UNARY:
+            check_node(node->left_child);
             if (node->op.unop == OP_NOT) {
-                result = &ty_bool;
+                result = bool_type();
             }
             break;
         case ND_FUNCALL: {
@@ -431,9 +460,41 @@ static Type* check_node(Node* node) {
                 nargs++;
             }
             Function* callee = find_function(node);
+            if (node->len == 5 && !memcmp(node->name, "print", 5) && !callee && !find_class(node->name, node->len)) {
+                if (nargs != 1) {
+                    error_plain("`print`の引数は1個ですが、%d個が指定されています", nargs);
+                }
+                Type* at = arg_types[0];
+                if (at->kind == TY_UNKNOWN) {
+                    error_plain("型が分からない値は print できません");
+                }
+                Class* klass = class_of(at);
+                Function* method = klass ? find_method(klass, "__str__", 7) : NULL;
+                if (!method) {
+                    error_plain("`%s`型の値は print できません", type_text(at));
+                }
+                if (method->nparams != 1 || (method->return_type && method->return_type->kind != TY_UNKNOWN && !(method->return_type->kind == TY_CLASS && method->return_type->klass == find_class("str", 3)))) {
+                    error_plain("クラス`%.*s`の`__str__`は引数を取らず、`str`を返す必要があります", klass->len, klass->name);
+                }
+                Node* conv = calloc(1, sizeof(Node));
+                conv->kind = ND_MCALL;
+                conv->name = "__str__";
+                conv->len = 7;
+                conv->left_child = node->args;
+                conv->klass = klass;
+                conv->func = method;
+                node->args = conv;
+                node->name = "__println";
+                node->len = 9;
+                result = &ty_unknown;
+                break;
+            }
             if (!callee) {
                 Class* klass = find_class(node->name, node->len);
                 if (klass) {
+                    if (klass->type->kind != TY_CLASS) {
+                        error_plain("`%.*s`はクラスではありません", klass->len, klass->name);
+                    }
                     node->klass = klass;
                     Function* init = find_method(klass, "__init__", 8);
                     node->func = init;
@@ -575,10 +636,10 @@ static Type* check_node(Node* node) {
                 result = &ty_int;
                 break;
             }
-            if (obj->kind != TY_CLASS) {
+            Class* klass = class_of(obj);
+            if (!klass) {
                 error_plain("`%s`型の値にフィールドは使えません", type_text(obj));
             }
-            Class* klass = obj->klass;
             node->klass = klass;
             Field* field = NULL;
             for (Field* f = klass->fields; f; f = f->next) {
@@ -628,10 +689,10 @@ static Type* check_node(Node* node) {
                 result = &ty_unknown;
                 break;
             }
-            if (obj->kind != TY_CLASS) {
+            Class* klass = class_of(obj);
+            if (!klass) {
                 error_plain("`%s`型の値にメソッドは使えません", type_text(obj));
             }
-            Class* klass = obj->klass;
             Function* method = find_method(klass, node->name, node->len);
             if (!method) {
                 error_plain("クラス`%.*s`にメソッド`%.*s`は定義されていません", klass->len, klass->name, node->len, node->name);
