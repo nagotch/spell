@@ -462,6 +462,9 @@ static Type* check_node(Node* node) {
             if (!callee) {
                 Class* klass = find_class(node->name, node->len);
                 if (klass) {
+                    if (klass->type->kind != TY_CLASS) {
+                        error_plain("`%.*s`はクラスではありません", klass->len, klass->name);
+                    }
                     node->klass = klass;
                     Function* init = find_method(klass, "__init__", 8);
                     node->func = init;
