@@ -53,12 +53,13 @@ class int {
         neg = 0;
         if (n < 0) {
             neg = 1;
-            n = -n;
         }
         digits = [0] * 20;
         i = 0;
         while (n > 0) {
-            digits[i] = 48 + n % 10;
+            d = n % 10;
+            if (d < 0) { d = -d; }
+            digits[i] = 48 + d;
             n /= 10;
             i += 1;
         }
@@ -161,10 +162,17 @@ def read_int() -> int {
 }
 
 def read_str() -> str {
-    str = [0; 100];
+    cap = 64;
+    str = [0; cap];
     n = 0;
     char = getchar();
     while (char != -1) {
+        if (n == cap) {
+            bigger = [0; cap * 2];
+            for (i=0; i<n; i=i+1) { bigger[i] = str[i]; }
+            str = bigger;
+            cap = cap * 2;
+        }
         str[n] = char;
         char = getchar();
         n=n+1;

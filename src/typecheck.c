@@ -348,7 +348,7 @@ static Type* check_node(Node* node) {
                             Function* method = find_method(class_of(lt), "__ne__", 6);
                             result = rewrite_to_mcall(node, lt, rt, "__ne__", 6, method);
                         }
-                        if (result->kind == TY_UNKNOWN) { result = bool_type(); }
+                        result = bool_type();
                         break;
                     }
                     result = bool_type();
