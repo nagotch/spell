@@ -30,6 +30,16 @@ class str {
         return !(self == o);
     }
 
+    def __hash__(self) -> int {
+        h = 5381;
+        i = 0;
+        while (i < self.chars.len) {
+            h = h * 33 + self.chars[i];
+            i = i + 1;
+        }
+        return h;
+    }
+
     def __str__(self) -> str {
         return self;
     }
@@ -53,6 +63,7 @@ class int {
     def __ne__(self, o: int) -> bool { return self != o; }
     def __lt__(self, o: int) -> bool { return self < o; }
     def __le__(self, o: int) -> bool { return self <= o; }
+    def __hash__(self) -> int { return self; }
 
     def __iter__(self) -> RangeIter {
         return RangeIter(0, self, 1, 0);
@@ -97,6 +108,11 @@ class int {
 }
 
 class bool {
+    def __hash__(self) -> int {
+        if (self) { return 1; }
+        return 0;
+    }
+
     def __str__(self) -> str {
         if (self) { return "true"; }
         return "false";
@@ -136,6 +152,18 @@ class array<T> {
 
     def __ne__(self, o: [T]) -> bool {
         return !(self == o);
+    }
+
+    def __hash__(self) -> int {
+        // 要素のハッシュを合成する。配列は書き換え可能なので、辞書のキーに
+        // 使ったあとで中身を変えると、そのエントリは引けなくなる
+        h = 5381;
+        i = 0;
+        while (i < self.len) {
+            h = h * 33 + self[i].__hash__();
+            i = i + 1;
+        }
+        return h;
     }
 
     def __mul__(self, n: int) -> [T] {
@@ -263,6 +291,206 @@ class ArrayIter<T> {
         return v;
     }
 }
+
+class DictIter<K> {
+    ks: [K];
+    n: int;
+    i: int;
+
+    def __init__(self, ks: [K], n: int) {
+        self.ks = ks;
+        self.n = n;
+        self.i = 0;
+    }
+
+    def __has_next__(self) -> bool {
+        return self.i < self.n;
+    }
+
+    def __next__(self) -> K {
+        v = self.ks[self.i];
+        self.i = self.i + 1;
+        return v;
+    }
+}
+
+def __dict_is_prime(n: int) -> int {
+    if (n % 2 == 0) { return 0; }
+    d = 3;
+    while (d * d <= n) {
+        if (n % d == 0) { return 0; }
+        d = d + 2;
+    }
+    return 1;
+}
+
+def __dict_next_cap(cap: int) -> int {
+    // 容量は素数にする（恒等ハッシュでも、剰余で全体に散らすため）。
+    // おおよそ2倍ずつ大きくなる素数を返す
+    n = cap * 2 + 1;
+    if (n < 17) { n = 17; }
+    while (__dict_is_prime(n) == 0) { n = n + 2; }
+    return n;
+}
+
+// 辞書。キーは __hash__ と __eq__ を持つ型なら何でもよい（等しいキーは
+// 等しいハッシュを返すこと）。読み取り d[k] は、キーが無ければ構築時に
+// 渡したファクトリで作った既定値を登録してから返す（defaultdict 式）。
+// ファクトリはキーごとに呼ばれるので、既定値が共有されることはない。
+// ファクトリの中で同じ辞書を触ってはいけない（キーを入れた場合だけ、
+// 入れた側の値が返るよう __getitem__ が引き直す）。
+// 内部はオープンアドレス法のハッシュテーブルで、キーと値は挿入順の
+// 並行配列に持ち、テーブルはエントリ番号を引く。削除はないので
+// tombstone は持たない。イテレーションは開始時点のキー並びを見る。
+class Dict<K, V> {
+    factory: fn() -> V;
+    ks: [K];
+    vs: [V];
+    hs: [int];
+    slots: [int];
+    count: int;
+    cap: int;
+
+    def __init__(self, factory: fn() -> V) {
+        self.factory = factory;
+        self.ks = [];
+        self.vs = [];
+        self.hs = [];
+        self.slots = [];
+        self.count = 0;
+        self.cap = 0;
+    }
+
+    def len(self) -> int {
+        return self.count;
+    }
+
+    def has(self, key: K) -> bool {
+        if (self.cap == 0) { return 1 == 0; }
+        return self.find_slot(key, self.mixed_hash(key)) >= 0;
+    }
+
+    def keys(self) -> [K] {
+        if (self.count == 0) { return []; }
+        r = [self.ks[0]; self.count];
+        i = 0;
+        while (i < self.count) {
+            r[i] = self.ks[i];
+            i = i + 1;
+        }
+        return r;
+    }
+
+    def __getitem__(self, key: K) -> V {
+        h = self.mixed_hash(key);
+        if (self.cap > 0) {
+            s = self.find_slot(key, h);
+            if (s >= 0) { return self.vs[self.slots[s] - 1]; }
+        }
+        v = self.factory();
+        // ファクトリが同じ辞書にこのキーを入れていたら、そちらを返す
+        if (self.cap > 0) {
+            s = self.find_slot(key, h);
+            if (s >= 0) { return self.vs[self.slots[s] - 1]; }
+        }
+        self.insert_entry(key, h, v);
+        return v;
+    }
+
+    def __setitem__(self, key: K, v: V) {
+        h = self.mixed_hash(key);
+        done = 0;
+        if (self.cap > 0) {
+            s = self.find_slot(key, h);
+            if (s >= 0) {
+                // 上書きではキーの並び（挿入位置）は変えない
+                self.vs[self.slots[s] - 1] = v;
+                done = 1;
+            }
+        }
+        if (done == 0) { self.insert_entry(key, h, v); }
+    }
+
+    def __iter__(self) -> DictIter<K> {
+        return DictIter(self.ks, self.count);
+    }
+
+    def mixed_hash(self, key: K) -> int {
+        // キーのハッシュをテーブル用に64ビット全体へ混ぜる。ビット演算が
+        // 無いので、Knuth の LCG 定数による乗算と加算で代用する。定数は
+        // 32ビット即値に収まらないため、上位と下位に分けて組み立てる
+        // （6364136223846793005 = 1481765933 * 2^32 + 1284865837、
+        //   1442695040888963407 = 335903614 * 2^32 + (2^32 - 144211633)）
+        m = (1481765933 * 65536) * 65536 + 1284865837;
+        a = (335903614 * 65536) * 65536 - 144211633;
+        return key.__hash__() * m + a;
+    }
+
+    def find_slot(self, key: K, h: int) -> int {
+        // 戻り値: キーがあればそのスロット位置、なければ -(挿入位置) - 1。
+        // cap > 0 のときだけ呼ぶこと
+        i = h % self.cap;
+        while (1 == 1) {
+            s = self.slots[i];
+            if (s == 0) { return -i - 1; }
+            e = s - 1;
+            if (self.hs[e] == h && self.ks[e] == key) { return i; }
+            i = i + 1;
+            if (i == self.cap) { i = 0; }
+        }
+        return 0;
+    }
+
+    def insert_entry(self, key: K, h: int, v: V) {
+        // 負荷率が 2/3 を超えるなら先にテーブルを広げる
+        if ((self.count + 1) * 3 > self.cap * 2) { self.grow_table(); }
+        // エントリ配列の容量が一杯なら、今の cap まで広げる。埋め草は
+        // 挿入するキー・値・ハッシュ自身で、count の範囲外は読まれない
+        if (self.count == self.ks.len) {
+            nk = [key; self.cap];
+            nv = [v; self.cap];
+            nh = [h; self.cap];
+            i = 0;
+            while (i < self.count) {
+                nk[i] = self.ks[i];
+                nv[i] = self.vs[i];
+                nh[i] = self.hs[i];
+                i = i + 1;
+            }
+            self.ks = nk;
+            self.vs = nv;
+            self.hs = nh;
+        }
+        s = self.find_slot(key, h);
+        self.ks[self.count] = key;
+        self.vs[self.count] = v;
+        self.hs[self.count] = h;
+        self.slots[-s - 1] = self.count + 1;
+        self.count = self.count + 1;
+    }
+
+    def grow_table(self) {
+        ncap = __dict_next_cap(self.cap);
+        nslots = [0; ncap];
+        e = 0;
+        while (e < self.count) {
+            i = self.hs[e] % ncap;
+            while (nslots[i] != 0) {
+                i = i + 1;
+                if (i == ncap) { i = 0; }
+            }
+            nslots[i] = e + 1;
+            e = e + 1;
+        }
+        self.slots = nslots;
+        self.cap = ncap;
+    }
+}
+
+// Dict の既定値ファクトリ（型ごとのゼロ値）
+def zero_int() -> int { return 0; }
+def zero_bool() -> bool { return 1 == 0; }
+def zero_str() -> str { return ""; }
 
 def read_ints(n: int) -> [int] {
     a = [0; n];
