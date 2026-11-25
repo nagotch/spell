@@ -35,7 +35,7 @@ def t034() { x: int = 40; x = x + 2; return x; }
 def t035() { s = 0; for i in 1..5 { s = s + i; } return s; }
 def t036() { s = 0; for 4 { s = s + 3; } return s; }
 def t037() { for i in 3 { } return i; }
-def t038() { s = 0; for i in 3 { i = 99; s = s + 1; } return s; }
+def t038() { s = 0; j = 0; for i in 3 { j = 99; s = s + 1; } return s; }
 def t039() { x = 2; if (x == 1) { return 1; } elif (x == 2) { return 2; } else { return 3; } }
 def t040() { s = 0; i = 0; while (i < 10) { i++; if (i == 3) { ^; } if (i == 6) { !; } s = s + i; } return s; }
 def t041() { x = 5; x++; x++; x--; a = [10]; a[0]++; return x * 100 + a[0]; }
@@ -214,6 +214,18 @@ def t071() {
     return t * 10 + n
 }
 
+def t072() { a = [1, 2, 3]; x@a { x = x * 2; } return a[0] * 100 + a[1] * 10 + a[2]; }
+
+def t073() { a = [1, 2, 3, 4]; for x in a { x = x * 10; if (x == 20) { break; } } return a[0] * 1000 + a[1] * 100 + a[2] * 10 + a[3]; }
+
+def t074() { a = [1, 2, 3]; for x in a { x = x + 1; if (x == 3) { continue; } x = x * 10; } return a[0] * 10000 + a[1] * 100 + a[2]; }
+
+def t075() { a = [1, 2]; b = [10, 20]; for x in a { for y in b { y = y + 1; } } return a[0] * 1000 + a[1] * 100 + b[0] * 10 + b[1]; }
+
+def t076() { s = "ABCA"; for x in s { if (x != "A") { x = "."; } } if (s == "A..A") { return 1; } return 0; }
+
+def t077() { s = "abc"; n = 0; for x in s { n = n + x.len; } return n; }
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -298,6 +310,12 @@ def main() {
     mark(69); fails=fails+check(t069(), 15);
     mark(70); fails=fails+check(t070(), 16);
     mark(71); fails=fails+check(t071(), 33);
+    mark(72); fails=fails+check(t072(), 246);
+    mark(73); fails=fails+check(t073(), 12034);
+    mark(74); fails=fails+check(t074(), 200340);
+    mark(75); fails=fails+check(t075(), 1342);
+    mark(76); fails=fails+check(t076(), 1);
+    mark(77); fails=fails+check(t077(), 3);
 
     print_str("done"); putchar(10);
     return fails > 0;

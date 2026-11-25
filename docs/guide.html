@@ -221,6 +221,31 @@ put s;</pre>
 0</pre>
 </figure>
 
+<p>
+  配列と文字列の反復では、ループ変数への代入がその要素へ書き戻ります
+  （<code>break</code> / <code>continue</code> で抜ける場合も、その時点の値が書き戻ります）。
+  範囲や Dict のキーの反復では書き戻し先がないため、ループ変数への代入はエラーになります。
+  文字列を反復すると1文字ずつの文字列が得られます（添字 <code>s[i]</code> は文字コードの <code>int</code> を返します）。
+</p>
+
+<figure class="code">
+  <figcaption>例 — 書き戻し</figcaption>
+<pre>a = [1, 2, 3];
+for x in a { x = x * 2; }
+put a;
+s = "ABCA";
+for c in s {
+    if (c != "A") { c = "."; }
+}
+put s;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2 4 6
+A..A</pre>
+</figure>
+
 <h2 id="s05"><span class="no">05</span>配列と文字列</h2>
 <p>
   配列は <code>[3, 1, 4]</code> のようなリテラルと、<code>[0; 5]</code> のような「値と長さ」の形で作れます。
@@ -337,7 +362,8 @@ put r.area();
   添字や演算子も、対応するダンダーメソッドを定義すれば自作クラスに持たせられます。
   <code>a[i]</code> は <code>__getitem__</code>、<code>a[i] = v</code> は <code>__setitem__</code>、
   <code>for x in a</code> は <code>__iter__</code> の返すイテレータの <code>__has_next__</code> / <code>__next__</code>、
-  という具合です。<code>__eq__</code> を持たないクラスの <code>==</code> は同一性比較になります。
+  という具合です。イテレータに <code>__set_current__</code> を定義すると、ループ変数への代入が要素へ書き戻ります。
+  <code>__eq__</code> を持たないクラスの <code>==</code> は同一性比較になります。
 </p>
 
 <h2 id="s08"><span class="no">08</span>ジェネリクス</h2>

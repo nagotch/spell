@@ -87,6 +87,7 @@ error_tests=(
     "def id_str(s: str) -> str { return s; } def main() { f: fn(int) -> int = id_str; return 0; }|fn(int) -> int"
     "def main() { x = 5; return x(1); }|型の値は呼び出せません"
     "def twice(x: int) -> int { return x * 2; } def main() { twice += 1; return 0; }|fn(int) -> int\`型と"
+    "def main() { for i in 0..3 { i = 1; } return 0; }|書き戻されないため、代入できません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -227,6 +228,7 @@ one_io_test "def main() { yn 1 < 2; yn 1 > 2; return 0; }" "" "Yes\nNo\n"
 one_io_test "def main() { a- = in[3]; print(a); return 0; }" "1 2 3\n" "0 1 2\n"
 one_io_test "def main() { print_int(0 - 10); putchar(10); print_int(0 - 100); putchar(10); print_int(0 - 1); putchar(10); return 0; }" "" "-10\n-100\n-1\n"
 one_io_test "def main() { x = in; print_int(x); putchar(10); return 0; }" "-9223372036854775808\n" "-9223372036854775808\n"
+one_io_test "def main() { s = in_str; for x in s { if (x != \"A\") { x = \".\"; } } print(s); return 0; }" "ABCA\n" "A..A\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
