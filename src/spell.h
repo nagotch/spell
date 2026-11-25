@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <setjmp.h>
 
 typedef struct Field Field;
 typedef struct Class Class;
@@ -214,6 +215,23 @@ void error_at_v(long start, long end, char* fmt, va_list ap);
 void error_plain(char* fmt, ...);
 void error_plain_v(char* fmt, va_list ap);
 void error_internal(char* fmt, ...);
+
+// エラーの回収（LSP サーバー用）。error_capture_begin が返す jmp_buf へ
+// setjmp しておくと、キャプチャ有効中のエラーは表示も exit もせず、
+// 内容を下の変数へ記録して longjmp で戻る。通常モードでは無効で、
+// 従来どおり表示して exit(1) する
+jmp_buf* error_capture_begin(void);
+void error_capture_end(void);
+extern char error_captured_message[4096];
+extern long error_captured_start;
+extern long error_captured_end;
+extern bool error_captured_has_pos;
+extern char* error_captured_src;
+
+// コンパイルのパイプライン（main.c）。LSP サーバーからも使う
+Function* load_program(char* path);
+Function* load_program_text(char* text, char* name);
+void spell_prelude_path(char* buf, long size);
 
 Token* tokenize(char* s);
 Function* program();
