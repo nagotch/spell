@@ -677,6 +677,11 @@ void codegen(Function* prog) {
             tail = tail->next;
             printf("  pop rax\n");
         }
+        if (!prog->klass && prog->len == 4 && memcmp(prog->name, "main", 4) == 0) {
+            // C の main と同じく、末尾まで落ちたら 0 を返す。return 文は
+            // 独自のエピローグを持つので、ここは到達しない経路には影響しない
+            printf("  mov rax, 0\n");
+        }
         printf("  mov rsp, rbp\n");
         printf("  pop rbp\n");
         printf("  ret\n");

@@ -12,6 +12,9 @@ tests=(
     "class P { x: int; def one(self) -> int { return 1; } } def main() { return 42; }|42"
     "class B<T> { n: int; def __init__(self) { self.n = 7; } def get(self) -> int { return self.n; } } def main() { b: B<str> = B(); return b.get(); }|7"
     "class G { a: [int]; def __init__(self) { self.a = []; } def get(self) -> int { x = self.a.len; return x; } } def main() { g = G(); return g.get(); }|0"
+    "def main() { print(42); }|0"
+    "def main() { putchar(65); }|0"
+    "def main() -> int { return 3; }|3"
 )
 
 error_tests=(
