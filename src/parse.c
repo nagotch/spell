@@ -404,13 +404,17 @@ static void expect_stmt_end(const char* subject) {
 
 static Node* stmt() {
     Token* start = token;
-    // 空文（余分な `;`）は読み飛ばす。読み飛ばした直後がブロックの
-    // 閉じ `}` なら空文として扱う（`}` は呼び出し側のループが消費
-    // する）。それ以外の止まり方は通常の解析に任せてエラーにする
-    // （リスト文脈で消費せずに戻ると無限ループになるため）
+    // 空文（余分な `;`）は読み飛ばす。1つ以上読み飛ばした直後が
+    // ブロックの閉じ `}` なら空文として扱う（`}` は呼び出し側の
+    // ループが消費する）。それ以外の止まり方は通常の解析に任せて
+    // エラーにする（リスト文脈で消費せずに戻ると無限ループに
+    // なるため。また `;` が無いのに文が無い場合まで許すと、
+    // 以前はエラーだった `if (1) }` のような形を受け付けてしまう）
+    bool skipped_semi = false;
     while (consume(";")) {
+        skipped_semi = true;
     }
-    if (!is_top_level
+    if (skipped_semi && !is_top_level
             && token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '}') {
         Node* node = create_node(ND_BLOCK);
         node->tok = start;
@@ -531,12 +535,15 @@ static Node* stmt() {
 // それらを消費できる呼び出し側（stmt_if 等）がいる場所だけにする
 static Node* stmt_branch() {
     Token* t = token;
+    bool skipped_semi = false;
     while (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == ';') {
         t = t->next;
+        skipped_semi = true;
     }
-    if (t->kind == TK_EOF
-            || (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == '}')
-            || (t->kind == TK_KEYWORD && (t->keyword == KW_ELSE || t->keyword == KW_ELIF))) {
+    if (skipped_semi
+            && (t->kind == TK_EOF
+                || (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == '}')
+                || (t->kind == TK_KEYWORD && (t->keyword == KW_ELSE || t->keyword == KW_ELIF)))) {
         token = t;
         Node* node = create_node(ND_BLOCK);
         node->tok = t;
