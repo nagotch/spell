@@ -499,4 +499,10 @@ void typecheck(Function* prog) {
             check_node(stmt);
         }
     }
+
+    for (Function* fn = prog; fn; fn = fn->next) {
+        if (fn->klass && fn->len == 8 && !memcmp(fn->name, "__init__", 8)) {
+            check_init(fn);
+        }
+    }
 }
