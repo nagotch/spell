@@ -20,6 +20,7 @@ typedef enum {
     KW_CONTINUE,
     KW_DEF,
     KW_CLASS,
+    KW_IN,
 } Keyword;
 
 typedef enum {

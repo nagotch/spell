@@ -247,19 +247,14 @@ static Node* stmt_while() {
 static Node* stmt_for() {
     Node* node;
     node = create_node(ND_FOR);
-    expect("(");
-    if (!consume(";")) {
-        node->init = expr();
-        expect(";");
+    Token* var = consume_ident();
+    if (!consume_keyword(KW_IN)) {
+        error_at(token_start(token), token_end(token), "`in`が必要ですが、%sが見つかりました", token_text(token));
     }
-    if (!consume(";")) {
-        node->cond = expr();
-        expect(";");
-    }
-    if (!consume(")")) {
-        node->inc = expr();
-        expect(")");
-    }
+    node->init = expr();
+    register_any();
+    node->offset = locals->offset;
+    node->left_child = create_ident_node(var);
     node->then = stmt();
     return node;
 }
