@@ -131,6 +131,35 @@ static Type* adopt_type(Type* anno, Type* rhs) {
     return rhs;
 }
 
+static const char* arith_dunder(BinOp op) {
+    switch (op) {
+        case OP_ADD: return "__add__";
+        case OP_SUB: return "__sub__";
+        case OP_MUL: return "__mul__";
+        case OP_DIV: return "__div__";
+        case OP_MOD: return "__mod__";
+        default: return NULL;
+    }
+}
+
+static const char* op_text(BinOp op) {
+    switch (op) {
+        case OP_ADD: return "+";
+        case OP_SUB: return "-";
+        case OP_MUL: return "*";
+        case OP_DIV: return "/";
+        case OP_MOD: return "%";
+        default: return "?";
+    }
+}
+
+static bool scalar_compatible(Type* a, Type* b) {
+    if (a->kind == b->kind) {
+        return true;
+    }
+    return (a->kind == TY_INT || a->kind == TY_CHAR) && (b->kind == TY_INT || b->kind == TY_CHAR);
+}
+
 static Type* check_node(Node* node) {
     if (!node) {
         return &ty_unknown;
@@ -146,9 +175,46 @@ static Type* check_node(Node* node) {
                 result = &ty_unknown;
             }
             break;
-        case ND_BINOP:
-            check_node(node->left_child);
-            check_node(node->right_child);
+        case ND_BINOP: {
+            Type* lt = check_node(node->left_child);
+            Type* rt = check_node(node->right_child);
+            const char* dunder = arith_dunder(node->op.binop);
+            if (dunder) {
+                if (lt->kind == TY_CLASS) {
+                    Function* method = find_method(lt->klass, (char*)dunder, 7);
+                    if (!method) {
+                        error_plain("クラス`%.*s`に演算子`%s`は定義されていません", lt->klass->len, lt->klass->name, op_text(node->op.binop));
+                    }
+                    if (method->nparams != 2) {
+                        error_plain("クラス`%.*s`のメソッド`%.*s`の引数は1個ですが、%d個が定義されています", lt->klass->len, lt->klass->name, dunder, method->nparams - 1);
+                    }
+                    if (method->param_types[1] && rt->kind != TY_UNKNOWN && !type_equals(method->param_types[1], rt)) {
+                        char buf[256];
+                        strcpy(buf, type_text(method->param_types[1]));
+                        error_plain("クラス`%.*s`のメソッド`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", lt->klass->len, lt->klass->name, dunder, buf, type_text(rt));
+                    }
+                    node->kind = ND_MCALL;
+                    node->name = (char*)dunder;
+                    node->len = 7;
+                    node->func = method;
+                    node->klass = lt->klass;
+                    node->args = node->right_child;
+                    node->args->next = NULL;
+                    result = method->return_type ? method->return_type : &ty_unknown;
+                    break;
+                }
+                if (lt->kind == TY_ARRAY || rt->kind == TY_ARRAY) {
+                    Type* at = lt->kind == TY_ARRAY ? lt : rt;
+                    error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                }
+                if (lt->kind != TY_UNKNOWN && rt->kind != TY_UNKNOWN && !scalar_compatible(lt, rt)) {
+                    char buf[256];
+                    strcpy(buf, type_text(lt));
+                    error_plain("`%s`型と`%s`型の値に演算子`%s`は使えません", buf, type_text(rt), op_text(node->op.binop));
+                }
+                result = &ty_int;
+                break;
+            }
             if (node->op.binop == OP_EQ || node->op.binop == OP_NE
              || node->op.binop == OP_LT || node->op.binop == OP_LE
              || node->op.binop == OP_OR || node->op.binop == OP_AND) {
@@ -157,6 +223,7 @@ static Type* check_node(Node* node) {
                 result = &ty_int;
             }
             break;
+        }
         case ND_ASSIGN:
             ;
             Type* rhs = check_node(node->right_child);
