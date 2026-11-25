@@ -2,7 +2,12 @@ class str {
     chars: [int];
 
     def __init__(self, chars: [int]) {
-        self.chars = chars;
+        self.chars = [0] * chars.len;
+        i = 0;
+        while (i < chars.len) {
+            self.char[i] = chars[i];
+            i += 1;
+        }
     }
 
     def len(self) -> int {
