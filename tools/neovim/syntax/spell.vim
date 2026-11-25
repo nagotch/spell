@@ -12,9 +12,12 @@ syntax match spellComment "//.*$" contains=spellTodo
 syntax region spellComment start="/\*" end="\*/" contains=spellTodo
 
 " キーワード（tokenize.c の keywords[] と一致させる）
-syntax keyword spellKeyword return if else elif while for break continue def class in fn
+" 制御系は C の cStatement、宣言系は C++ の cppStructure に寄せる
+syntax keyword spellKeyword return if else elif while for break continue in fn
 syntax keyword spellKeyword in_str in_line put yn
-syntax keyword spellBuiltin self true false
+syntax keyword spellDecl def class
+syntax keyword spellBuiltin self
+syntax keyword spellConstant true false
 
 " 関数定義・呼び出し
 syntax match spellFuncDef "def\s\+\zs\h\w*"
@@ -39,8 +42,10 @@ syntax match spellOperator "->\|\.\.=\|\.\.\|<<\|>>\|++\|--\|&&\|||\|==\|!=\|<=\
 
 highlight default link spellComment Comment
 highlight default link spellTodo Todo
-highlight default link spellKeyword Keyword
-highlight default link spellBuiltin Special
+highlight default link spellKeyword Statement
+highlight default link spellDecl Structure
+highlight default link spellBuiltin Statement
+highlight default link spellConstant Constant
 highlight default link spellType Type
 highlight default link spellNumber Number
 highlight default link spellString String
