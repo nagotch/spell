@@ -1,34 +1,39 @@
-/* spell ドキュメント — 活版印刷のマニュアルを意識した、紙と墨のデザイン */
+/* spell ドキュメント
+   設計の決定: 白地に墨色の文字、罫線は灰色、差し色は朱を1色だけ。
+   書体は見出しに明朝、本文にゴシック、コードに等幅。
+   強い要素は表紙のワードマーク1つに絞り、残りはすべて背景に退く。 */
 
 :root {
-  --paper: #f4eee0;
-  --sheet: #fdfaf0;
-  --code-bg: #faf5e7;
-  --ink: #221c11;
-  --ink-2: #6d6350;
+  --paper: #ffffff;
+  --code-bg: #f6f6f4;
+  --ink: #1a1a1a;
+  --ink-2: #5f5f5f;
   --accent: #b03a1e;
-  --rule: #d8cdb4;
-  --rule-dark: #221c11;
+  --rule: #e4e4e1;
+  --rule-dark: #1a1a1a;
 }
 
 * { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
 
 body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
   font-family: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-  font-size: 16px;
-  line-height: 1.95;
+  font-size: 17px;
+  line-height: 1.9;
   letter-spacing: 0.015em;
 }
 
 .wrap {
-  max-width: 860px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 0 24px 40px;
+  padding: 0 32px 40px;
 }
 
 /* ---------- マストヘッド ---------- */
@@ -38,14 +43,14 @@ body {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 8px 32px;
-  padding: 22px 0 14px;
+  padding: 26px 0 16px;
   border-bottom: 3px double var(--rule-dark);
 }
 
 .brand {
   font-family: "Shippori Mincho B1", "Hiragino Mincho ProN", serif;
   font-weight: 800;
-  font-size: 26px;
+  font-size: 28px;
   letter-spacing: 0.14em;
   color: var(--ink);
   text-decoration: none;
@@ -57,8 +62,8 @@ body {
   margin-left: auto;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 22px;
-  font-size: 13.5px;
+  gap: 4px 24px;
+  font-size: 14.5px;
   letter-spacing: 0.06em;
 }
 
@@ -75,56 +80,118 @@ body {
   border-bottom: 1px solid var(--accent);
 }
 
+/* ---------- レイアウト（広い画面ではサイドバー併置） ---------- */
+
+.layout { display: block; }
+
+.side { margin-top: 40px; }
+
+.side-h {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--ink-2);
+}
+
+.side-h:not(:first-child) { margin-top: 34px; }
+
+.side-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.side-list li { margin: 0; }
+
+.side-list a {
+  display: block;
+  padding: 5px 0 5px 14px;
+  border-left: 2px solid var(--rule);
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.side-list a:hover { color: var(--accent); }
+
+.side-list a.here {
+  color: var(--ink);
+  font-weight: 700;
+  border-left-color: var(--accent);
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    display: grid;
+    grid-template-columns: 228px minmax(0, 46em);
+    gap: 72px;
+    justify-content: center;
+  }
+
+  .side {
+    position: sticky;
+    top: 36px;
+    align-self: start;
+    max-height: calc(100vh - 72px);
+    overflow-y: auto;
+    margin-top: 64px;
+    padding-bottom: 24px;
+  }
+}
+
 /* ---------- 見出し ---------- */
 
 .eyebrow {
-  margin: 56px 0 10px;
-  font-size: 12.5px;
+  margin: 64px 0 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.34em;
   color: var(--accent);
 }
 
 h1.title {
-  margin: 0 0 18px;
+  margin: 0 0 20px;
   font-family: "Shippori Mincho B1", "Hiragino Mincho ProN", serif;
   font-weight: 800;
-  font-size: 64px;
+  font-size: 76px;
   line-height: 1.15;
   letter-spacing: 0.06em;
 }
 
 h1.page {
-  margin: 52px 0 14px;
+  margin: 60px 0 16px;
   font-family: "Shippori Mincho B1", "Hiragino Mincho ProN", serif;
   font-weight: 800;
-  font-size: 40px;
+  font-size: 44px;
   line-height: 1.3;
   letter-spacing: 0.04em;
 }
 
 .lede {
   margin: 0 0 8px;
-  font-size: 17.5px;
-  line-height: 2.05;
+  font-size: 19px;
+  line-height: 2.0;
   max-width: 38em;
 }
 
 h2 {
-  margin: 64px 0 18px;
-  padding-top: 20px;
+  margin: 72px 0 20px;
+  padding-top: 22px;
   border-top: 2px solid var(--rule-dark);
   font-family: "Shippori Mincho B1", "Hiragino Mincho ProN", serif;
   font-weight: 800;
-  font-size: 26px;
+  font-size: 29px;
   line-height: 1.5;
   letter-spacing: 0.03em;
+  scroll-margin-top: 28px;
 }
 
 h2 .no {
   font-family: "IBM Plex Mono", monospace;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--accent);
   letter-spacing: 0.1em;
   margin-right: 14px;
@@ -132,27 +199,27 @@ h2 .no {
 }
 
 h3 {
-  margin: 38px 0 10px;
-  font-size: 17px;
+  margin: 40px 0 10px;
+  font-size: 18.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
-p { margin: 0 0 16px; }
+p { margin: 0 0 18px; }
 
 a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 3px; }
 a:hover { color: var(--accent); }
 
 strong { font-weight: 700; }
 
-ul, ol { margin: 0 0 16px; padding-left: 1.4em; }
-li { margin-bottom: 6px; }
+ul, ol { margin: 0 0 18px; padding-left: 1.4em; }
+li { margin-bottom: 7px; }
 li::marker { color: var(--accent); }
 
 code {
   font-family: "IBM Plex Mono", "Menlo", monospace;
   font-size: 0.88em;
-  background: #ece4cd;
+  background: #f0f0ee;
   padding: 1px 5px;
 }
 
@@ -161,19 +228,18 @@ code {
 .spec {
   display: flex;
   flex-wrap: wrap;
-  gap: 0;
-  margin: 36px 0 8px;
+  margin: 40px 0 8px;
   border-top: 1px solid var(--rule-dark);
   border-bottom: 1px solid var(--rule-dark);
 }
 
 .spec div {
-  padding: 12px 28px 12px 0;
-  margin-right: 28px;
+  padding: 14px 30px 14px 0;
+  margin-right: 30px;
 }
 
 .spec dt {
-  font-size: 11px;
+  font-size: 11.5px;
   letter-spacing: 0.28em;
   color: var(--ink-2);
   margin-bottom: 2px;
@@ -183,28 +249,28 @@ code {
   margin: 0;
   font-family: "Shippori Mincho B1", serif;
   font-weight: 600;
-  font-size: 16.5px;
+  font-size: 17.5px;
 }
 
 /* ---------- コードと出力 ---------- */
 
 figure.code, figure.out {
-  margin: 26px 0;
+  margin: 28px 0;
   border: 1px solid var(--rule);
   background: var(--code-bg);
 }
 
 figure.code figcaption, figure.out figcaption {
-  padding: 5px 14px;
+  padding: 6px 14px;
   border-bottom: 1px solid var(--rule);
   font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
+  font-size: 11.5px;
   letter-spacing: 0.22em;
   color: var(--ink-2);
 }
 
 figure.out {
-  background: var(--sheet);
+  background: var(--paper);
   border-left: 3px solid var(--accent);
 }
 
@@ -212,22 +278,22 @@ figure.out figcaption { color: var(--accent); }
 
 figure.code pre, figure.out pre {
   margin: 0;
-  padding: 15px 18px;
+  padding: 16px 18px;
   overflow-x: auto;
   font-family: "IBM Plex Mono", "Menlo", monospace;
-  font-size: 13.5px;
+  font-size: 14.5px;
   line-height: 1.8;
   letter-spacing: 0;
 }
 
 pre.plain {
-  margin: 26px 0;
-  padding: 15px 18px;
+  margin: 28px 0;
+  padding: 16px 18px;
   overflow-x: auto;
   border: 1px solid var(--rule);
   background: var(--code-bg);
   font-family: "IBM Plex Mono", "Menlo", monospace;
-  font-size: 13.5px;
+  font-size: 14.5px;
   line-height: 1.8;
   letter-spacing: 0;
 }
@@ -237,14 +303,14 @@ pre.plain {
 table {
   width: 100%;
   border-collapse: collapse;
-  margin: 22px 0 30px;
-  font-size: 14.5px;
+  margin: 24px 0 32px;
+  font-size: 15.5px;
   line-height: 1.75;
 }
 
 th {
   text-align: left;
-  font-size: 12px;
+  font-size: 12.5px;
   letter-spacing: 0.18em;
   color: var(--ink-2);
   font-weight: 700;
@@ -253,7 +319,7 @@ th {
 }
 
 td {
-  padding: 8px 14px 8px 0;
+  padding: 9px 14px 9px 0;
   border-bottom: 1px solid var(--rule);
   vertical-align: top;
 }
@@ -263,7 +329,7 @@ td code { white-space: nowrap; }
 /* ---------- 目次（表紙） ---------- */
 
 .toc {
-  margin: 30px 0 0;
+  margin: 32px 0 0;
   border-top: 1px solid var(--rule-dark);
 }
 
@@ -271,7 +337,7 @@ td code { white-space: nowrap; }
   display: flex;
   gap: 20px;
   align-items: baseline;
-  padding: 15px 2px;
+  padding: 16px 2px;
   border-bottom: 1px solid var(--rule);
   text-decoration: none;
 }
@@ -280,7 +346,7 @@ td code { white-space: nowrap; }
 
 .toc .tno {
   font-family: "IBM Plex Mono", monospace;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--accent);
   letter-spacing: 0.1em;
   flex: none;
@@ -289,12 +355,12 @@ td code { white-space: nowrap; }
 .toc .tt {
   font-family: "Shippori Mincho B1", serif;
   font-weight: 700;
-  font-size: 18px;
+  font-size: 19px;
   flex: none;
 }
 
 .toc .td {
-  font-size: 13.5px;
+  font-size: 14.5px;
   color: var(--ink-2);
   line-height: 1.7;
 }
@@ -302,16 +368,16 @@ td code { white-space: nowrap; }
 /* ---------- 脚注・コロフォン ---------- */
 
 .note {
-  font-size: 13.5px;
+  font-size: 14.5px;
   color: var(--ink-2);
   line-height: 1.85;
 }
 
 footer {
-  margin-top: 88px;
+  margin-top: 96px;
   padding-top: 16px;
   border-top: 3px double var(--rule-dark);
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--ink-2);
   line-height: 1.9;
   padding-bottom: 48px;
@@ -322,13 +388,15 @@ footer .fname {
   font-weight: 800;
   letter-spacing: 0.14em;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 14.5px;
 }
 
 @media (max-width: 640px) {
-  h1.title { font-size: 44px; }
-  h1.page { font-size: 30px; }
-  h2 { font-size: 22px; }
+  .wrap { padding: 0 20px 32px; }
+  body { font-size: 16.5px; }
+  h1.title { font-size: 46px; }
+  h1.page { font-size: 32px; }
+  h2 { font-size: 24px; }
   .toc a { flex-wrap: wrap; gap: 2px 14px; }
   .mast nav { margin-left: 0; }
 }

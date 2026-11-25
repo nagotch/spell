@@ -24,12 +24,40 @@
   </nav>
 </header>
 
+<div class="layout">
+<aside class="side">
+  <p class="side-h">このページ</p>
+  <ul class="side-list">
+    <li><a href="#s01">文と出力</a></li>
+    <li><a href="#s02">変数と型</a></li>
+    <li><a href="#s03">数と演算</a></li>
+    <li><a href="#s04">分岐とループ</a></li>
+    <li><a href="#s05">配列と文字列</a></li>
+    <li><a href="#s06">関数</a></li>
+    <li><a href="#s07">クラス</a></li>
+    <li><a href="#s08">ジェネリクス</a></li>
+    <li><a href="#s09">関数値とクロージャ</a></li>
+    <li><a href="#s10">辞書</a></li>
+    <li><a href="#s11">入力</a></li>
+    <li><a href="#s12">エラー</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="index.html">概要</a></li>
+    <li><a href="guide.html" class="here">言語ツアー</a></li>
+    <li><a href="reference.html">リファレンス</a></li>
+    <li><a href="editor.html">エディタ連携</a></li>
+    <li><a href="https://github.com/nagotch/spell/blob/main/docs/language-design.md">設計メモ</a></li>
+  </ul>
+</aside>
+<main class="main">
+
 <h1 class="page">言語ツアー</h1>
 <p class="lede">
   文法を基礎から一通りたどります。出てくる例はすべて、現在のコンパイラで実行して出力を確かめたものです。
 </p>
 
-<h2><span class="no">01</span>文と出力</h2>
+<h2 id="s01"><span class="no">01</span>文と出力</h2>
 <p>
   プログラムはトップレベルに文を並べて書きます。文は <code>;</code> で終えます（ブロック <code>{ }</code> の直後は要りません）。
   出力の基本は <code>put</code> で、複数の値を空白区切りで1行に出します。
@@ -55,7 +83,7 @@ moji
   配列は要素を空白区切りで並べた形になります。
 </p>
 
-<h2><span class="no">02</span>変数と型</h2>
+<h2 id="s02"><span class="no">02</span>変数と型</h2>
 <p>
   変数は代入で生まれます。型は初期値から推論されるのが基本で、必要なら <code>x: int = 式</code> のように
   注釈を付けられます。注釈はキャストではなく制約で、合わない値を入れようとすると型エラーになります。
@@ -76,7 +104,7 @@ put a, b;</pre>
 <pre>2 1</pre>
 </figure>
 
-<h2><span class="no">03</span>数と演算</h2>
+<h2 id="s03"><span class="no">03</span>数と演算</h2>
 <p>
   四則演算と剰余があり、除算と剰余は Python と同じ床除算です
   （<code>a == (a / b) * b + a % b</code> が常に成り立ちます）。
@@ -97,7 +125,7 @@ put 2 + 3 * 4, (2 + 3) * 4;</pre>
 14 20</pre>
 </figure>
 
-<h2><span class="no">04</span>分岐とループ</h2>
+<h2 id="s04"><span class="no">04</span>分岐とループ</h2>
 <p>
   <code>if</code> / <code>elif</code> / <code>else</code> と <code>while</code> があります。
   <code>for</code> は反復対象を <code>in</code> の後に書く形で、整数なら「0 から その数−1」、
@@ -192,7 +220,7 @@ put s;</pre>
 0</pre>
 </figure>
 
-<h2><span class="no">05</span>配列と文字列</h2>
+<h2 id="s05"><span class="no">05</span>配列と文字列</h2>
 <p>
   配列は <code>[3, 1, 4]</code> のようなリテラルと、<code>[0; 5]</code> のような「値と長さ」の形で作れます。
   長さは <code>a.len</code>、逆順のコピーは <code>a.rev</code> です。<code>+</code> は連結、<code>*</code> は繰り返し、
@@ -250,7 +278,7 @@ put "A"[0];</pre>
 65</pre>
 </figure>
 
-<h2><span class="no">06</span>関数</h2>
+<h2 id="s06"><span class="no">06</span>関数</h2>
 <p>
   関数は <code>def</code> で定義します。引数と戻り値の型注釈は任意ですが、書けば検査されます。
   関数名は値として扱え、引数は6個までです。
@@ -270,7 +298,7 @@ put fib(20);</pre>
 <pre>6765</pre>
 </figure>
 
-<h2><span class="no">07</span>クラス</h2>
+<h2 id="s07"><span class="no">07</span>クラス</h2>
 <p>
   クラスは、フィールドを本体で型つきで宣言し、メソッドを <code>def</code> で書く形です。
   継承はありません。<code>self</code> は明示します。コンストラクタは <code>__init__</code> で、
@@ -311,7 +339,7 @@ put r.area();
   という具合です。<code>__eq__</code> を持たないクラスの <code>==</code> は同一性比較になります。
 </p>
 
-<h2><span class="no">08</span>ジェネリクス</h2>
+<h2 id="s08"><span class="no">08</span>ジェネリクス</h2>
 <p>
   クラスには型パラメータを最大4つまで付けられます。生成のときの型引数は、
   コンストラクタの引数と、束縛先の注釈から推論されます。実装は単相化で、
@@ -337,7 +365,7 @@ s: Box&lt;str&gt; = Box("spell");
 spell</pre>
 </figure>
 
-<h2><span class="no">09</span>関数値とクロージャ</h2>
+<h2 id="s09"><span class="no">09</span>関数値とクロージャ</h2>
 <p>
   関数は第一級の値です。型は <code>fn(int) -&gt; int</code> のように書きます。
   無名関数は <code>fn(x: int) -&gt; int { }</code> の形と、式だけの <code>x -&gt; x * x</code> という矢印形があります。
@@ -359,7 +387,7 @@ put add(5);</pre>
 15</pre>
 </figure>
 
-<h2><span class="no">10</span>辞書</h2>
+<h2 id="s10"><span class="no">10</span>辞書</h2>
 <p>
   <code>Dict&lt;K, V&gt;</code> は prelude のクラスです。キーは <code>__hash__</code> と <code>__eq__</code> を持つ型なら何でも使えます。
   読み取り <code>d[k]</code> は、キーが無ければ「構築時に渡したファクトリが作る既定値」を登録してから返す、
@@ -393,7 +421,7 @@ false</pre>
   生成には型の手がかり（注釈など）が要ります。辞書自体に文字列化は無いので、そのまま <code>put</code> には渡せません。
 </p>
 
-<h2><span class="no">11</span>入力</h2>
+<h2 id="s11"><span class="no">11</span>入力</h2>
 <p>
   標準入力は代入の右辺で <code>in</code> と書きます。<code>in[n]</code> は整数を n 個読んで配列にし、
   <code>in[h][w]</code> は h 行 × w 個の二次元配列にします。文字列は <code>in_str</code>（空白区切りのトークン）、
@@ -437,7 +465,7 @@ put a;</pre>
   Yes / No の出力には <code>yn</code> があります。<code>yn 条件;</code> で、真なら <code>Yes</code>、偽なら <code>No</code> を出します。
 </p>
 
-<h2><span class="no">12</span>エラー</h2>
+<h2 id="s12"><span class="no">12</span>エラー</h2>
 <p>
   コンパイルエラーは日本語で、位置と理由を示します。型の不一致、未定義の名前、構文の誤りが対象で、
   最初のエラーで処理が止まります。下の例は、<code>bool</code> を <code>int</code> の変数へ入れようとしたときの実際の表示です。
@@ -458,6 +486,9 @@ put a;</pre>
 <p class="note">
   言語サーバー <code>spell-lsp</code> を使えば、この診断はエディタの中にもそのまま出ます（<a href="editor.html">エディタ連携</a>）。
 </p>
+
+</main>
+</div>
 
 <footer>
   <span class="fname">spell.</span><br>

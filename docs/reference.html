@@ -24,6 +24,28 @@
   </nav>
 </header>
 
+<div class="layout">
+<aside class="side">
+  <p class="side-h">このページ</p>
+  <ul class="side-list">
+    <li><a href="#s01">演算子</a></li>
+    <li><a href="#s02">糖衣構文と正規形</a></li>
+    <li><a href="#s03">組み込み型とメソッド</a></li>
+    <li><a href="#s04">入出力の形</a></li>
+    <li><a href="#s05">キーワード</a></li>
+    <li><a href="#s06">型注釈を書ける場所</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="index.html">概要</a></li>
+    <li><a href="guide.html">言語ツアー</a></li>
+    <li><a href="reference.html" class="here">リファレンス</a></li>
+    <li><a href="editor.html">エディタ連携</a></li>
+    <li><a href="https://github.com/nagotch/spell/blob/main/docs/language-design.md">設計メモ</a></li>
+  </ul>
+</aside>
+<main class="main">
+
 <h1 class="page">リファレンス</h1>
 <p class="lede">
   演算子と糖衣構文、prelude が用意する型とメソッド、入出力の形の一覧です。
@@ -31,7 +53,7 @@
   <a href="https://github.com/nagotch/spell/blob/main/src/prelude.sp">prelude.sp</a> が正本です。
 </p>
 
-<h2><span class="no">01</span>演算子</h2>
+<h2 id="s01"><span class="no">01</span>演算子</h2>
 
 <table>
   <tr><th>分類</th><th>演算子</th><th>備考</th></tr>
@@ -45,7 +67,7 @@
   <tr><td>関数値</td><td><code>x -&gt; 式</code>、<code>fn(...) { }</code></td><td>矢印形は式1つの無名関数。<code>fn</code> 形は本体がブロック</td></tr>
 </table>
 
-<h2><span class="no">02</span>糖衣構文と正規形</h2>
+<h2 id="s02"><span class="no">02</span>糖衣構文と正規形</h2>
 <p>
   記号形はすべて、通常の構文への書き換えとして定義されています。
 </p>
@@ -64,7 +86,7 @@
   <tr><td><code>x.rev</code></td><td>範囲・配列・文字列の逆順（コピーを返す）</td></tr>
 </table>
 
-<h2><span class="no">03</span>組み込み型とメソッド</h2>
+<h2 id="s03"><span class="no">03</span>組み込み型とメソッド</h2>
 <p>
   起動時に読み込まれる prelude が定義する型です。メソッドのうち引数を取らないものは、
   呼び出しの括弧を省略できます（例: <code>a.len</code>）。
@@ -86,7 +108,7 @@
   自作クラスが <code>__hash__</code> と <code>__eq__</code> を持てば、辞書のキーにも使えます。
 </p>
 
-<h2><span class="no">04</span>入出力の形</h2>
+<h2 id="s04"><span class="no">04</span>入出力の形</h2>
 
 <table>
   <tr><th>形</th><th>意味</th></tr>
@@ -101,7 +123,7 @@
   <tr><td><code>yn 条件;</code></td><td>真なら <code>Yes</code>、偽なら <code>No</code> を出す</td></tr>
 </table>
 
-<h2><span class="no">05</span>キーワード</h2>
+<h2 id="s05"><span class="no">05</span>キーワード</h2>
 <p>
   <code>def</code>、<code>class</code>、<code>return</code>、<code>if</code>、<code>elif</code>、<code>else</code>、
   <code>while</code>、<code>for</code>、<code>in</code>、<code>break</code>、<code>continue</code>、<code>fn</code>、
@@ -109,7 +131,7 @@
   コメントは <code>//</code> と <code>/* */</code> が使えます。
 </p>
 
-<h2><span class="no">06</span>型注釈を書ける場所</h2>
+<h2 id="s06"><span class="no">06</span>型注釈を書ける場所</h2>
 <ul>
   <li>ローカル変数の初回束縛: <code>x: int = 式</code></li>
   <li>関数の引数と戻り値: <code>def f(x: int) -&gt; int { }</code></li>
@@ -120,6 +142,9 @@
   型パラメータはクラス定義側で明示し（最大4つ）、生成側では推論されます。
   どちらからも決まらない場合は、注釈を求めるエラーになります。
 </p>
+
+</main>
+</div>
 
 <footer>
   <span class="fname">spell.</span><br>
