@@ -178,7 +178,7 @@ static const char* cmp_dunder(BinOp op) {
 }
 
 static Type* rewrite_to_mcall(Node* node, Type* lt, Type* rt, const char* name, int len, Function* method) {
-    Class* klass = lt->klass;
+    Class* klass = class_of(lt);
     if (method->nparams != 2) {
         error_plain("クラス`%.*s`のメソッド`%.*s`の引数は1個ですが、%d個が定義されています", klass->len, klass->name, name, method->nparams - 1);
     }
@@ -272,23 +272,34 @@ static Type* check_node(Node* node) {
                     break;
                 }
                 if (lt->kind == TY_ARRAY || rt->kind == TY_ARRAY) {
-                    Type* at = lt->kind == TY_ARRAY ? lt : rt;
                     Type* ot = lt->kind == TY_ARRAY ? rt : lt;
+                    if (lt->kind != TY_ARRAY) {
+                        Node* tn = node->left_child;
+                        node->left_child = node->right_child;
+                        node->right_child = tn;
+                        Type* tt = lt;
+                        lt = rt;
+                        rt = tt;
+                    }
                     if (node->op.binop == OP_ADD) {
                         if (ot->kind != TY_ARRAY && ot->kind != TY_UNKNOWN) {
-                            error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                            error_plain("`%s`型の値に演算子`%s`は使えません", type_text(lt), op_text(node->op.binop));
                         }
-                        result = rewrite_to_funcall(node, "__array_add", 11, at, false);
+                        Function* method = find_method(class_of(lt), "__add__", 7);
+                        result = rewrite_to_mcall(node, lt, rt, "__add__", 7, method);
+                        if (result->kind == TY_UNKNOWN) { result = lt; }
                         break;
                     }
                     if (node->op.binop == OP_MUL) {
                         if (ot->kind != TY_INT && ot->kind != TY_UNKNOWN) {
-                            error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                            error_plain("`%s`型の値に演算子`%s`は使えません", type_text(lt), op_text(node->op.binop));
                         }
-                        result = rewrite_to_funcall(node, "__array_mul", 11, at, lt->kind != TY_ARRAY);
+                        Function* method = find_method(class_of(lt), "__mul__", 7);
+                        result = rewrite_to_mcall(node, lt, rt, "__mul__", 7, method);
+                        if (result->kind == TY_UNKNOWN) { result = lt; }
                         break;
                     }
-                    error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                    error_plain("`%s`型の値に演算子`%s`は使えません", type_text(lt), op_text(node->op.binop));
                 }
                 if (lt->kind != TY_UNKNOWN && rt->kind != TY_UNKNOWN && !scalar_compatible(lt, rt)) {
                     char buf[256];
@@ -320,10 +331,13 @@ static Type* check_node(Node* node) {
                     Type* ot = lt->kind == TY_ARRAY ? rt : lt;
                     if (ot->kind == TY_ARRAY || ot->kind == TY_UNKNOWN) {
                         if (node->op.binop == OP_EQ) {
-                            result = rewrite_to_funcall(node, "__array_eq", 10, &ty_bool, false);
+                            Function* method = find_method(class_of(lt), "__eq__", 6);
+                            result = rewrite_to_mcall(node, lt, rt, "__eq__", 6, method);
                         } else {
-                            result = rewrite_to_funcall(node, "__array_ne", 10, &ty_bool, false);
+                            Function* method = find_method(class_of(lt), "__ne__", 6);
+                            result = rewrite_to_mcall(node, lt, rt, "__ne__", 6, method);
                         }
+                        if (result->kind == TY_UNKNOWN) { result = &ty_bool; }
                         break;
                     }
                     result = &ty_bool;
