@@ -41,6 +41,9 @@ Node* parse_put_args() {
 
 static Node* primary() {
     Node* node;
+    if (token->kind == TK_KEYWORD && token->keyword == KW_FN) {
+        return parse_lambda(false, token);
+    }
     if (token->kind == TK_KEYWORD && (token->keyword == KW_IN || token->keyword == KW_IN_STR || token->keyword == KW_IN_LINE)) {
         // 入力構文: in / in[n] / in[h][w]、in_str / in_str[n]、in_line
         Token* kw = token;
@@ -82,6 +85,10 @@ static Node* primary() {
         token = token->next;
         node = array_literal();
         node->tok = bracket;
+    } else if (ident_token && token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '(' && ident_is_value_call(ident_token)) {
+        // 変数に収まった関数値の呼び出しは、名前呼び出しではなく値経由にする。
+        // `(` は後置ループ側で ND_VCALL として消費する
+        node = create_ident_node(ident_token);
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
         node->name = ident_token->str;
@@ -101,6 +108,15 @@ static Node* primary() {
     }
     while (true) {
         Token* postfix_tok = token;
+        if (consume("(")) {
+            // 値経由の呼び出し: 関数値・ラムダ・括弧つき式などの直後の `(`
+            Node* call = create_node(ND_VCALL);
+            call->tok = postfix_tok;
+            call->left_child = node;
+            call->args = parse_args();
+            node = call;
+            continue;
+        }
         bool inc = consume("++");
         if (inc || consume("--")) {
             Node* assign_node = create_node(ND_OPASSIGN);
@@ -365,6 +381,9 @@ static Node* range() {
 }
 
 static Node* assign() {
+    if (lambda_arrow_ahead()) {
+        return parse_lambda(true, token);
+    }
     Token* first_token = token;
     Node* node = range();
     Token* error_token = token;
@@ -406,6 +425,14 @@ static Node* assign() {
         if (ntargets != nvalues) {
             error_at(token_start(first_token), token_end(first_token), "代入先と値の個数が一致しません（代入先%d個、値%d個）", ntargets, nvalues);
         }
+        for (Node* t = targets; t; t = t->next) {
+            Node* bound = bind_target_node(t);
+            if (bound != t) {
+                Node* saved_next = t->next;
+                *t = *bound;
+                t->next = saved_next;
+            }
+        }
         Node* multi = create_node(ND_MULTIASSIGN);
         multi->tok = first_token;
         multi->body = targets;
@@ -421,6 +448,7 @@ static Node* assign() {
     }
     if (consume(":")) {
         Node* assign_node = create_node(ND_ASSIGN);
+        node = bind_target_node(node);
         if (node->kind != ND_LVAR && node->kind != ND_GVAR) {
             error_at(token_start(error_token), token_end(error_token), "型注釈は変数にだけ付けられます");
         }
@@ -433,7 +461,7 @@ static Node* assign() {
     } else if (consume("=")) {
         Node* assign_node = create_node(ND_ASSIGN);
         assign_node->tok = node->tok;
-        assign_node->left_child = node;
+        assign_node->left_child = bind_target_node(node);
         assign_node->right_child = assign();
         node = assign_node;
     } else if (consume("+=")) {
@@ -531,6 +559,28 @@ static void expect_type_end() {
 }
 
 Type* parse_type() {
+    if (token->kind == TK_KEYWORD && token->keyword == KW_FN) {
+        token = token->next;
+        expect("(");
+        Type* params[6] = {};
+        int nparams = 0;
+        if (!consume(")")) {
+            do {
+                Type* pt = parse_type();
+                if (nparams < 6) {
+                    params[nparams] = pt;
+                }
+                nparams++;
+            } while (consume(","));
+            expect(")");
+        }
+        if (nparams > 6) {
+            error_at(token_start(token), token_end(token), "関数型の引数は6個までですが、%d個が指定されています", nparams);
+        }
+        expect("->");
+        Type* ret = parse_type();
+        return func_type(params, nparams, ret);
+    }
     if (consume("[")) {
         Type* elem = parse_type();
         expect("]");

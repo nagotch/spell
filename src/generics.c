@@ -34,6 +34,72 @@ static Node* memo_orig[CLONE_MEMO_MAX];
 static Node* memo_copy[CLONE_MEMO_MAX];
 static int memo_n = 0;
 
+static Function* clone_lambda_func(Function* fn, Class* tmpl, Type* targs[]);
+static Node* clone_node(Node* n, Class* tmpl, Type* targs[]);
+
+// 実体化で複製したラムダ。instantiate が関数チェーンへ足す
+static Function* cloned_lambdas;
+
+// 捕捉の複製時に、元の捕捉→複製品の対応を覚えておく。
+// 推移的捕捉の src_cap（外側ラムダの捕捉へのポインタ）の付け替えに使う
+#define CAP_MAP_MAX 256
+static Capture* cap_map_old[CAP_MAP_MAX];
+static Capture* cap_map_new[CAP_MAP_MAX];
+static int cap_map_n = 0;
+
+// ラムダ関数を実体化用に複製する。本体も複製し、検査状態は未検査に戻す
+static Function* clone_lambda_func(Function* fn, Class* tmpl, Type* targs[]) {
+    static int clone_counter = 0;
+    Function* nf = calloc(1, sizeof(Function));
+    *nf = *fn;
+    nf->next = NULL;
+    nf->lambda_checked = false;
+    nf->func_type = NULL;
+    for (int i = 0; i < 6; i++) {
+        nf->param_types[i] = subst_type(fn->param_types[i], tmpl, targs);
+    }
+    nf->return_type = subst_type(fn->return_type, tmpl, targs);
+    char* name = malloc(48);
+    snprintf(name, 48, "%s$g%d", fn->name, clone_counter++);
+    nf->name = name;
+    nf->len = (int)strlen(name);
+    // 自分の捕捉を複製して対応表へ登録してから、本体を複製する
+    // （本体中の内側ラムダが、推移的捕捉を複製品へ付け替えられるように）
+    int saved_map_n = cap_map_n;
+    Capture* ncap_head = NULL;
+    Capture** ncap_tail = &ncap_head;
+    for (Capture* c = fn->captures; c; c = c->next) {
+        Capture* nc = calloc(1, sizeof(Capture));
+        *nc = *c;
+        nc->type = NULL;
+        nc->next = NULL;
+        if (c->src_cap) {
+            Capture* mapped = NULL;
+            for (int i = 0; i < cap_map_n; i++) {
+                if (cap_map_old[i] == c->src_cap) {
+                    mapped = cap_map_new[i];
+                    break;
+                }
+            }
+            nc->src_cap = mapped;
+        }
+        if (cap_map_n >= CAP_MAP_MAX) {
+            error_internal("ジェネリクス実体化での捕捉が多すぎます");
+        }
+        cap_map_old[cap_map_n] = c;
+        cap_map_new[cap_map_n] = nc;
+        cap_map_n++;
+        *ncap_tail = nc;
+        ncap_tail = &nc->next;
+    }
+    nf->captures = ncap_head;
+    nf->body = clone_node(fn->body, tmpl, targs);
+    cap_map_n = saved_map_n;
+    nf->next = cloned_lambdas;
+    cloned_lambdas = nf;
+    return nf;
+}
+
 static Node* clone_node(Node* n, Class* tmpl, Type* targs[]) {
     if (!n) {
         return NULL;
@@ -55,6 +121,13 @@ static Node* clone_node(Node* n, Class* tmpl, Type* targs[]) {
     c->func = NULL;
     c->klass = NULL;
     c->anno = subst_type(n->anno, tmpl, targs);
+    if (n->kind == ND_LAMBDA && n->func) {
+        // ラムダは実体化ごとに専用の関数へ複製する（型と検査状態を共有しない）
+        c->func = clone_lambda_func(n->func, tmpl, targs);
+        c->name = c->func->name;
+        c->len = c->func->len;
+        c->captures = c->func->captures;
+    }
     c->left_child = clone_node(n->left_child, tmpl, targs);
     c->right_child = clone_node(n->right_child, tmpl, targs);
     c->cond = clone_node(n->cond, tmpl, targs);
@@ -142,6 +215,13 @@ Class* instantiate(Class* tmpl, Type* targs[], int targ_count) {
         nf->body = clone_node(fn->body, tmpl, targs);
         tail->next = nf;
         tail = nf;
+    }
+    while (cloned_lambdas) {
+        Function* lf = cloned_lambdas;
+        cloned_lambdas = lf->next;
+        lf->next = NULL;
+        tail->next = lf;
+        tail = lf;
     }
     return inst;
 }
