@@ -7,7 +7,11 @@ static Node* primary() {
     Node* node;
     Token* ident_token = consume_ident();
     if (token->kind == TK_STR) {
-        node = char_array();
+        Node* arr = char_array();
+        node = create_node(ND_FUNCALL);
+        node->name = "str";
+        node->len = 3;
+        node->args = arr;
     } else if (!ident_token && consume("[")) {
         node = array_literal();
     } else if (ident_token && consume("(")) {

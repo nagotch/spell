@@ -222,6 +222,24 @@ static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index
     node->args = index;
 }
 
+static Type* rewrite_to_funcall(Node* node, const char* name, int len, Type* result, bool swap) {
+    Node* left = node->left_child;
+    Node* right = node->right_child;
+    if (swap) {
+        right->next = left;
+        left->next = NULL;
+        node->args = right;
+    } else {
+        left->next = right;
+        right->next = NULL;
+        node->args = left;
+    }
+    node->kind = ND_FUNCALL;
+    node->name = (char*)name;
+    node->len = len;
+    return result;
+}
+
 static Type* check_node(Node* node) {
     if (!node) {
         return &ty_unknown;
@@ -252,6 +270,21 @@ static Type* check_node(Node* node) {
                 }
                 if (lt->kind == TY_ARRAY || rt->kind == TY_ARRAY) {
                     Type* at = lt->kind == TY_ARRAY ? lt : rt;
+                    Type* ot = lt->kind == TY_ARRAY ? rt : lt;
+                    if (node->op.binop == OP_ADD) {
+                        if (ot->kind != TY_ARRAY && ot->kind != TY_UNKNOWN) {
+                            error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                        }
+                        result = rewrite_to_funcall(node, "__array_add", 11, at, false);
+                        break;
+                    }
+                    if (node->op.binop == OP_MUL) {
+                        if (ot->kind != TY_INT && ot->kind != TY_UNKNOWN) {
+                            error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                        }
+                        result = rewrite_to_funcall(node, "__array_mul", 11, at, lt->kind != TY_ARRAY);
+                        break;
+                    }
                     error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
                 }
                 if (lt->kind != TY_UNKNOWN && rt->kind != TY_UNKNOWN && !scalar_compatible(lt, rt)) {
@@ -280,6 +313,15 @@ static Type* check_node(Node* node) {
                     if (node->op.binop == OP_LT || node->op.binop == OP_LE) {
                         Type* at = lt->kind == TY_ARRAY ? lt : rt;
                         error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                    }
+                    Type* ot = lt->kind == TY_ARRAY ? rt : lt;
+                    if (ot->kind == TY_ARRAY || ot->kind == TY_UNKNOWN) {
+                        if (node->op.binop == OP_EQ) {
+                            result = rewrite_to_funcall(node, "__array_eq", 10, &ty_bool, false);
+                        } else {
+                            result = rewrite_to_funcall(node, "__array_ne", 10, &ty_bool, false);
+                        }
+                        break;
                     }
                     result = &ty_bool;
                     break;

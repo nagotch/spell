@@ -58,7 +58,7 @@ def print_int(n) {
     }
 }
 
-def print_str(s) {
+def print_str(s: str) {
     for (i=0; i<s.len; i=i+1) {
         putchar(s[i]);
     }
