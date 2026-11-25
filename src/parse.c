@@ -194,9 +194,8 @@ static Node* stmt() {
     }
 }
 
-static Node* stmt_block() {
-    Node* node;
-    node = create_node(ND_BLOCK);
+// 「}」まで文を読み、連結リストで返す
+static Node* parse_stmt_list() {
     Node head;
     head.next = NULL;
     Node* cur = &head;
@@ -204,7 +203,13 @@ static Node* stmt_block() {
         cur->next = stmt();
         cur = cur->next;
     }
-    node->body = head.next;
+    return head.next;
+}
+
+static Node* stmt_block() {
+    Node* node;
+    node = create_node(ND_BLOCK);
+    node->body = parse_stmt_list();
     return node;
 }
 
@@ -304,17 +309,11 @@ static Function* function(Class* klass) {
         return_type = parse_type();
     }
     expect("{");
-    Node head;
-    head.next = NULL;
-    Node* cur = &head;
-    while (!consume("}")) {
-        cur->next = stmt();
-        cur = cur->next;
-    }
+    Node* body = parse_stmt_list();
     Function* func = calloc(1, sizeof(Function));
     func->name = name;
     func->len = len;
-    func->body = head.next;
+    func->body = body;
     func->nparams = nparams;
     func->return_type = return_type;
     memcpy(func->param_types, param_types, sizeof(param_types));
