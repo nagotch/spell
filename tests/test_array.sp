@@ -9,24 +9,24 @@ def t008() { x=3; y=&x; *y=8; return *y; }
 def t009() { a = [10, 20, 30]; return a[0] + a[1] + a[2]; }
 def t010() { a = [1, 2, 3]; a[1] = 42; return a[1]; }
 def t011() { a = [5, 6, 7]; i = 2; return a[i]; }
-def t012() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < 4; i = i+ 1) s = s + a[i]; return s; }
+def t012() { a = [1, 2, 3, 4]; s = 0; for x in a s = s + x; return s; }
 def t013() { x = 3; a = [x, x * 2]; return a[1]; }
 def t014() { a = [10, 20, 30]; return a.len; }
 def t015() { a = [7]; return a.len; }
-def t016() { a = [1, 2, 3, 4]; s = 0; for (i = 0; i < a.len; i = i + 1) s = s + a[i]; return s; }
+def t016() { a = [1, 2, 3, 4]; s = 0; for x in a s = s + x; return s; }
 def count(a) { return a.len; }
 def t017() { x = [1, 2, 3, 4, 5]; return count(x); }
 def t018() { n = 3; a = [0; n]; a[0] = 10; a[2] = 30; return a[0] + a[1] + a[2] + a.len; }
 def t019() { a = [7; 4]; return a[0] + a[3]; }
 def t020() { a = [5; 0]; return a.len; }
-def t021() { n = 5; a = [0; n]; for (i = 0; i < a.len; i = i + 1) a[i] = i * 2; s = 0; for (i = 0; i < a.len; i = i + 1) s = s + a[i]; return s; }
+def t021() { n = 5; a = [0; n]; for i in a.len a[i] = i * 2; s = 0; for x in a s = s + x; return s; }
 def make(n) { return [9; n]; }
 def t022() { a = make(3); return a[2] + a.len; }
 def t023() { s = "hello"; return s.len; }
 def t024() { s = "hello"; return s[0]; }
 def t025() { s = "A\n"; return s[1]; }
 def t026() { s = "abc".chars; s[1] = 120; return s[1]; }
-def t027() { s = "hello"; c = 0; for (i = 0; i < s.len; i = i + 1) if (s[i] == 108) c = c + 1; return c; }
+def t027() { s = "hello"; c = 0; for ch in s if (ch == 108) c = c + 1; return c; }
 def t028() { s = "hi"; putchar(s[0]); putchar(s[1]); return 0; }
 def t029() { s = ""; return s.len; }
 def t030() { a = [1, 2] + [3]; return a[0] * 100 + a[1] * 10 + a[2]; }
@@ -34,6 +34,9 @@ def t031() { r = 0; if ([1, 2] == [1, 2]) { r = r + 1; } if ([1, 2] != [1, 3]) {
 def t032() { a = [7] * 2; b = 3 * [1]; return a.len * 10 + b.len; }
 def t033() { s = "ab" + "cd"; r = 0; if (s == "abcd") { r = 1; } return s.len * 10 + r; }
 def t034() { s = "hello"; return s[1] + s.len; }
+def t035() { t = 0; for s in ["ab", "cde"] { t = t + s.len; } return t; }
+def t036() { s = 0; for x in [1, 2, 3, 4] { if (x == 3) { break; } s = s + x; } return s; }
+def t037() { s = 0; for a in [[1, 2], [3]] { for x in a { s = s + x; } } return s; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -82,6 +85,9 @@ def main() {
     mark(32); fails=fails+check(t032(), 23);
     mark(33); fails=fails+check(t033(), 41);
     mark(34); fails=fails+check(t034(), 106);
+    mark(35); fails=fails+check(t035(), 5);
+    mark(36); fails=fails+check(t036(), 3);
+    mark(37); fails=fails+check(t037(), 6);
 
     print_str("done"); putchar(10);
     return fails > 0;

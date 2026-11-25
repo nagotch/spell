@@ -88,11 +88,25 @@ Node* create_number_node(long num) {
     return num_node_ptr;
 }
 
+// トップレベル文の解析中に確保されたスタック量の最大値。
+// 合成関数（__spell_init / main）のフレーム確保に使う
+static int top_max_offset = 0;
+
+static void note_top_used(int offset, int array_len) {
+    if (is_top_level) {
+        int used = offset + 8 * array_len;
+        if (top_max_offset < used) {
+            top_max_offset = used;
+        }
+    }
+}
+
 static void register_any() {
     LVar* lvar = calloc(1, sizeof(LVar));
     lvar->offset = locals ? locals->offset + 8 * (locals->array_len + 1): 8;
     lvar->next = locals;
     locals = lvar;
+    note_top_used(lvar->offset, 0);
 }
 
 static void register_lvar(Token* tok) {
@@ -112,6 +126,7 @@ static void register_gvar(Token* tok) {
 void register_array(int array_len) {
     register_any();
     locals->array_len = array_len;
+    note_top_used(locals->offset, array_len);
 }
 
 Node* create_ident_node(Token* tok) {
@@ -247,14 +262,30 @@ static Node* stmt_while() {
 static Node* stmt_for() {
     Node* node;
     node = create_node(ND_FOR);
-    Token* var = consume_ident();
-    if (!consume_keyword(KW_IN)) {
-        error_at(token_start(token), token_end(token), "`in`が必要ですが、%sが見つかりました", token_text(token));
+    if (token->kind == TK_IDENT && token->next->kind == TK_KEYWORD && token->next->keyword == KW_IN) {
+        Token* var = consume_ident();
+        consume_keyword(KW_IN);
+        node->init = expr();
+        register_any();
+        node->offset = locals->offset;
+        node->left_child = create_ident_node(var);
+    } else {
+        // 束縛なしの回数リピート（for n:）は Range(0, n) の要素走査として扱う
+        Node* count = expr();
+        Node* range_call = create_node(ND_FUNCALL);
+        range_call->name = "Range";
+        range_call->len = 5;
+        Node* zero = create_number_node(0);
+        zero->next = count;
+        range_call->args = zero;
+        node->init = range_call;
+        register_any();
+        node->offset = locals->offset;
+        register_any();
+        Node* var = create_node(ND_LVAR);
+        var->offset = locals->offset;
+        node->left_child = var;
     }
-    node->init = expr();
-    register_any();
-    node->offset = locals->offset;
-    node->left_child = create_ident_node(var);
     node->then = stmt();
     return node;
 }
@@ -403,6 +434,7 @@ static void class_decl(Function** cur) {
 }
 
 Function* program() {
+    top_max_offset = 0;
     Token* head_t = token;
     for (Token* t = head_t; t->kind != TK_EOF; t = t->next) {
         if (t->kind == TK_KEYWORD && t->keyword == KW_CLASS && t->next->kind == TK_IDENT) {
@@ -440,6 +472,7 @@ Function* program() {
     block->body = stmt_head.next;
     Function* init = calloc(1, sizeof(Function));
     init->body = block;
+    init->stack_size = (top_max_offset + 15) / 16 * 16;
     bool has_main = false;
     for (Function* fn = head.next; fn; fn = fn->next) {
         if (fn->len == 4 && !memcmp(fn->name, "main", 4)) {
