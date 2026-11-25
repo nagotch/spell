@@ -29,10 +29,11 @@ def t026() { s = "abc".chars; s[1] = 120; return s[1]; }
 def t027() { s = "hello"; c = 0; for (i = 0; i < s.len; i = i + 1) if (s[i] == 108) c = c + 1; return c; }
 def t028() { s = "hi"; putchar(s[0]); putchar(s[1]); return 0; }
 def t029() { s = ""; return s.len; }
-def t030() { a = [1,2,3]; a[1] += 10; return a[1]; }
-def t031() { a: [int] = []; a = [7, 8]; return a.len + a[1]; }
-def t032() { a = [[], [1]]; return a[1][0]; }
-def t033() { a = []; a = [1]; return a[0]; }
+def t030() { a = [1, 2] + [3]; return a[0] * 100 + a[1] * 10 + a[2]; }
+def t031() { r = 0; if ([1, 2] == [1, 2]) { r = r + 1; } if ([1, 2] != [1, 3]) { r = r + 2; } if ([1, 2] == [1, 3]) { r = r + 4; } return r; }
+def t032() { a = [7] * 2; b = 3 * [1]; return a.len * 10 + b.len; }
+def t033() { s = "ab" + "cd"; r = 0; if (s == "abcd") { r = 1; } return s.len * 10 + r; }
+def t034() { s = "hello"; return s[1] + s.len; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -76,10 +77,11 @@ def main() {
     mark(27); fails=fails+check(t027(), 2);
     mark(28); fails=fails+check(t028(), 0);
     mark(29); fails=fails+check(t029(), 0);
-    mark(30); fails=fails+check(t030(), 12);
-    mark(31); fails=fails+check(t031(), 10);
-    mark(32); fails=fails+check(t032(), 1);
-    mark(33); fails=fails+check(t033(), 1);
+    mark(30); fails=fails+check(t030(), 123);
+    mark(31); fails=fails+check(t031(), 3);
+    mark(32); fails=fails+check(t032(), 23);
+    mark(33); fails=fails+check(t033(), 41);
+    mark(34); fails=fails+check(t034(), 106);
 
     print_str("done"); putchar(10);
     return fails > 0;
