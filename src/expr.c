@@ -24,8 +24,49 @@ static Node* parse_args() {
     return head.next;
 }
 
+// put 文の引数列（括弧なし、カンマ区切り）を読む
+Node* parse_put_args() {
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    bool saved = suppress_multi;
+    suppress_multi = true;
+    do {
+        cur->next = expr();
+        cur = cur->next;
+    } while (consume(","));
+    suppress_multi = saved;
+    return head.next;
+}
+
 static Node* primary() {
     Node* node;
+    if (token->kind == TK_KEYWORD && (token->keyword == KW_IN || token->keyword == KW_IN_STR || token->keyword == KW_IN_LINE)) {
+        // 入力構文: in / in[n] / in[h][w]、in_str / in_str[n]、in_line
+        Token* kw = token;
+        int mode = token->keyword == KW_IN ? 0 : token->keyword == KW_IN_STR ? 1 : 2;
+        token = token->next;
+        node = create_node(ND_INPUT);
+        node->val = mode;
+        Node* args = NULL;
+        Node** tail = &args;
+        int nb = 0;
+        while (consume("[")) {
+            Node* elem = expr();
+            expect("]");
+            *tail = elem;
+            tail = &elem->next;
+            nb++;
+        }
+        if (mode == 2 && nb > 0) {
+            error_at(token_start(kw), token_end(kw), "`in_line`に添え字は付けられません");
+        }
+        if ((mode == 0 && nb > 2) || (mode == 1 && nb > 1)) {
+            error_at(token_start(kw), token_end(kw), "`%.*s`の添え字は%d個までです", kw->len, kw->str, mode == 0 ? 2 : 1);
+        }
+        node->args = args;
+        return node;
+    }
     Token* ident_token = consume_ident();
     if (token->kind == TK_STR) {
         Node* arr = char_array();
@@ -307,6 +348,19 @@ static Node* assign() {
             nvalues++;
         }
         suppress_multi = saved;
+        if (nvalues == 1 && values->kind == ND_INPUT && !values->args && values->val != 2 && ntargets > 1) {
+            // a, b = in の形: 対象の数だけ読み取りを並べ替える
+            Node* chain = NULL;
+            Node** ctail = &chain;
+            for (int i = 0; i < ntargets; i++) {
+                Node* in_node = create_node(ND_INPUT);
+                in_node->val = values->val;
+                *ctail = in_node;
+                ctail = &in_node->next;
+            }
+            values = chain;
+            nvalues = ntargets;
+        }
         if (ntargets != nvalues) {
             error_at(token_start(first_token), token_end(first_token), "代入先と値の個数が一致しません（代入先%d個、値%d個）", ntargets, nvalues);
         }

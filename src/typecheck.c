@@ -737,6 +737,79 @@ static Type* check_chain(Node* node) {
     return bool_type();
 }
 
+// 入力構文: 形に応じて prelude の読み取り関数への呼び出しに置き換える
+static Type* check_input(Node* node) {
+    int nargs = 0;
+    for (Node* a = node->args; a; a = a->next) {
+        nargs++;
+    }
+    const char* fname;
+    if (node->val == 0) {
+        fname = nargs == 0 ? "read_int" : nargs == 1 ? "read_ints" : "read_ints2";
+    } else if (node->val == 1) {
+        fname = nargs == 0 ? "read_token" : "read_tokens";
+    } else {
+        fname = "read_line";
+    }
+    node->kind = ND_FUNCALL;
+    node->name = (char*)fname;
+    node->len = (int)strlen(fname);
+    return check_funcall(node);
+}
+
+// put 文: 各値を __str__ で文字列化し、空白区切りで出して改行する
+static Type* check_put(Node* node) {
+    Node* head = NULL;
+    Node** tail = &head;
+    int i = 0;
+    for (Node* arg = node->args; arg; arg = arg->next, i++) {
+        if (i > 0) {
+            Node* sep = create_node(ND_FUNCALL);
+            sep->name = "putchar";
+            sep->len = 7;
+            Node* sp = create_node(ND_NUM);
+            sp->val = 32;
+            sep->args = sp;
+            *tail = sep;
+            tail = &sep->next;
+        }
+        Type* at = check_node(arg);
+        if (at->kind == TY_UNKNOWN) {
+            error_plain("型が分からない値は put できません");
+        }
+        Class* klass = class_of(at);
+        Function* method = klass ? find_callable(klass, "__str__", 7) : NULL;
+        if (!method) {
+            error_plain("`%s`型の値は put できません", type_text(at));
+        }
+        if (method->nparams != 1 || (method->return_type && method->return_type->kind != TY_UNKNOWN && !(method->return_type->kind == TY_CLASS && method->return_type->klass == find_class("str", 3)))) {
+            error_plain("クラス`%.*s`の`__str__`は引数を取らず、`str`を返す必要があります", klass->len, klass->name);
+        }
+        Node* conv = create_node(ND_MCALL);
+        conv->name = "__str__";
+        conv->len = 7;
+        conv->left_child = arg;
+        conv->klass = klass;
+        conv->func = method;
+        Node* out = create_node(ND_FUNCALL);
+        out->name = "print_str";
+        out->len = 9;
+        out->args = conv;
+        *tail = out;
+        tail = &out->next;
+    }
+    Node* nl = create_node(ND_FUNCALL);
+    nl->name = "putchar";
+    nl->len = 7;
+    Node* lf = create_node(ND_NUM);
+    lf->val = 10;
+    nl->args = lf;
+    *tail = nl;
+    node->kind = ND_BLOCK;
+    node->body = head;
+    return &ty_unknown;
+}
+
 static Type* check_node(Node* node) {
     if (!node) {
         return &ty_unknown;
@@ -811,6 +884,12 @@ static Type* check_node(Node* node) {
             break;
         case ND_CHAIN:
             result = check_chain(node);
+            break;
+        case ND_INPUT:
+            result = check_input(node);
+            break;
+        case ND_PUT:
+            result = check_put(node);
             break;
         case ND_RETURN:
             result = check_return(node);

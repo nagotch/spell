@@ -22,6 +22,10 @@ typedef enum {
     KW_CLASS,
     KW_IN,
     KW_ELIF,
+    KW_IN_STR,
+    KW_IN_LINE,
+    KW_PUT,
+    KW_YN,
 } Keyword;
 
 typedef enum {
@@ -106,6 +110,8 @@ typedef enum {
     ND_MCALL,
     ND_MULTIASSIGN,
     ND_CHAIN,
+    ND_INPUT,
+    ND_PUT,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
