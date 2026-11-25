@@ -379,6 +379,7 @@ static Node* stmt_while(Token* kw);
 static Node* stmt_for(Token* kw);
 static Node* make_for_iter(Token* var, Node* init, Token* kw);
 static Node* make_for_count(Node* count, Token* kw);
+static Node* stmt_branch();
 
 // 文（やフィールド）の終わり。`;` があれば消費する。なければ、次の
 // トークンが改行の後か、`}` か、ファイル末尾でなければならない
@@ -449,6 +450,16 @@ static Node* stmt() {
         expect_stmt_end("文");
         return node;
     } else if (consume("@")) {
+        if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '{') {
+            // `@ {}` は while true {} の省略形（無限ループ）
+            Node* node = create_node(ND_WHILE);
+            node->tok = start;
+            node->cond = create_node(ND_NUM);
+            node->cond->val = 1;
+            node->cond->tok = start;
+            node->then = stmt_branch();
+            return node;
+        }
         return make_for_count(expr(), start);
     } else if (token->kind == TK_IDENT && token->next->kind == TK_SYMBOL && token->next->len == 1 && token->next->str[0] == '@') {
         Token* var = consume_ident();
