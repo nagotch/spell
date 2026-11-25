@@ -19,6 +19,16 @@ static Function* current_fn;
 static Type* current_return;
 static Function* functions;
 
+static Class* class_of(Type* t) {
+    switch (t->kind) {
+        case TY_CLASS: return t->klass;
+        case TY_INT: return find_class("int", 3);
+        case TY_BOOL: return find_class("bool", 4);
+        case TY_ARRAY: return find_class("array", 5);
+        default: return NULL;
+    }
+}
+
 static Function* find_method(Class* klass, char* name, int len) {
     for (Function* fn = functions; fn; fn = fn->next) {
         if (fn->klass == klass && fn->len == len && !memcmp(fn->name, name, len)) {
@@ -571,7 +581,10 @@ static Type* check_node(Node* node) {
             if (obj->kind != TY_CLASS) {
                 error_plain("`%s`型の値にフィールドは使えません", type_text(obj));
             }
-            Class* klass = obj->klass;
+            Class* klass = class_of(obj);
+            if (!klass) {
+                error_plain("`%s`型の値にフィールドは使えません", type_text(obj));
+            }
             node->klass = klass;
             Field* field = NULL;
             for (Field* f = klass->fields; f; f = f->next) {
@@ -624,7 +637,10 @@ static Type* check_node(Node* node) {
             if (obj->kind != TY_CLASS) {
                 error_plain("`%s`型の値にメソッドは使えません", type_text(obj));
             }
-            Class* klass = obj->klass;
+            Class* klass = class_of(obj);
+            if (!klass) {
+                error_plain("`%s`型の値にフィールドは使えません", type_text(obj));
+            }
             Function* method = find_method(klass, node->name, node->len);
             if (!method) {
                 error_plain("クラス`%.*s`にメソッド`%.*s`は定義されていません", klass->len, klass->name, node->len, node->name);
