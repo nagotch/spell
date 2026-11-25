@@ -28,6 +28,7 @@ typedef enum {
     KW_IN_LINE,
     KW_PUT,
     KW_YN,
+    KW_FN,
 } Keyword;
 
 typedef enum {
@@ -80,6 +81,7 @@ typedef enum {
     TY_ARRAY,
     TY_CLASS,
     TY_VAR,
+    TY_FUNC,
 } TypeKind;
 typedef struct Type Type;
 struct Type {
@@ -90,6 +92,24 @@ struct Type {
     int targ_count;
     char* name;
     int len;
+    // TY_FUNC のときだけ使う: 引数の型と戻り値の型
+    Type* func_params[6];
+    int func_nparams;
+    Type* func_ret;
+};
+
+// ラムダが外側の変数を捕まえた記録。環境ブロック内のスロットと、
+// 捕まえ元の場所（外側関数のローカル、または外側ラムダの環境スロット）を結ぶ
+typedef struct Capture Capture;
+struct Capture {
+    char* name;
+    int len;
+    int src_offset;
+    bool src_is_env;
+    Capture* src_cap;
+    int env_offset;
+    Type* type;
+    Capture* next;
 };
 
 typedef enum {
@@ -118,6 +138,10 @@ typedef enum {
     ND_CHAIN,
     ND_INPUT,
     ND_PUT,
+    ND_FUNCREF,
+    ND_LAMBDA,
+    ND_VCALL,
+    ND_CAPVAR,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
@@ -143,6 +167,8 @@ struct Node {
     Class* klass;
     Function* func;
     Token* tok;
+    // ND_LAMBDA のときだけ使う: このラムダの捕捉一覧
+    Capture* captures;
 };
 
 struct Function {
@@ -155,6 +181,12 @@ struct Function {
     Type* param_types[6];
     Type* return_type;
     Class* klass;
+    // ラムダのときだけ使う
+    bool is_lambda;
+    int env_offset;
+    Capture* captures;
+    bool lambda_checked;
+    Type* func_type;
 };
 
 typedef struct LVar LVar;
@@ -208,6 +240,7 @@ Node* create_node(NodeKind kind);
 Class* find_class(char* name, int len);
 
 Type* array_type(Type* elem);
+Type* func_type(Type* params[], int nparams, Type* ret);
 
 void error_at(long start, long end, char* fmt, ...);
 void error_at_v(long start, long end, char* fmt, va_list ap);

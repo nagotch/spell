@@ -319,6 +319,34 @@ def t030() {
     return t.x + t.y.len + t.z.len;
 }
 
+class Handler {
+    cb: fn(int) -> int;
+    def __init__(self, cb: fn(int) -> int) { self.cb = cb; }
+    def run(self, x: int) -> int { return self.cb(x); }
+}
+
+def t031() {
+    h = Handler(fn(v: int) -> int { return v * 2; });
+    return h.run(21);
+}
+
+class FnBox<T> {
+    v: T;
+    def __init__(self, v: T) { self.v = v; }
+    def getter(self) -> fn() -> T {
+        return fn() -> T { return self.v; };
+    }
+}
+
+def t032() {
+    bi = FnBox(42);
+    gi = bi.getter();
+    bs = FnBox("ab");
+    gs = bs.getter();
+    s = gs();
+    return gi() + s.len;
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -356,6 +384,8 @@ def main() {
     mark(28); fails=fails+check(t028(), 7);
     mark(29); fails=fails+check(t029(), 4);
     mark(30); fails=fails+check(t030(), 6);
+    mark(31); fails=fails+check(t031(), 42);
+    mark(32); fails=fails+check(t032(), 44);
 
     print_str("done"); putchar(10);
     return fails > 0;

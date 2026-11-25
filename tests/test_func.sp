@@ -35,6 +35,106 @@ g_counter = 0;
 def get_g() { return g_val; }
 def bump() { g_counter += 1; return g_counter; }
 
+def dbl(x: int) -> int { return x * 2; }
+def apply1(f: fn(int) -> int, x: int) -> int { return f(x); }
+def apply6(f: fn(int, int, int, int, int, int) -> int, a: int) -> int {
+    return f(a, a + 1, a + 2, a + 3, a + 4, a + 5);
+}
+def sort_with(a: [int], cmp: fn(int, int) -> int) {
+    n = a.len;
+    i = 0;
+    while (i < n) {
+        j = 0;
+        while (j + 1 < n - i) {
+            if (cmp(a[j], a[j + 1]) > 0) {
+                t = a[j];
+                a[j] = a[j + 1];
+                a[j + 1] = t;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+}
+def t019() { g = dbl; return g(10); }
+def t020() { return apply1(dbl, 1); }
+def t021() { return apply1(fn(v: int) -> int { return v + 100; }, 1); }
+def t022() { return apply1(fn(v) { return v + 1000; }, 1); }
+def t023() { return apply1(v -> v + 5, 1); }
+def t024() { return (fn(x: int) -> int { return x * 3; })(7); }
+def t025() { x = 10; f = fn() -> int { return x + 1; }; return f(); }
+def t026() {
+    y = 1;
+    c = fn() -> int { y = y + 1; return y; };
+    c();
+    return c();
+}
+def t027() {
+    y = 1;
+    c = fn() -> int { y = y + 1; return y; };
+    c();
+    c();
+    return y;
+}
+def t028() { z = 1; g = fn() -> int { return z; }; z = 99; return g(); }
+def t029() {
+    w = 7;
+    maker = fn() -> fn() -> int { return fn() -> int { return w; }; };
+    inner = maker();
+    return inner();
+}
+def t030() {
+    maker = fn() -> fn() -> int { local = 5; return fn() -> int { return local; }; };
+    inner = maker();
+    return inner();
+}
+def t031() { a = [1, 2, 3]; s = fn() -> int { return a[0] + a[1] + a[2]; }; return s(); }
+def t032() {
+    fs = [fn() -> int { return 0; }; 3];
+    i = 0;
+    while (i < 3) {
+        v = i * 10;
+        fs[i] = fn() -> int { return v; };
+        i = i + 1;
+    }
+    f0 = fs[0];
+    f1 = fs[1];
+    f2 = fs[2];
+    return f0() + f1() + f2();
+}
+def t033() {
+    factory = fn() -> [int] { return [0; 2]; };
+    a1 = factory();
+    a2 = factory();
+    a1[0] = 5;
+    return a1[0] * 10 + a2[0];
+}
+def t034() {
+    h = dbl;
+    return apply6(fn(a: int, b: int, c: int, d: int, e: int, g: int) -> int { return a + b + c + d + e + g; }, h(1) - 1);
+}
+def t035() {
+    base = dbl;
+    wrap = fn(x: int) -> int { return base(x) + 1; };
+    return wrap(5);
+}
+def t036() {
+    a = [3, 1, 2];
+    sort_with(a, (x, y) -> x - y);
+    return a[0] * 100 + a[1] * 10 + a[2];
+}
+def t037() {
+    x = 1;
+    maker = fn() -> fn() -> int {
+        x = x + 10;
+        return fn() -> int { return x; };
+    };
+    inner = maker();
+    r = inner();
+    if (x != 1) { return -1; }
+    return r;
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -69,6 +169,25 @@ def main() {
     mark(19); fails=fails+check(bump(), 2);
     mark(20); fails=fails+check(t017(3), 1);
     mark(21); fails=fails+check(t018(40, 2), 42);
+    mark(22); fails=fails+check(t019(), 20);
+    mark(23); fails=fails+check(t020(), 2);
+    mark(24); fails=fails+check(t021(), 101);
+    mark(25); fails=fails+check(t022(), 1001);
+    mark(26); fails=fails+check(t023(), 6);
+    mark(27); fails=fails+check(t024(), 21);
+    mark(28); fails=fails+check(t025(), 11);
+    mark(29); fails=fails+check(t026(), 3);
+    mark(30); fails=fails+check(t027(), 1);
+    mark(31); fails=fails+check(t028(), 1);
+    mark(32); fails=fails+check(t029(), 7);
+    mark(33); fails=fails+check(t030(), 5);
+    mark(34); fails=fails+check(t031(), 6);
+    mark(35); fails=fails+check(t032(), 30);
+    mark(36); fails=fails+check(t033(), 50);
+    mark(37); fails=fails+check(t034(), 21);
+    mark(38); fails=fails+check(t035(), 11);
+    mark(39); fails=fails+check(t036(), 123);
+    mark(40); fails=fails+check(t037(), 11);
 
     print_str("done"); putchar(10);
     return fails > 0;

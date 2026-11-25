@@ -6,8 +6,154 @@ LVar* globals = NULL;
 static Class* classes;
 bool is_top_level = false;
 
+// トップレベル関数の名前表。関数参照（関数名を値として使う）の解決に使う。
+// クラス表と同じく program() をまたいで残る（prelude の関数も対象になる）
+typedef struct FuncName FuncName;
+struct FuncName {
+    char* name;
+    int len;
+    FuncName* next;
+};
+static FuncName* func_names;
+
+static void register_func_name(char* name, int len) {
+    for (FuncName* f = func_names; f; f = f->next) {
+        if (f->len == len && !memcmp(f->name, name, len)) {
+            return;
+        }
+    }
+    FuncName* f = calloc(1, sizeof(FuncName));
+    f->name = name;
+    f->len = len;
+    f->next = func_names;
+    func_names = f;
+}
+
+static bool is_func_name(char* name, int len) {
+    for (FuncName* f = func_names; f; f = f->next) {
+        if (f->len == len && !memcmp(f->name, name, len)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// ラムダ解析中の文脈。外側のスコープは、ラムダへ入った時点の locals 先頭への
+// スナップショットでたどる（ローカルは先頭追加のみで、既存ノードのリンクは
+// 変わらないため、凍結として扱える）。値は凍結せず、実行時にラムダ式を
+// 評価した時点でコピーされる
+typedef struct LambdaParse LambdaParse;
+struct LambdaParse {
+    Capture* captures;
+    int ncaptures;
+    LVar* outer_locals;
+    LambdaParse* outer;
+    Function* func;
+};
+static LambdaParse* lambda_stack;
+
+// 解析済みラムダの Function。program() の最後に関数チェーンへ足す
+static Function* pending_lambdas;
+
+// 外側スコープを内側から順に探し、名前の在り処を返す。
+// level は「そのラムダが直接取り込む」階層、lvar はローカルとして、
+// cap は外側ラムダの捕捉として見つけた場合に設定される
+typedef struct CaptureHit CaptureHit;
+struct CaptureHit {
+    LambdaParse* level;
+    LVar* lvar;
+    Capture* cap;
+};
+
+static bool find_outer(Token* tok, CaptureHit* hit) {
+    for (LambdaParse* level = lambda_stack; level; level = level->outer) {
+        for (LVar* v = level->outer_locals; v; v = v->next) {
+            if (v->name && v->len == tok->len && !memcmp(v->name, tok->str, tok->len)) {
+                hit->level = level;
+                hit->lvar = v;
+                hit->cap = NULL;
+                return true;
+            }
+        }
+        if (level->outer) {
+            for (Capture* c = level->outer->captures; c; c = c->next) {
+                if (c->len == tok->len && !memcmp(c->name, tok->str, tok->len)) {
+                    hit->level = level;
+                    hit->lvar = NULL;
+                    hit->cap = c;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+// ラムダ文脈 lp に捕捉を追加する（同名が既にあればそれを返す）
+static Capture* add_capture(LambdaParse* lp, char* name, int len, int src_offset, bool src_is_env, Capture* src_cap) {
+    for (Capture* c = lp->captures; c; c = c->next) {
+        if (c->len == len && !memcmp(c->name, name, len)) {
+            return c;
+        }
+    }
+    Capture* c = calloc(1, sizeof(Capture));
+    c->name = name;
+    c->len = len;
+    c->src_offset = src_offset;
+    c->src_is_env = src_is_env;
+    c->src_cap = src_cap;
+    c->env_offset = lp->ncaptures * 8;
+    lp->ncaptures++;
+    c->next = lp->captures;
+    lp->captures = c;
+    return c;
+}
+
+// 名前が外側スコープで見つかれば、見つけた階層から現在のラムダまで
+// 各ラムダへ捕捉を積みながら鎖をつなぎ、現在のラムダの捕捉を返す
+static Capture* resolve_capture(Token* tok) {
+    CaptureHit hit;
+    if (!find_outer(tok, &hit)) {
+        return NULL;
+    }
+    Capture* cap;
+    if (hit.lvar) {
+        cap = add_capture(hit.level, tok->str, tok->len, hit.lvar->offset, false, NULL);
+    } else {
+        cap = add_capture(hit.level, tok->str, tok->len, hit.cap->env_offset, true, hit.cap);
+    }
+    LambdaParse* chain[64];
+    int n = 0;
+    for (LambdaParse* p = lambda_stack; p != hit.level; p = p->outer) {
+        chain[n++] = p;
+    }
+    for (int i = n - 1; i >= 0; i--) {
+        cap = add_capture(chain[i], tok->str, tok->len, cap->env_offset, true, cap);
+    }
+    return cap;
+}
+
 static LVar* find_lvar(Token* tok);
 static LVar* find_gvar(Token* tok);
+
+// 識別子＋`(` を、名前呼び出しではなく値経由の呼び出しに振り分けるかの判定。
+// 識別子そのものの解決（create_ident_node）と同じく、変数が関数名・クラス名
+// より優先される: 変数（ローカル・捕捉可能な外側の変数・グローバル）に
+// 解決されれば値経由の呼び出しにする
+bool ident_is_value_call(Token* tok) {
+    if (!is_top_level) {
+        if (find_lvar(tok)) {
+            return true;
+        }
+        if (lambda_stack) {
+            CaptureHit hit;
+            if (find_outer(tok, &hit)) {
+                return true;
+            }
+        }
+    }
+    return find_gvar(tok) != NULL;
+}
 
 bool consume(char* symbol) {
     int len = strlen(symbol);
@@ -140,9 +286,27 @@ Node* create_ident_node(Token* tok) {
             node->tok = tok;
             return node;
         }
+        if (lambda_stack) {
+            Capture* cap = resolve_capture(tok);
+            if (cap) {
+                Node* node = create_node(ND_CAPVAR);
+                node->name = tok->str;
+                node->len = tok->len;
+                node->offset = cap->env_offset;
+                node->tok = tok;
+                return node;
+            }
+        }
     }
     LVar* gvar = find_gvar(tok);
     if (!gvar) {
+        if (is_func_name(tok->str, tok->len)) {
+            Node* node = create_node(ND_FUNCREF);
+            node->name = tok->str;
+            node->len = tok->len;
+            node->tok = tok;
+            return node;
+        }
         if (!is_top_level) {
             register_lvar(tok);
             Node* node = create_node(ND_LVAR);
@@ -159,6 +323,30 @@ Node* create_ident_node(Token* tok) {
     node->len = tok->len;
     node->tok = tok;
     return node;
+}
+
+// 代入先として使われた関数参照ノードを、新しい変数への束縛に作り替える。
+// 関数名と同じ名前への代入は、関数ではなく変数の初回束縛として扱う
+// （読み取りでは関数値のまま）。それ以外のノードはそのまま返す
+Node* bind_target_node(Node* node) {
+    if (node->kind != ND_FUNCREF || !node->tok) {
+        return node;
+    }
+    if (is_top_level) {
+        register_gvar(node->tok);
+        Node* g = create_node(ND_GVAR);
+        g->name = node->name;
+        g->len = node->len;
+        g->tok = node->tok;
+        return g;
+    }
+    register_lvar(node->tok);
+    Node* v = create_node(ND_LVAR);
+    v->name = node->name;
+    v->len = node->len;
+    v->tok = node->tok;
+    v->offset = locals->offset;
+    return v;
 }
 
 Node* char_array() {
@@ -232,7 +420,7 @@ static Node* stmt() {
         return node;
     } else if (consume(">>")) {
         // 入力の省略形: >> 対象
-        Node* target = expr();
+        Node* target = bind_target_node(expr());
         expect(";");
         Node* input = create_node(ND_INPUT);
         input->val = 0;
@@ -275,7 +463,7 @@ static Node* stmt() {
         call->len = 13;
         call->args = n;
         Node* node = create_node(ND_ASSIGN);
-        node->left_child = create_ident_node(var);
+        node->left_child = bind_target_node(create_ident_node(var));
         node->right_child = call;
         node->tok = var;
         return node;
@@ -359,7 +547,7 @@ static Node* make_for_iter(Token* var, Node* init, Token* kw) {
     node->init = init;
     register_any();
     node->offset = locals->offset;
-    node->left_child = create_ident_node(var);
+    node->left_child = bind_target_node(create_ident_node(var));
     node->then = stmt();
     if (consume_keyword(KW_ELSE)) {
         register_any();
@@ -474,6 +662,132 @@ static Function* function(Class* klass) {
     }
     func->stack_size = (max_offset + 15) / 16 * 16;
     return func;
+}
+
+static int lambda_counter = 0;
+
+// 矢印形ラムダの先読み判定: 「識別子 ->」または「(識別子, ...) ->」で始まるか
+bool lambda_arrow_ahead() {
+    Token* t = token;
+    if (t->kind == TK_IDENT) {
+        Token* n = t->next;
+        return n && n->kind == TK_SYMBOL && n->len == 2 && !memcmp(n->str, "->", 2);
+    }
+    if (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == '(') {
+        t = t->next;
+        if (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == ')') {
+            t = t->next;
+            return t->kind == TK_SYMBOL && t->len == 2 && !memcmp(t->str, "->", 2);
+        }
+        while (true) {
+            if (t->kind != TK_IDENT) {
+                return false;
+            }
+            t = t->next;
+            if (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == ',') {
+                t = t->next;
+                continue;
+            }
+            if (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == ')') {
+                t = t->next;
+                return t->kind == TK_SYMBOL && t->len == 2 && !memcmp(t->str, "->", 2);
+            }
+            return false;
+        }
+    }
+    return false;
+}
+
+// ラムダ式を解析する。arrow なら矢印形（x -> 式）、でなければ fn 完全形。
+// 生成した関数は pending_lambdas へ積み、program() がチェーンへ足す
+Node* parse_lambda(bool arrow, Token* kw) {
+    LambdaParse* lp = calloc(1, sizeof(LambdaParse));
+    lp->outer_locals = locals;
+    lp->outer = lambda_stack;
+    lambda_stack = lp;
+    LVar* saved_locals = locals;
+    bool saved_top = is_top_level;
+    is_top_level = false;
+    locals = NULL;
+
+    Type* param_types[6] = {};
+    int nparams = 0;
+    Type* return_type = NULL;
+    Node* body;
+    if (arrow) {
+        if (consume("(")) {
+            if (!consume(")")) {
+                do {
+                    Token* p = consume_ident();
+                    if (!p) {
+                        error_at(token_start(token), token_end(token), "引数名が必要ですが、%sが見つかりました", token_text(token));
+                    }
+                    register_lvar(p);
+                    nparams++;
+                } while (consume(","));
+                expect(")");
+            }
+        } else {
+            register_lvar(consume_ident());
+            nparams = 1;
+        }
+        if (nparams > 6) {
+            error_at(token_start(kw), token_end(kw), "引数は6個までですが、%d個が指定されています", nparams);
+        }
+        expect("->");
+        Node* ret = create_node(ND_RETURN);
+        ret->left_child = expr();
+        body = ret;
+    } else {
+        token = token->next;
+        expect("(");
+        nparams = parse_params(param_types);
+        if (nparams > 6) {
+            error_at(token_start(kw), token_end(kw), "引数は6個までですが、%d個が指定されています", nparams);
+        }
+        if (consume("->")) {
+            return_type = parse_type();
+        }
+        expect("{");
+        body = parse_stmt_list();
+    }
+
+    Function* func = calloc(1, sizeof(Function));
+    char* name = malloc(32);
+    snprintf(name, 32, "__lambda_%d", lambda_counter++);
+    func->name = name;
+    func->len = (int)strlen(name);
+    func->body = body;
+    func->nparams = nparams;
+    func->return_type = return_type;
+    memcpy(func->param_types, param_types, sizeof(param_types));
+    func->is_lambda = true;
+    func->captures = lp->captures;
+    lp->func = func;
+    int max_offset = 0;
+    for (LVar* v = locals; v; v = v->next) {
+        int off = v->offset + 8 * v->array_len;
+        if (max_offset < off) {
+            max_offset = off;
+        }
+    }
+    // 環境ポインタの退避スロットは、ローカルの後ろに1つ取る
+    func->env_offset = max_offset + 8;
+    func->stack_size = (func->env_offset + 15) / 16 * 16;
+    func->next = pending_lambdas;
+    pending_lambdas = func;
+
+    lambda_stack = lp->outer;
+    locals = saved_locals;
+    is_top_level = saved_top;
+
+    Node* node = create_node(ND_LAMBDA);
+    node->func = func;
+    node->name = func->name;
+    node->len = func->len;
+    node->captures = lp->captures;
+    node->tok = kw;
+    return node;
 }
 
 static Class* register_class(char* name, int len) {
@@ -596,6 +910,34 @@ Function* program() {
             }
         }
     }
+    // トップレベル関数の名前も先に登録しておく。関数参照（関数名を値として
+    // 使う）が、定義より前の位置からでも解決できるようにするため。
+    // 波括弧の深さ0にある def 名と `:` 形の関数名だけを対象にする
+    int depth = 0;
+    for (Token* t = head_t; t->kind != TK_EOF; t = t->next) {
+        if (token_is_symbol(t, "{")) {
+            depth++;
+            continue;
+        }
+        if (token_is_symbol(t, "}")) {
+            depth--;
+            continue;
+        }
+        if (depth != 0) {
+            continue;
+        }
+        if (t->kind == TK_KEYWORD && t->keyword == KW_DEF && t->next->kind == TK_IDENT) {
+            register_func_name(t->next->str, t->next->len);
+        } else if (token_is_symbol(t, ":")) {
+            Token* u = t->next;
+            if (u->kind == TK_KEYWORD && u->keyword == KW_DEF) {
+                u = u->next;
+            }
+            if (u->kind == TK_IDENT && token_is_symbol(u->next, "(")) {
+                register_func_name(u->str, u->len);
+            }
+        }
+    }
     token = head_t;
 
     Function head;
@@ -615,6 +957,24 @@ Function* program() {
             stmt_cur->next = stmt();
             stmt_cur = stmt_cur->next;
             is_top_level = false;
+        }
+    }
+    // 解析中に作られたラムダを関数チェーンの末尾へ足す
+    if (pending_lambdas) {
+        Function* tail = head.next;
+        while (tail && tail->next) {
+            tail = tail->next;
+        }
+        while (pending_lambdas) {
+            Function* f = pending_lambdas;
+            pending_lambdas = f->next;
+            f->next = NULL;
+            if (tail) {
+                tail->next = f;
+            } else {
+                head.next = f;
+            }
+            tail = f;
         }
     }
     if (!stmt_head.next) {
