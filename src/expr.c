@@ -4,6 +4,8 @@
 static Node* array_literal();
 
 // 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数なしなら NULL
+static bool suppress_multi = false;
+
 static Node* parse_args() {
     if (consume(")")) {
         return NULL;
@@ -11,10 +13,13 @@ static Node* parse_args() {
     Node head;
     head.next = NULL;
     Node* cur = &head;
+    bool saved = suppress_multi;
+    suppress_multi = true;
     do {
         cur->next = expr();
         cur = cur->next;
     } while (consume(","));
+    suppress_multi = saved;
     expect(")");
     return head.next;
 }
@@ -143,36 +148,101 @@ static Node* add() {
     return node;
 }
 
-static Node* relational() {
-    Node* node = add();
-    while (true) {
-        if (consume("<=")) {
-            node = create_binary_operation_node(OP_LE, node, add());
-        } else if (consume(">=")) {
-            node = create_binary_operation_node(OP_LE, add(), node);
-        } else if (consume("<")) {
-            node = create_binary_operation_node(OP_LT, node, add());
-        } else if (consume(">")) {
-            node = create_binary_operation_node(OP_LT, add(), node);
-        } else {
-            break;
-        }
+// 関係演算子を1つ読む。> / >= は左右を入れ替えて < / <= にそろえる
+static bool read_rel_op(BinOp* op, bool* swapped) {
+    if (consume("<=")) {
+        *op = OP_LE;
+        *swapped = false;
+    } else if (consume(">=")) {
+        *op = OP_LE;
+        *swapped = true;
+    } else if (consume("<")) {
+        *op = OP_LT;
+        *swapped = false;
+    } else if (consume(">")) {
+        *op = OP_LT;
+        *swapped = true;
+    } else {
+        return false;
     }
+    return true;
+}
+
+// 比較が1つだけなら従来どおりの二項演算、2つ以上連なれば ND_CHAIN にする
+static Node* make_cmp_chain(Node* first, Node* pairs, int npairs) {
+    if (npairs == 1) {
+        if (pairs->val) {
+            return create_binary_operation_node(pairs->op.binop, pairs->left_child, first);
+        }
+        return create_binary_operation_node(pairs->op.binop, first, pairs->left_child);
+    }
+    Node* node = create_node(ND_CHAIN);
+    node->left_child = first;
+    node->body = pairs;
+    register_any();
+    node->offset = locals->offset;
+    register_any();
     return node;
 }
 
-static Node* equality() {
-    Node* node = relational();
+static Node* relational() {
+    Node* first = add();
+    BinOp op;
+    bool swapped;
+    if (!read_rel_op(&op, &swapped)) {
+        return first;
+    }
+    Node* pairs = NULL;
+    Node** tail = &pairs;
+    int npairs = 0;
     while (true) {
-        if (consume("==")) {
-            node = create_binary_operation_node(OP_EQ, node, relational());
-        } else if (consume("!=")) {
-            node = create_binary_operation_node(OP_NE, node, relational());
-        } else {
+        Node* pair = create_node(ND_BINOP);
+        pair->op.binop = op;
+        pair->left_child = add();
+        pair->val = swapped ? 1 : 0;
+        *tail = pair;
+        tail = &pair->next;
+        npairs++;
+        if (!read_rel_op(&op, &swapped)) {
             break;
         }
     }
-    return node;
+    return make_cmp_chain(first, pairs, npairs);
+}
+
+static bool read_eq_op(BinOp* op) {
+    if (consume("==")) {
+        *op = OP_EQ;
+    } else if (consume("!=")) {
+        *op = OP_NE;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+static Node* equality() {
+    Node* first = relational();
+    BinOp op;
+    if (!read_eq_op(&op)) {
+        return first;
+    }
+    Node* pairs = NULL;
+    Node** tail = &pairs;
+    int npairs = 0;
+    while (true) {
+        Node* pair = create_node(ND_BINOP);
+        pair->op.binop = op;
+        pair->left_child = relational();
+        pair->val = 0;
+        *tail = pair;
+        tail = &pair->next;
+        npairs++;
+        if (!read_eq_op(&op)) {
+            break;
+        }
+    }
+    return make_cmp_chain(first, pairs, npairs);
 }
 
 static Node* and() {
@@ -212,8 +282,46 @@ static Node* range() {
 }
 
 static Node* assign() {
+    Token* first_token = token;
     Node* node = range();
     Token* error_token = token;
+    if (!suppress_multi && token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ',') {
+        // 複数代入: a, b = 値, 値。値は全部評価してから一時置き場経由で代入する
+        Node* targets = node;
+        Node* targets_tail = node;
+        int ntargets = 1;
+        while (consume(",")) {
+            targets_tail->next = range();
+            targets_tail = targets_tail->next;
+            ntargets++;
+        }
+        expect("=");
+        bool saved = suppress_multi;
+        suppress_multi = true;
+        Node* values = assign();
+        Node* values_tail = values;
+        int nvalues = 1;
+        while (consume(",")) {
+            values_tail->next = assign();
+            values_tail = values_tail->next;
+            nvalues++;
+        }
+        suppress_multi = saved;
+        if (ntargets != nvalues) {
+            error_at(token_start(first_token), token_end(first_token), "代入先と値の個数が一致しません（代入先%d個、値%d個）", ntargets, nvalues);
+        }
+        Node* multi = create_node(ND_MULTIASSIGN);
+        multi->body = targets;
+        multi->args = values;
+        multi->array_len = nvalues;
+        for (int i = 0; i < nvalues; i++) {
+            register_any();
+            if (i == 0) {
+                multi->offset = locals->offset;
+            }
+        }
+        return multi;
+    }
     if (consume(":")) {
         Node* assign_node = create_node(ND_ASSIGN);
         if (node->kind != ND_LVAR && node->kind != ND_GVAR) {
@@ -277,6 +385,8 @@ static Node* array_literal() {
         node->offset = locals->offset;
         return node;
     }
+    bool saved = suppress_multi;
+    suppress_multi = true;
     Node* first_expr = expr();
     if (consume(";")) {
         Node* len_expr = expr();
@@ -300,6 +410,7 @@ static Node* array_literal() {
         node->body = body.next;
         node->offset = locals->offset;
     }
+    suppress_multi = saved;
     expect("]");
     return node;
 }
