@@ -71,6 +71,8 @@ error_tests=(
     "def main() { x = int(42); return 0; }|はクラスではありません"
     "def main() { print(1, 2); return 0; }|引数は1個ですが、2個が指定されています"
     "class P<T> { a: T; } def main() { p = P(); return 0; }|型引数を推論できません"
+    "class P<A, B, C, D, E> { x: int; } def main() { return 0; }|型パラメータは4個までですが、5個が指定されています"
+    "class P<A, B> { x: A; y: B; def __init__(self, x: A, y: B) { self.x = x; self.y = y; } } def main() { p: P<int> = P(1, 2); return 0; }|型引数は2個ですが、1個が指定されています"
 )
 
 cc -c -o funcs.o funcs.c

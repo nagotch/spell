@@ -258,6 +258,67 @@ def t022() {
     return b.get().len;
 }
 
+class Pair<A, B> {
+    first: A;
+    second: B;
+    def __init__(self, a: A, b: B) {
+        self.first = a;
+        self.second = b;
+    }
+    def get_first(self) -> A {
+        return self.first;
+    }
+    def get_second(self) -> B {
+        return self.second;
+    }
+    def swap(self) -> Pair<B, A> {
+        return Pair(self.second, self.first);
+    }
+}
+
+class Triple<A, B, C> {
+    x: A;
+    y: B;
+    z: C;
+    def __init__(self, x: A, y: B, z: C) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+    }
+}
+
+def t025() {
+    p = Pair(42, "ab");
+    return p.first + p.second.len;
+}
+
+def t026() {
+    p: Pair<int, str> = Pair(7, "xyz");
+    return p.get_second().len * 10 + p.get_first();
+}
+
+def t027() {
+    p = Pair(5, "ab");
+    q = p.swap();
+    return q.first.len * 10 + q.second;
+}
+
+def t028() {
+    b: GBox<Pair<int, str>> = GBox(Pair(3, "abcd"));
+    return b.get().second.len + b.get().first;
+}
+
+def t029() {
+    p1 = Pair(1, 2);
+    p2 = Pair(1, "ab");
+    return p1.second + p2.second.len;
+}
+
+def t030() {
+    t = Triple(1, "ab", [10, 20, 30]);
+    return t.x + t.y.len + t.z.len;
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -289,6 +350,12 @@ def main() {
     mark(22); fails=fails+check(t022(), 4);
     mark(23); fails=fails+check(t023(), 6);
     mark(24); fails=fails+check(t024(), 1);
+    mark(25); fails=fails+check(t025(), 44);
+    mark(26); fails=fails+check(t026(), 37);
+    mark(27); fails=fails+check(t027(), 25);
+    mark(28); fails=fails+check(t028(), 7);
+    mark(29); fails=fails+check(t029(), 4);
+    mark(30); fails=fails+check(t030(), 6);
 
     print_str("done"); putchar(10);
     return fails > 0;
