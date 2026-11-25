@@ -1,4 +1,5 @@
 src/spell
+src/spell-lsp
 tmp
 tmp.s
 *.o

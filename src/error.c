@@ -1,8 +1,44 @@
 #include "spell.h"
 #include <stdarg.h>
 
+// 現在処理中のソースとその名前。main.c と lsp.c の両方から使うため、
+// 実体はここ（共通オブジェクト側）に置く
+char* src;
+char* src_name;
+
 static long utf8_read(long i, long* cp);
 static long char_width(long cp);
+
+// エラーの回収（LSP サーバー用）。通常モードでは capture_enabled が
+// false で、以下の分岐はすべて素通りする
+static bool capture_enabled;
+static jmp_buf capture_jmp;
+char error_captured_message[4096];
+long error_captured_start;
+long error_captured_end;
+bool error_captured_has_pos;
+char* error_captured_src;
+
+jmp_buf* error_capture_begin(void) {
+    capture_enabled = true;
+    return &capture_jmp;
+}
+
+void error_capture_end(void) {
+    capture_enabled = false;
+}
+
+// 注意: ここから longjmp するため、呼び出し側（error_at 等）の
+// va_end は実行されない。対象環境（gcc/glibc）では va_end は
+// 無処理なので実害はないが、規格厳密には未定義寄りの使い方
+static void capture_error(long start, long end, bool has_pos, char* fmt, va_list ap) {
+    vsnprintf(error_captured_message, sizeof(error_captured_message), fmt, ap);
+    error_captured_start = start;
+    error_captured_end = end;
+    error_captured_has_pos = has_pos;
+    error_captured_src = src;
+    longjmp(capture_jmp, 1);
+}
 
 void error_at(long start, long end, char* fmt, ...) {
     va_list ap;
@@ -12,6 +48,9 @@ void error_at(long start, long end, char* fmt, ...) {
 }
 
 void error_at_v(long start, long end, char* fmt, va_list ap) {
+    if (capture_enabled) {
+        capture_error(start, end, true, fmt, ap);
+    }
     long line = 1;
     long line_start = 0;
     for (long i = 0; i < start; i++) {
@@ -112,6 +151,9 @@ void error_plain(char* fmt, ...) {
 }
 
 void error_plain_v(char* fmt, va_list ap) {
+    if (capture_enabled) {
+        capture_error(0, 0, false, fmt, ap);
+    }
     fprintf(stderr, "エラー: ");
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
@@ -119,9 +161,12 @@ void error_plain_v(char* fmt, va_list ap) {
 }
 
 void error_internal(char* fmt, ...) {
-    fprintf(stderr, "内部エラー: ");
     va_list ap;
     va_start(ap, fmt);
+    if (capture_enabled) {
+        capture_error(0, 0, false, fmt, ap);
+    }
+    fprintf(stderr, "内部エラー: ");
     vfprintf(stderr, fmt, ap);
     va_end(ap);
     fprintf(stderr, "\n");

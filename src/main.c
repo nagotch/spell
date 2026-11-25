@@ -2,12 +2,6 @@
 #include "spell.h"
 #include <unistd.h>
 
-char* src;
-char* src_name;
-
-static char* read_file(char* src_name);
-static Function* load_program(char* path);
-
 int main(int argc, char **argv) {
     bool only_assembly = false;
     char* output_name = "a.out";
@@ -28,13 +22,7 @@ int main(int argc, char **argv) {
     }
 
     char prelude_path[4096];
-    ssize_t path_len = readlink("/proc/self/exe", prelude_path, sizeof(prelude_path) - 16);
-    if (path_len < 0) {
-        error_plain("コンパイラの実行ファイルの場所を特定できませんでした");
-    }
-    prelude_path[path_len] = '\0';
-    char* slash = strrchr(prelude_path, '/');
-    strcpy(slash + 1, "prelude.sp");
+    spell_prelude_path(prelude_path, sizeof(prelude_path));
 
     Function* prog = load_program(prelude_path);
     Function* user_prog = load_program(input_name);
@@ -73,29 +61,4 @@ int main(int argc, char **argv) {
     }
 
     return 0;
-}
-
-static char* read_file(char* src_name) {
-    FILE *fp = fopen(src_name, "r");
-    if (!fp) {
-        error_plain("ファイル`%s`を開けませんでした", src_name);
-    }
-    fseek(fp, 0, SEEK_END);
-    long size = ftell(fp);
-    rewind(fp);
-    char* src = malloc(size + 1);
-    int read_size = fread(src, 1, size, fp);
-    if (read_size != size) {
-        error_plain("ファイル`%s`から%ldバイト読み取る予定でしたが、%ldバイトを読み取りました", src_name, size, read_size);
-    }
-    src[size] = '\0';
-    fclose(fp);
-    return src;
-}
-
-static Function* load_program(char* path) {
-    src_name = path;
-    src = read_file(path);
-    token = tokenize(src);
-    return program();
 }
