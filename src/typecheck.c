@@ -82,8 +82,9 @@ static Type* scalar_cmp_result(const char* dunder) {
 // strict では不明な型同士だけを一致とする厳密な比較（実体化のキャッシュ用）
 static bool type_cmp(Type* a, Type* b, bool strict) {
     if (!strict) {
+        // 緩い比較では型変数同士は名前が違っても一致とする（元の type_equals の挙動）
         if (a->kind == TY_VAR && b->kind == TY_VAR) {
-            return a->len == b->len && !memcmp(a->name, b->name, a->len);
+            return true;
         }
         if (a->kind == TY_UNKNOWN || b->kind == TY_UNKNOWN) {
             return true;
