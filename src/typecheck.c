@@ -528,6 +528,9 @@ static Type* check_for(Node* node) {
     if (!iter_fn) {
         error_plain("`%s`型の値は反復できません", type_text(iterable));
     }
+    if (iter_fn->nparams != 1) {
+        error_plain("クラス`%.*s`の`__iter__`は引数を取れません", klass->len, klass->name);
+    }
     Type* iter_type = iter_fn->return_type;
     if (!iter_type || iter_type->kind != TY_CLASS) {
         error_plain("クラス`%.*s`の`__iter__`はイテレータを返す必要があります", klass->len, klass->name);
@@ -537,6 +540,15 @@ static Type* check_for(Node* node) {
     Function* next_fn = find_callable(iklass, "__next__", 8);
     if (!has_next_fn || !next_fn) {
         error_plain("クラス`%.*s`には`__has_next__`と`__next__`が必要です", iklass->len, iklass->name);
+    }
+    if (has_next_fn->nparams != 1) {
+        error_plain("クラス`%.*s`の`__has_next__`は引数を取れません", iklass->len, iklass->name);
+    }
+    if (next_fn->nparams != 1) {
+        error_plain("クラス`%.*s`の`__next__`は引数を取れません", iklass->len, iklass->name);
+    }
+    if (has_next_fn->return_type && !type_equals(has_next_fn->return_type, bool_type())) {
+        error_plain("クラス`%.*s`の`__has_next__`は`bool`を返す必要があります", iklass->len, iklass->name);
     }
     Type* elem = next_fn->return_type ? next_fn->return_type : &ty_unknown;
 
