@@ -75,6 +75,10 @@ error_tests=(
     "class P<A, B> { x: A; y: B; def __init__(self, x: A, y: B) { self.x = x; self.y = y; } } def main() { p: P<int> = P(1, 2); return 0; }|型引数は2個ですが、1個が指定されています"
     "def f(p: P<int, int, int, int, int>) -> int { return 1; } class P<A, B, C, D, E> { x: int; } def main() { return 0; }|型パラメータは4個までですが、5個が指定されています"
     "class B1<T> { v: T; def __init__(self, v: T) { self.v = v; } } class B2<T> { v: T; def __init__(self, v: T) { self.v = v; } } class W<T> { v: B1<T>; def __init__(self, v: B1<T>) { self.v = v; } } def main() { w = W(B2(5)); return 0; }|型引数を推論できません"
+    "def main() { g = x -> x; return 0; }|ラムダの引数の型が分かりません"
+    "def id_str(s: str) -> str { return s; } def main() { f: fn(int) -> int = id_str; return 0; }|fn(int) -> int"
+    "def main() { x = 5; return x(1); }|型の値は呼び出せません"
+    "def twice(x: int) -> int { return x * 2; } def main() { twice += 1; return 0; }|fn(int) -> int\`型と"
 )
 
 cc -c -o funcs.o funcs.c

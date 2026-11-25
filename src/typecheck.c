@@ -10,6 +10,14 @@ static Function* current_fn;
 static Type* current_return;
 Function* functions;
 
+// 式に期待される型（双方向の型制約）。注釈つき代入の右辺・呼び出しの引数・
+// 戻り値など、期待が分かる場所でだけ直前にセットし、ND_LAMBDA が消費する。
+// check_node は入口でこれを取り込み、それ以外のノードでは子へ漏らさない
+static Type* expected_type;
+
+// ラムダ本体の検査中に、その関数が捕まえた変数の一覧
+static Capture* current_captures;
+
 // ノードの代表トークンが現在のソース（利用者のファイル）の範囲内にあれば
 // 位置つきで、なければ位置なしでエラーを出す。prelude 由来のノードや
 // そのジェネリクスクローンは prelude のバッファを指すため、範囲チェック
@@ -139,17 +147,24 @@ static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index
 
 static Type* check_node(Node* node);
 
-// 引数を全部検査し、型を最大 6 個まで記録する。引数の数を返す
-static int check_args(Node* args, Type* arg_types[6]) {
+// 引数を全部検査し、型を最大 6 個まで記録する。引数の数を返す。
+// expected_list があれば、各引数の期待型として渡す（ラムダの型決定用）
+static int check_args_expected(Node* args, Type* arg_types[6], Type* expected_list[6]) {
     int nargs = 0;
     for (Node* arg = args; arg; arg = arg->next) {
+        expected_type = expected_list && nargs < 6 ? expected_list[nargs] : NULL;
         Type* at = check_node(arg);
+        expected_type = NULL;
         if (nargs < 6) {
             arg_types[nargs] = at;
         }
         nargs++;
     }
     return nargs;
+}
+
+static int check_args(Node* args, Type* arg_types[6]) {
+    return check_args_expected(args, arg_types, NULL);
 }
 
 // 変数の型（注釈または記録済み）と代入する値の型が食い違えばエラー
@@ -254,7 +269,17 @@ static Type* check_binop(Node* node) {
 }
 
 static Type* check_assign(Node* node) {
+    // 右辺への期待型: 注釈があれば注釈、なければ代入先の記録済みの型
+    if (node->anno) {
+        expected_type = node->anno;
+    } else if (node->left_child->kind == ND_LVAR) {
+        expected_type = local_types[node->left_child->offset / 8];
+    } else if (node->left_child->kind == ND_GVAR) {
+        Type* gt = find_global_type(node->left_child);
+        expected_type = gt->kind != TY_UNKNOWN ? gt : NULL;
+    }
     Type* rhs = check_node(node->right_child);
+    expected_type = NULL;
     if (node->anno) {
         rhs = adopt_type(node->anno, rhs);
     }
@@ -293,6 +318,12 @@ static Type* check_assign(Node* node) {
                 error_node(node, "配列の要素は`%s`ですが、`%s`が代入されています", type_text(elem), type_text(rhs));
             }
         }
+    } else if (lhs->kind == ND_CAPVAR) {
+        Type* cap_type = check_node(lhs);
+        if (cap_type->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(cap_type, rhs)) {
+            error_node(lhs, "変数`%.*s`の型は`%s`ですが、`%s`が代入されています", lhs->len, lhs->name, type_text(cap_type), type_text(rhs));
+        }
+        lhs->type = cap_type;
     } else {
         check_node(lhs);
         if (lhs->kind == ND_LEN) {
@@ -301,8 +332,14 @@ static Type* check_assign(Node* node) {
         if (lhs->kind == ND_MEMBER && lhs->func) {
             error_node(lhs, "メソッド`%.*s`には代入できません", lhs->len, lhs->name);
         }
-        if (lhs->kind == ND_MCALL || lhs->kind == ND_FUNCALL) {
+        if (lhs->kind == ND_FUNCREF) {
+            error_node(lhs, "関数`%.*s`には代入できません", lhs->len, lhs->name);
+        }
+        if (lhs->kind == ND_MCALL || lhs->kind == ND_FUNCALL || lhs->kind == ND_VCALL) {
             error_node(lhs, "呼び出しの結果には代入できません");
+        }
+        if (lhs->kind == ND_LAMBDA) {
+            error_node(lhs, "ラムダには代入できません");
         }
     }
     return rhs;
@@ -343,11 +380,158 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
     return klass->type;
 }
 
-static Type* check_funcall(Node* node) {
+// 関数参照: 関数のシグネチャから関数型を組み立てる
+static Type* check_funcref(Node* node) {
+    Function* fn = find_callable(NULL, node->name, node->len);
+    if (!fn) {
+        return &ty_unknown;
+    }
+    node->func = fn;
+    Type* params[6];
+    for (int i = 0; i < fn->nparams && i < 6; i++) {
+        params[i] = fn->param_types[i] ? fn->param_types[i] : &ty_unknown;
+    }
+    return func_type(params, fn->nparams, fn->return_type ? fn->return_type : &ty_unknown);
+}
+
+// ラムダ本体のオンデマンド検査。本体は外側の関数の検査の途中で呼ばれるため、
+// 検査状態（local_types と現在関数まわり）を退避してから本体を歩く。
+// 期待型があれば引数型と戻り値型をそれで補い、捕捉の型は外側の文脈から確定する
+static Type* check_lambda(Node* node, Type* expected) {
+    Function* fn = node->func;
+    if (!fn) {
+        // ジェネリクスのクローンでは func がリセットされるため、名前で引き直す
+        for (Function* f = functions; f; f = f->next) {
+            if (f->is_lambda && f->len == node->len && !memcmp(f->name, node->name, node->len)) {
+                fn = f;
+                break;
+            }
+        }
+        node->func = fn;
+    }
+    if (!fn) {
+        return &ty_unknown;
+    }
+    if (fn->lambda_checked) {
+        if (expected && expected->kind == TY_FUNC && fn->func_type && !type_equals(expected, fn->func_type)) {
+            error_node(node, "ラムダの型は`%s`ですが、`%s`が期待されています", type_text(fn->func_type), type_text(expected));
+        }
+        return fn->func_type ? fn->func_type : &ty_unknown;
+    }
+    if (expected && expected->kind == TY_FUNC) {
+        if (expected->func_nparams != fn->nparams) {
+            error_node(node, "ラムダの引数は%d個ですが、%d個が期待されています", fn->nparams, expected->func_nparams);
+        }
+        for (int i = 0; i < fn->nparams; i++) {
+            Type* et = expected->func_params[i];
+            if (!et || et->kind == TY_UNKNOWN) {
+                continue;
+            }
+            if (fn->param_types[i] && !type_equals(fn->param_types[i], et)) {
+                error_node(node, "ラムダの引数の型は`%s`ですが、`%s`が期待されています", type_text(fn->param_types[i]), type_text(et));
+            }
+            if (!fn->param_types[i]) {
+                fn->param_types[i] = et;
+            }
+        }
+        if (!fn->return_type && expected->func_ret && expected->func_ret->kind != TY_UNKNOWN) {
+            fn->return_type = expected->func_ret;
+        }
+    }
+    for (int i = 0; i < fn->nparams; i++) {
+        if (!fn->param_types[i]) {
+            error_node(node, "ラムダの引数の型が分かりません（型注釈を付けるか、関数型が期待される場所で使ってください）");
+        }
+    }
+    // 捕捉の型を確定する。直接捕捉は外側の local_types から、推移的捕捉は
+    // 捕まえ元の捕捉（外側ラムダの検査で確定済み）から取る
+    for (Capture* c = fn->captures; c; c = c->next) {
+        if (c->src_is_env) {
+            c->type = c->src_cap && c->src_cap->type ? c->src_cap->type : &ty_unknown;
+        } else {
+            Type* t = local_types[c->src_offset / 8];
+            c->type = t ? t : &ty_unknown;
+        }
+    }
+    Type* saved_types[1024];
+    memcpy(saved_types, local_types, sizeof(local_types));
+    Function* saved_fn = current_fn;
+    Type* saved_return = current_return;
+    Capture* saved_captures = current_captures;
+    memset(local_types, 0, sizeof(local_types));
+    current_fn = fn;
+    current_return = fn->return_type;
+    current_captures = fn->captures;
+    for (int i = 0; i < fn->nparams && i < 6; i++) {
+        if (fn->param_types[i]) {
+            local_types[i + 1] = fn->param_types[i];
+        }
+    }
+    for (Node* stmt = fn->body; stmt; stmt = stmt->next) {
+        check_node(stmt);
+    }
+    fn->lambda_checked = true;
+    Type* params[6];
+    for (int i = 0; i < fn->nparams && i < 6; i++) {
+        params[i] = fn->param_types[i] ? fn->param_types[i] : &ty_unknown;
+    }
+    fn->func_type = func_type(params, fn->nparams, fn->return_type ? fn->return_type : &ty_unknown);
+    memcpy(local_types, saved_types, sizeof(local_types));
+    current_fn = saved_fn;
+    current_return = saved_return;
+    current_captures = saved_captures;
+    return fn->func_type;
+}
+
+// 値経由の呼び出し: 対象が関数型なら、個数と引数の型を照合する
+static Type* check_vcall(Node* node) {
+    Type* lt = check_node(node->left_child);
+    Type* expected_list[6] = {};
+    if (lt->kind == TY_FUNC) {
+        for (int i = 0; i < lt->func_nparams && i < 6; i++) {
+            expected_list[i] = lt->func_params[i];
+        }
+    }
     Type* arg_types[6];
-    int nargs = check_args(node->args, arg_types);
+    int nargs = check_args_expected(node->args, arg_types, expected_list);
+    if (lt->kind == TY_UNKNOWN) {
+        return &ty_unknown;
+    }
+    if (lt->kind != TY_FUNC) {
+        error_node(node, "`%s`型の値は呼び出せません", type_text(lt));
+    }
+    if (nargs != lt->func_nparams) {
+        error_node(node, "関数値の引数は%d個ですが、%d個が指定されています", lt->func_nparams, nargs);
+    }
+    for (int i = 0; i < nargs && i < lt->func_nparams && i < 6; i++) {
+        Type* pt = lt->func_params[i];
+        if (pt && arg_types[i]->kind != TY_UNKNOWN && !type_equals(pt, arg_types[i])) {
+            error_node(node, "関数値の引数には`%s`が必要ですが、`%s`が指定されています", type_text(pt), type_text(arg_types[i]));
+        }
+    }
+    return lt->func_ret ? lt->func_ret : &ty_unknown;
+}
+
+static Type* check_funcall(Node* node) {
     Function* callee = find_callable(NULL, node->name, node->len);
-    if (node->len == 5 && !memcmp(node->name, "print", 5) && !callee && !find_class(node->name, node->len)) {
+    Class* klass = callee ? NULL : find_class(node->name, node->len);
+    // 引数の期待型を先に用意する（引数位置のラムダの型を決めるため）
+    Type* expected_list[6] = {};
+    if (callee) {
+        for (int i = 0; i < callee->nparams && i < 6; i++) {
+            expected_list[i] = callee->param_types[i];
+        }
+    } else if (klass) {
+        Function* init = find_callable(klass, "__init__", 8);
+        if (init) {
+            for (int i = 0; i + 1 < init->nparams && i < 6; i++) {
+                expected_list[i] = init->param_types[i + 1];
+            }
+        }
+    }
+    Type* arg_types[6];
+    int nargs = check_args_expected(node->args, arg_types, expected_list);
+    if (node->len == 5 && !memcmp(node->name, "print", 5) && !callee && !klass) {
         if (nargs != 1) {
             error_node(node, "`print`の引数は1個ですが、%d個が指定されています", nargs);
         }
@@ -376,7 +560,6 @@ static Type* check_funcall(Node* node) {
         return &ty_unknown;
     }
     if (!callee) {
-        Class* klass = find_class(node->name, node->len);
         if (klass) {
             return check_construct(node, klass, arg_types, nargs);
         }
@@ -441,9 +624,9 @@ static Type* check_member(Node* node) {
 
 static Type* check_mcall(Node* node) {
     Type* obj = check_node(node->left_child);
-    Type* arg_types[6];
-    int nargs = check_args(node->args, arg_types);
     if (node->len == 3 && !memcmp(node->name, "len", 3) && (obj->kind == TY_ARRAY || obj->kind == TY_UNKNOWN)) {
+        Type* arg_types[6];
+        int nargs = check_args(node->args, arg_types);
         if (nargs != 0) {
             error_node(node, "`len`の引数は0個ですが、%d個が指定されています", nargs);
         }
@@ -451,6 +634,8 @@ static Type* check_mcall(Node* node) {
         return &ty_int;
     }
     if (obj->kind == TY_UNKNOWN) {
+        Type* arg_types[6];
+        check_args(node->args, arg_types);
         return &ty_unknown;
     }
     Class* klass = class_of(obj);
@@ -459,10 +644,33 @@ static Type* check_mcall(Node* node) {
     }
     Function* method = find_callable(klass, node->name, node->len);
     if (!method) {
+        // メソッドではなくフィールドなら、関数型フィールドの呼び出しとして
+        // 値経由の呼び出しに書き換える（設計メモの決定）
+        for (Field* f = klass->fields; f; f = f->next) {
+            if (f->len == node->len && !memcmp(f->name, node->name, f->len)) {
+                Node* member = create_node(ND_MEMBER);
+                member->left_child = node->left_child;
+                member->name = node->name;
+                member->len = node->len;
+                member->tok = node->tok;
+                member->klass = klass;
+                member->offset = f->offset;
+                member->type = f->type;
+                node->kind = ND_VCALL;
+                node->left_child = member;
+                return check_vcall(node);
+            }
+        }
         error_node(node, "クラス`%.*s`にメソッド`%.*s`は定義されていません", klass->len, klass->name, node->len, node->name);
     }
     node->func = method;
     node->klass = klass;
+    Type* expected_list[6] = {};
+    for (int i = 0; i + 1 < method->nparams && i < 6; i++) {
+        expected_list[i] = method->param_types[i + 1];
+    }
+    Type* arg_types[6];
+    int nargs = check_args_expected(node->args, arg_types, expected_list);
     if (nargs != method->nparams - 1) {
         error_node(node, "クラス`%.*s`のメソッド`%.*s`の引数は%d個ですが、%d個が指定されています", klass->len, klass->name, node->len, node->name, method->nparams - 1, nargs);
     }
@@ -475,10 +683,13 @@ static Type* check_mcall(Node* node) {
     return method->return_type ? method->return_type : &ty_unknown;
 }
 
-static Type* check_arraylit(Node* node) {
+static Type* check_arraylit(Node* node, Type* expected) {
     Type* elem = &ty_unknown;
+    Type* elem_expected = expected && expected->kind == TY_ARRAY ? expected->elem : NULL;
     for (Node* e = node->body; e; e = e->next) {
+        expected_type = elem_expected;
         Type* et = check_node(e);
+        expected_type = NULL;
         if (et->kind == TY_UNKNOWN) {
             continue;
         }
@@ -513,7 +724,9 @@ static Type* check_index(Node* node) {
 }
 
 static Type* check_return(Node* node) {
+    expected_type = current_return;
     Type* rt = check_node(node->left_child);
+    expected_type = NULL;
     if (rt->kind != TY_UNKNOWN) {
         if (!current_return) {
             current_fn->return_type = rt;
@@ -840,6 +1053,12 @@ static Type* check_node(Node* node) {
     if (!node) {
         return &ty_unknown;
     }
+    // 期待型は直属のラムダと配列リテラルだけが受け取り、それ以外へは漏らさない
+    Type* my_expected = NULL;
+    if (node->kind == ND_LAMBDA || node->kind == ND_ARRAY) {
+        my_expected = expected_type;
+    }
+    expected_type = NULL;
     Type* result = &ty_unknown;
     switch (node->kind) {
         case ND_NUM:
@@ -850,6 +1069,25 @@ static Type* check_node(Node* node) {
             if (!result) {
                 result = &ty_unknown;
             }
+            break;
+        case ND_CAPVAR: {
+            result = &ty_unknown;
+            for (Capture* c = current_captures; c; c = c->next) {
+                if (c->env_offset == node->offset) {
+                    result = c->type ? c->type : &ty_unknown;
+                    break;
+                }
+            }
+            break;
+        }
+        case ND_FUNCREF:
+            result = check_funcref(node);
+            break;
+        case ND_LAMBDA:
+            result = check_lambda(node, my_expected);
+            break;
+        case ND_VCALL:
+            result = check_vcall(node);
             break;
         case ND_BINOP:
             result = check_binop(node);
@@ -870,7 +1108,7 @@ static Type* check_node(Node* node) {
             result = check_funcall(node);
             break;
         case ND_ARRAY:
-            result = check_arraylit(node);
+            result = check_arraylit(node, my_expected);
             break;
         case ND_NEWARRAY: {
             Type* fill = check_node(node->left_child);
@@ -1027,6 +1265,10 @@ void typecheck(Function* prog) {
     functions = prog;
     for (Function* fn = prog; fn; fn = fn->next) {
         if (fn->klass && fn->klass->tparam_count > 0) {
+            continue;
+        }
+        if (fn->is_lambda) {
+            // ラムダ本体は、使われている場所で期待型と一緒に検査する
             continue;
         }
         memset(local_types, 0, sizeof(local_types));

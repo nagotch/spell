@@ -13,6 +13,10 @@ static int new_label() {
 static int break_label = -1;
 static int continue_label = -1;
 
+// 生成中の関数がラムダの場合、その環境ポインタ退避スロットのオフセット。
+// ラムダでなければ 0（捕捉変数や環境経由の捕捉は現れない）
+static int current_env_offset = 0;
+
 // 関数呼び出しの引数レジスタ（System V ABI の順）
 static char* arg_regs[] = {
     "rdi",
@@ -83,6 +87,23 @@ static void emit_call(int label, Class* klass, int len, char* name) {
     printf(".Lend%d:\n", label);
 }
 
+// r11 に入っているコードポインタへの間接呼び出し（値経由の呼び出し用）。
+// 境界調整は rax と rsp だけを使い、引数レジスタと r10（環境）・r11 を壊さない
+static void emit_call_reg(int label) {
+    printf("  mov rax, rsp\n");
+    printf("  and rax, 15\n");
+    printf("  jnz .Lcall%d\n", label);
+    printf("  mov rax, 0\n");
+    printf("  call r11\n");
+    printf("  jmp .Lend%d\n", label);
+    printf(".Lcall%d:\n", label);
+    printf("  sub rsp, 8\n");
+    printf("  mov rax, 0\n");
+    printf("  call r11\n");
+    printf("  add rsp, 8\n");
+    printf(".Lend%d:\n", label);
+}
+
 // ---- アドレスの生成 ----
 
 // スタック上の引数を arg_regs[offset] から逆順に pop する
@@ -111,6 +132,13 @@ static void gen_addr(Node* node) {
     if (node->kind == ND_LVAR) {
         printf("  mov rax, rbp\n");
         printf("  sub rax, %d\n", node->offset);
+        printf("  push rax\n");
+        return;
+    }
+    if (node->kind == ND_CAPVAR) {
+        // 環境ポインタ（フレームに退避済み）＋環境内のスロットオフセット
+        printf("  mov rax, [rbp-%d]\n", current_env_offset);
+        printf("  add rax, %d\n", node->offset);
         printf("  push rax\n");
         return;
     }
@@ -345,6 +373,72 @@ static void gen_funcall(Node* node) {
     printf("  push rax\n");
 }
 
+// 関数値の組（[0]=コード、[8]=環境ポインタ）をヒープに作って push する
+static void gen_funcref(Node* node) {
+    printf("  mov rdi, 16\n");
+    emit_call(new_label(), NULL, 6, "malloc");
+    printf("  lea rcx, [rip + %.*s]\n", node->len, node->name);
+    printf("  mov [rax], rcx\n");
+    printf("  mov qword ptr [rax + 8], 0\n");
+    printf("  push rax\n");
+}
+
+// ラムダ式: 組と環境を1つのブロックに確保する（[0]=コード、[8]=環境、
+// 環境はブロックの16バイト目から）。捕捉は生成時点の値をコピーする
+static void gen_lambda(Node* node) {
+    if (!node->func) {
+        error_internal("ラムダの関数が解決されていません");
+    }
+    int ncaptures = 0;
+    for (Capture* c = node->captures; c; c = c->next) {
+        ncaptures++;
+    }
+    if (ncaptures == 0) {
+        printf("  mov rdi, 16\n");
+        emit_call(new_label(), NULL, 6, "malloc");
+        printf("  lea rcx, [rip + %.*s]\n", node->func->len, node->func->name);
+        printf("  mov [rax], rcx\n");
+        printf("  mov qword ptr [rax + 8], 0\n");
+        printf("  push rax\n");
+        return;
+    }
+    printf("  mov rdi, %d\n", 16 + 8 * ncaptures);
+    emit_call(new_label(), NULL, 6, "malloc");
+    printf("  lea rcx, [rip + %.*s]\n", node->func->len, node->func->name);
+    printf("  mov [rax], rcx\n");
+    printf("  lea rcx, [rax + 16]\n");
+    printf("  mov [rax + 8], rcx\n");
+    for (Capture* c = node->captures; c; c = c->next) {
+        if (c->src_is_env) {
+            printf("  mov rcx, [rbp-%d]\n", current_env_offset);
+            printf("  mov rcx, [rcx + %d]\n", c->src_offset);
+        } else {
+            printf("  mov rcx, [rbp-%d]\n", c->src_offset);
+        }
+        printf("  mov [rax + %d], rcx\n", 16 + c->env_offset);
+    }
+    printf("  push rax\n");
+}
+
+// 値経由の呼び出し: 組からコードと環境を取り、環境は r10 で渡す
+static void gen_vcall(Node* node) {
+    gen(node->left_child);
+    int args_cnt = 0;
+    for (Node* arg = node->args; arg; arg = arg->next) {
+        gen(arg);
+        args_cnt++;
+    }
+    if (args_cnt > 6) {
+        error_plain("関数に渡せる引数は6個までですが、%d個が指定されています", args_cnt);
+    }
+    pop_args(args_cnt, 0);
+    printf("  pop rax\n");
+    printf("  mov r11, [rax]\n");
+    printf("  mov r10, [rax + 8]\n");
+    emit_call_reg(new_label());
+    printf("  push rax\n");
+}
+
 static void gen_member(Node* node) {
     gen(node->left_child);
     if (node->func) {
@@ -482,7 +576,11 @@ static void gen(Node* node) {
     switch (node->kind) {
         case ND_UNARY: gen_unary(node); break;
         case ND_LVAR:
-        case ND_GVAR: gen_var(node); break;
+        case ND_GVAR:
+        case ND_CAPVAR: gen_var(node); break;
+        case ND_FUNCREF: gen_funcref(node); break;
+        case ND_LAMBDA: gen_lambda(node); break;
+        case ND_VCALL: gen_vcall(node); break;
         case ND_ASSIGN: gen_assign(node); break;
         case ND_NUM: gen_num(node); break;
         case ND_RETURN: gen_return(node); break;
@@ -550,6 +648,11 @@ void codegen(Function* prog) {
         printf("  push rbp\n");
         printf("  mov rbp, rsp\n");
         printf("  sub rsp, %d\n", prog->stack_size);
+        current_env_offset = prog->is_lambda ? prog->env_offset : 0;
+        if (prog->is_lambda) {
+            // 隠し引数（r10）の環境ポインタをフレームへ退避する
+            printf("  mov [rbp-%d], r10\n", prog->env_offset);
+        }
         if (has_init && prog->len == 4 && memcmp(prog->name, "main", 4) == 0) {
             printf("  call __spell_init\n");
         }
