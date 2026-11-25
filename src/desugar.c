@@ -18,6 +18,7 @@ static Node* desugar_node(Node* node) {
     if (node->kind == ND_OPASSIGN) {
         Node* combined = create_node(ND_BINOP);
         combined->op = node->op;
+        combined->tok = node->tok;
         combined->left_child = node->left_child;
         combined->right_child = node->right_child;
         node->kind = ND_ASSIGN;

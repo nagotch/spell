@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 typedef struct Field Field;
@@ -136,6 +138,7 @@ struct Node {
     Type* anno;
     Class* klass;
     Function* func;
+    Token* tok;
 };
 
 struct Function {
@@ -201,7 +204,9 @@ Class* find_class(char* name, int len);
 Type* array_type(Type* elem);
 
 void error_at(long start, long end, char* fmt, ...);
+void error_at_v(long start, long end, char* fmt, va_list ap);
 void error_plain(char* fmt, ...);
+void error_plain_v(char* fmt, va_list ap);
 void error_internal(char* fmt, ...);
 
 Token* tokenize(char* s);

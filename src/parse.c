@@ -137,6 +137,7 @@ Node* create_ident_node(Token* tok) {
             node->name = tok->str;
             node->len = tok->len;
             node->offset = lvar->offset;
+            node->tok = tok;
             return node;
         }
     }
@@ -148,6 +149,7 @@ Node* create_ident_node(Token* tok) {
             node->name = tok->str;
             node->len = tok->len;
             node->offset = locals->offset;
+            node->tok = tok;
             return node;
         }
         register_gvar(tok);
@@ -155,6 +157,7 @@ Node* create_ident_node(Token* tok) {
     Node* node = create_node(ND_GVAR);
     node->name = tok->str;
     node->len = tok->len;
+    node->tok = tok;
     return node;
 }
 
@@ -174,51 +177,56 @@ Node* char_array() {
     node->array_len = str_token->len;
     node->body = body.next;
     node->offset = locals->offset;
+    node->tok = str_token;
     return node;
 }
 
 static Node* stmt_block();
-static Node* stmt_return();
-static Node* stmt_if();
-static Node* stmt_while();
-static Node* stmt_for();
-static Node* make_for_iter(Token* var, Node* init);
-static Node* make_for_count(Node* count);
+static Node* stmt_return(Token* kw);
+static Node* stmt_if(Token* kw);
+static Node* stmt_while(Token* kw);
+static Node* stmt_for(Token* kw);
+static Node* make_for_iter(Token* var, Node* init, Token* kw);
+static Node* make_for_count(Node* count, Token* kw);
 
 static Node* stmt() {
+    Token* start = token;
     if (consume("{")) {
         return stmt_block();
     } else if (consume_keyword(KW_RETURN)) {
-        return stmt_return();
+        return stmt_return(start);
     } else if (consume_keyword(KW_IF)) {
-        return stmt_if();
+        return stmt_if(start);
     } else if (consume_keyword(KW_WHILE)) {
-        return stmt_while();
+        return stmt_while(start);
     } else if (consume_keyword(KW_FOR)) {
-        return stmt_for();
+        return stmt_for(start);
     } else if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '!'
                && token->next->kind == TK_SYMBOL && token->next->len == 1 && token->next->str[0] == ';') {
         // `!;` は break の省略形
         consume("!");
         consume(";");
         Node* node = create_node(ND_BREAK);
+        node->tok = start;
         return node;
     } else if (consume("^")) {
         // `^;` は continue の省略形
         Node* node = create_node(ND_CONTINUE);
+        node->tok = start;
         expect(";");
         return node;
     } else if (consume("@")) {
-        return make_for_count(expr());
+        return make_for_count(expr(), start);
     } else if (token->kind == TK_IDENT && token->next->kind == TK_SYMBOL && token->next->len == 1 && token->next->str[0] == '@') {
         Token* var = consume_ident();
         consume("@");
-        return make_for_iter(var, expr());
+        return make_for_iter(var, expr(), start);
     } else if (consume("<<") || consume("<")) {
         // 出力の省略形: << 式 / < 式（print と同じ）
         Node* node = create_node(ND_FUNCALL);
         node->name = "print";
         node->len = 5;
+        node->tok = start;
         node->args = expr();
         expect(";");
         return node;
@@ -228,12 +236,15 @@ static Node* stmt() {
         expect(";");
         Node* input = create_node(ND_INPUT);
         input->val = 0;
+        input->tok = start;
         Node* node = create_node(ND_ASSIGN);
         node->left_child = target;
         node->right_child = input;
+        node->tok = target->tok;
         return node;
     } else if (consume_keyword(KW_PUT)) {
         Node* node = create_node(ND_PUT);
+        node->tok = start;
         node->args = parse_put_args();
         expect(";");
         return node;
@@ -241,6 +252,7 @@ static Node* stmt() {
         Node* node = create_node(ND_FUNCALL);
         node->name = "print_yn";
         node->len = 8;
+        node->tok = start;
         node->args = expr();
         expect(";");
         return node;
@@ -265,13 +277,16 @@ static Node* stmt() {
         Node* node = create_node(ND_ASSIGN);
         node->left_child = create_ident_node(var);
         node->right_child = call;
+        node->tok = var;
         return node;
     } else if (consume_keyword(KW_BREAK)) {
         Node* node = create_node(ND_BREAK);
+        node->tok = start;
         expect(";");
         return node;
     } else if (consume_keyword(KW_CONTINUE)) {
         Node* node = create_node(ND_CONTINUE);
+        node->tok = start;
         expect(";");
         return node;
     } else {
@@ -300,32 +315,37 @@ static Node* stmt_block() {
     return node;
 }
 
-static Node* stmt_return() {
+static Node* stmt_return(Token* kw) {
     Node* node;
     node = create_node(ND_RETURN);
+    node->tok = kw;
     node->left_child = expr();
     expect(";");
     return node;
 }
 
-static Node* stmt_if() {
+static Node* stmt_if(Token* kw) {
     Node* node;
     node = create_node(ND_IF);
+    node->tok = kw;
     expect("(");
     node->cond = expr();
     expect(")");
     node->then = stmt();
     if (consume_keyword(KW_ELSE)) {
         node->els = stmt();
-    } else if (consume_keyword(KW_ELIF)) {
-        node->els = stmt_if();
+    } else if (token->kind == TK_KEYWORD && token->keyword == KW_ELIF) {
+        Token* elif_tok = token;
+        token = token->next;
+        node->els = stmt_if(elif_tok);
     }
     return node;
 }
 
-static Node* stmt_while() {
+static Node* stmt_while(Token* kw) {
     Node* node;
     node = create_node(ND_WHILE);
+    node->tok = kw;
     expect("(");
     node->cond = expr();
     expect(")");
@@ -333,8 +353,9 @@ static Node* stmt_while() {
     return node;
 }
 
-static Node* make_for_iter(Token* var, Node* init) {
+static Node* make_for_iter(Token* var, Node* init, Token* kw) {
     Node* node = create_node(ND_FOR);
+    node->tok = kw;
     node->init = init;
     register_any();
     node->offset = locals->offset;
@@ -348,9 +369,10 @@ static Node* make_for_iter(Token* var, Node* init) {
     return node;
 }
 
-static Node* make_for_count(Node* count) {
+static Node* make_for_count(Node* count, Token* kw) {
     // 束縛なしの回数リピートは Range(0, n) の要素走査として扱う
     Node* node = create_node(ND_FOR);
+    node->tok = kw;
     Node* range_call = create_node(ND_FUNCALL);
     range_call->name = "__count_range";
     range_call->len = 13;
@@ -371,13 +393,13 @@ static Node* make_for_count(Node* count) {
     return node;
 }
 
-static Node* stmt_for() {
+static Node* stmt_for(Token* kw) {
     if (token->kind == TK_IDENT && token->next->kind == TK_KEYWORD && token->next->keyword == KW_IN) {
         Token* var = consume_ident();
         consume_keyword(KW_IN);
-        return make_for_iter(var, expr());
+        return make_for_iter(var, expr(), kw);
     }
-    return make_for_count(expr());
+    return make_for_count(expr(), kw);
 }
 
 // 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数の数を返す
