@@ -593,7 +593,8 @@ static long utf8_len_at(const char* text, long off) {
 }
 
 // 子プロセス側: パイプラインを回し、結果をパイプへ書いて _exit する
-static void run_check_child(const char* text, int out_fd) {
+// is_prelude のときは組み込み prelude を読み込まず、本文だけで回す
+static void run_check_child(const char* text, int out_fd, int is_prelude) {
     int devnull = open("/dev/null", O_WRONLY);
     if (devnull >= 0) {
         dup2(devnull, STDOUT_FILENO);
@@ -603,9 +604,12 @@ static void run_check_child(const char* text, int out_fd) {
     memset(&res, 0, sizeof(res));
     char* copy = strdup(text);
     if (setjmp(*error_capture_begin()) == 0) {
-        char prelude_path[4096];
-        spell_prelude_path(prelude_path, sizeof(prelude_path));
-        Function* prog = load_program(prelude_path);
+        Function* prog = NULL;
+        if (!is_prelude) {
+            char prelude_path[4096];
+            spell_prelude_path(prelude_path, sizeof(prelude_path));
+            prog = load_program(prelude_path);
+        }
         Function* user_prog = load_program_text(copy, (char*)"spell-lsp");
         if (prog) {
             Function* tail = prog;
@@ -657,7 +661,7 @@ static void run_check_child(const char* text, int out_fd) {
     _exit(0);
 }
 
-static CheckResult run_check(const char* text) {
+static CheckResult run_check(const char* text, int is_prelude) {
     CheckResult res;
     memset(&res, 0, sizeof(res));
     int fds[2];
@@ -676,7 +680,7 @@ static CheckResult run_check(const char* text) {
     }
     if (pid == 0) {
         close(fds[0]);
-        run_check_child(text, fds[1]);
+        run_check_child(text, fds[1], is_prelude);
     }
     close(fds[1]);
     char* p = (char*)&res;
@@ -704,8 +708,18 @@ static CheckResult run_check(const char* text) {
 
 // ===== 診断の送信 =====
 
+// prelude.sp 自身を開いたときは、組み込み prelude と二重定義になるのを避け、
+// 本文だけでチェックする（prelude は自己完結しているので意味論もその方が正しい）。
+// 別ディレクトリの同名ファイルも対象になるが、実用上の問題はないと判断した
+static int uri_is_prelude(const char* uri) {
+    const char* suffix = "/prelude.sp";
+    size_t ulen = strlen(uri);
+    size_t slen = strlen(suffix);
+    return ulen >= slen && !strcmp(uri + ulen - slen, suffix);
+}
+
 static void publish_diagnostics(const Doc* doc) {
-    CheckResult r = run_check(doc->text);
+    CheckResult r = run_check(doc->text, uri_is_prelude(doc->uri));
     Buf b = {0};
     buf_adds(&b, "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":");
     buf_add_json_string(&b, doc->uri);
