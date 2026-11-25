@@ -47,6 +47,7 @@ static Node* primary() {
         int mode = token->keyword == KW_IN ? 0 : token->keyword == KW_IN_STR ? 1 : 2;
         token = token->next;
         node = create_node(ND_INPUT);
+        node->tok = kw;
         node->val = mode;
         Node* args = NULL;
         Node** tail = &args;
@@ -69,17 +70,23 @@ static Node* primary() {
     }
     Token* ident_token = consume_ident();
     if (token->kind == TK_STR) {
+        Token* str_tok = token;
         Node* arr = char_array();
         node = create_node(ND_FUNCALL);
         node->name = "str";
         node->len = 3;
+        node->tok = str_tok;
         node->args = arr;
-    } else if (!ident_token && consume("[")) {
+    } else if (!ident_token && token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '[') {
+        Token* bracket = token;
+        token = token->next;
         node = array_literal();
+        node->tok = bracket;
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
         node->name = ident_token->str;
         node->len = ident_token->len;
+        node->tok = ident_token;
         node->args = parse_args();
     } else if (ident_token) {
         node = create_ident_node(ident_token);
@@ -87,14 +94,18 @@ static Node* primary() {
         node = expr();
         expect(")");
     } else {
+        Token* num_tok = token;
         long num = expect_number();
         node = create_number_node(num);
+        node->tok = num_tok;
     }
     while (true) {
+        Token* postfix_tok = token;
         bool inc = consume("++");
         if (inc || consume("--")) {
             Node* assign_node = create_node(ND_OPASSIGN);
             assign_node->op.binop = inc ? OP_ADD : OP_SUB;
+            assign_node->tok = postfix_tok;
             assign_node->left_child = node;
             assign_node->right_child = create_number_node(1);
             node = assign_node;
@@ -104,6 +115,7 @@ static Node* primary() {
             Node* right_child = expr();
             expect("]");
             Node* new_node = create_node(ND_INDEX);
+            new_node->tok = postfix_tok;
             new_node->left_child = node;
             new_node->right_child = right_child;
             node = new_node;
@@ -125,6 +137,7 @@ static Node* primary() {
         new_node->left_child = node;
         new_node->name = member_token->str;
         new_node->len = member_token->len;
+        new_node->tok = member_token;
         node = new_node;
         if (consume("(")) {
             new_node->kind = ND_MCALL;
@@ -135,24 +148,29 @@ static Node* primary() {
 }
 
 static Node* unary() {
+    Token* op_tok = token;
     if (consume("+")) {
         return primary();
     } else if (consume("-")) {
         Node* node = create_binary_operation_node(OP_SUB, create_number_node(0), primary());
+        node->tok = op_tok;
         return node;
     } else if (consume("*")) {
         Node* node = create_node(ND_UNARY);
         node->op.unop = OP_DEREF;
+        node->tok = op_tok;
         node->left_child = unary();
         return node;
     } else if (consume("&")) {
         Node* node = create_node(ND_UNARY);
         node->op.unop = OP_ADDR;
+        node->tok = op_tok;
         node->left_child = unary();
         return node;
     } else if (consume("!")) {
         Node* node = create_node(ND_UNARY);
         node->op.unop = OP_NOT;
+        node->tok = op_tok;
         node->left_child = unary();
         return node;
     }
@@ -162,12 +180,16 @@ static Node* unary() {
 static Node* mul() {
     Node* node = unary();
     while (true) {
+        Token* op_tok = token;
         if (consume("*")) {
             node = create_binary_operation_node(OP_MUL, node, unary());
+            node->tok = op_tok;
         } else if (consume("/")) {
             node = create_binary_operation_node(OP_DIV, node, unary());
+            node->tok = op_tok;
         } else if (consume("%")) {
             node = create_binary_operation_node(OP_MOD, node, unary());
+            node->tok = op_tok;
         } else {
             break;
         }
@@ -178,10 +200,13 @@ static Node* mul() {
 static Node* add() {
     Node* node = mul();
     while (true) {
+        Token* op_tok = token;
         if (consume("+")) {
             node = create_binary_operation_node(OP_ADD, node, mul());
+            node->tok = op_tok;
         } else if (consume("-")) {
             node = create_binary_operation_node(OP_SUB, node, mul());
+            node->tok = op_tok;
         } else {
             break;
         }
@@ -212,12 +237,17 @@ static bool read_rel_op(BinOp* op, bool* swapped) {
 // 比較が1つだけなら従来どおりの二項演算、2つ以上連なれば ND_CHAIN にする
 static Node* make_cmp_chain(Node* first, Node* pairs, int npairs) {
     if (npairs == 1) {
+        Node* single;
         if (pairs->val) {
-            return create_binary_operation_node(pairs->op.binop, pairs->left_child, first);
+            single = create_binary_operation_node(pairs->op.binop, pairs->left_child, first);
+        } else {
+            single = create_binary_operation_node(pairs->op.binop, first, pairs->left_child);
         }
-        return create_binary_operation_node(pairs->op.binop, first, pairs->left_child);
+        single->tok = pairs->tok;
+        return single;
     }
     Node* node = create_node(ND_CHAIN);
+    node->tok = pairs->tok;
     node->left_child = first;
     node->body = pairs;
     register_any();
@@ -230,6 +260,7 @@ static Node* relational() {
     Node* first = add();
     BinOp op;
     bool swapped;
+    Token* op_tok = token;
     if (!read_rel_op(&op, &swapped)) {
         return first;
     }
@@ -239,11 +270,13 @@ static Node* relational() {
     while (true) {
         Node* pair = create_node(ND_BINOP);
         pair->op.binop = op;
+        pair->tok = op_tok;
         pair->left_child = add();
         pair->val = swapped ? 1 : 0;
         *tail = pair;
         tail = &pair->next;
         npairs++;
+        op_tok = token;
         if (!read_rel_op(&op, &swapped)) {
             break;
         }
@@ -265,6 +298,7 @@ static bool read_eq_op(BinOp* op) {
 static Node* equality() {
     Node* first = relational();
     BinOp op;
+    Token* op_tok = token;
     if (!read_eq_op(&op)) {
         return first;
     }
@@ -274,11 +308,13 @@ static Node* equality() {
     while (true) {
         Node* pair = create_node(ND_BINOP);
         pair->op.binop = op;
+        pair->tok = op_tok;
         pair->left_child = relational();
         pair->val = 0;
         *tail = pair;
         tail = &pair->next;
         npairs++;
+        op_tok = token;
         if (!read_eq_op(&op)) {
             break;
         }
@@ -288,22 +324,27 @@ static Node* equality() {
 
 static Node* and() {
     Node* node = equality();
+    Token* op_tok = token;
     if (consume("&&")) {
         node = create_binary_operation_node(OP_AND, node, and());
+        node->tok = op_tok;
     }
     return node;
 }
 
 static Node* or() {
     Node* node = and();
+    Token* op_tok = token;
     if (consume("||")) {
         node = create_binary_operation_node(OP_OR, node, or());
+        node->tok = op_tok;
     }
     return node;
 }
 
 static Node* range() {
     Node* node = or();
+    Token* op_tok = token;
     int incl;
     if (consume("..=")) {
         incl = 1;
@@ -316,6 +357,7 @@ static Node* range() {
     Node* call = create_node(ND_FUNCALL);
     call->name = "Range";
     call->len = 5;
+    call->tok = op_tok;
     node->next = rhs;
     rhs->next = create_number_node(incl);
     call->args = node;
@@ -365,6 +407,7 @@ static Node* assign() {
             error_at(token_start(first_token), token_end(first_token), "代入先と値の個数が一致しません（代入先%d個、値%d個）", ntargets, nvalues);
         }
         Node* multi = create_node(ND_MULTIASSIGN);
+        multi->tok = first_token;
         multi->body = targets;
         multi->args = values;
         multi->array_len = nvalues;
@@ -383,41 +426,48 @@ static Node* assign() {
         }
         assign_node->anno = parse_type();
         expect("=");
+        assign_node->tok = node->tok;
         assign_node->left_child = node;
         assign_node->right_child = assign();
         node = assign_node;
     } else if (consume("=")) {
         Node* assign_node = create_node(ND_ASSIGN);
+        assign_node->tok = node->tok;
         assign_node->left_child = node;
         assign_node->right_child = assign();
         node = assign_node;
     } else if (consume("+=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
         assign_node->op.binop = OP_ADD;
+        assign_node->tok = node->tok;
         assign_node->left_child = node;
         assign_node->right_child = assign();
         node = assign_node;
     } else if (consume("-=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
         assign_node->op.binop = OP_SUB;
+        assign_node->tok = node->tok;
         assign_node->left_child = node;
         assign_node->right_child = assign();
         node = assign_node;
     } else if (consume("*=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
         assign_node->op.binop = OP_MUL;
+        assign_node->tok = node->tok;
         assign_node->left_child = node;
         assign_node->right_child = assign();
         node = assign_node;
     } else if (consume("/=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
         assign_node->op.binop = OP_DIV;
+        assign_node->tok = node->tok;
         assign_node->left_child = node;
         assign_node->right_child = assign();
         node = assign_node;
     } else if (consume("%=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
         assign_node->op.binop = OP_MOD;
+        assign_node->tok = node->tok;
         assign_node->left_child = node;
         assign_node->right_child = assign();
         node = assign_node;
