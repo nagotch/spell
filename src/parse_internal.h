@@ -14,4 +14,5 @@ void register_any();
 
 // expr.c
 Node* expr();
+Node* parse_put_args();
 Type* parse_type();

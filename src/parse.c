@@ -214,6 +214,58 @@ static Node* stmt() {
         Token* var = consume_ident();
         consume("@");
         return make_for_iter(var, expr());
+    } else if (consume("<<") || consume("<")) {
+        // 出力の省略形: << 式 / < 式（print と同じ）
+        Node* node = create_node(ND_FUNCALL);
+        node->name = "print";
+        node->len = 5;
+        node->args = expr();
+        expect(";");
+        return node;
+    } else if (consume(">>")) {
+        // 入力の省略形: >> 対象
+        Node* target = expr();
+        expect(";");
+        Node* input = create_node(ND_INPUT);
+        input->val = 0;
+        Node* node = create_node(ND_ASSIGN);
+        node->left_child = target;
+        node->right_child = input;
+        return node;
+    } else if (consume_keyword(KW_PUT)) {
+        Node* node = create_node(ND_PUT);
+        node->args = parse_put_args();
+        expect(";");
+        return node;
+    } else if (consume_keyword(KW_YN)) {
+        Node* node = create_node(ND_FUNCALL);
+        node->name = "print_yn";
+        node->len = 8;
+        node->args = expr();
+        expect(";");
+        return node;
+    } else if (token->kind == TK_IDENT && token->next->kind == TK_SYMBOL && token->next->len == 1 && token->next->str[0] == '-'
+               && token->next->next->kind == TK_SYMBOL && token->next->next->len == 1 && token->next->next->str[0] == '=') {
+        // 入力修飾子: a- = in[n] は、読み取った各値から1を引く（1始まり→0始まり）
+        Token* var = consume_ident();
+        consume("-");
+        consume("=");
+        if (token->kind != TK_KEYWORD || token->keyword != KW_IN) {
+            error_at(token_start(token), token_end(token), "`in`が必要ですが、%sが見つかりました", token_text(token));
+        }
+        token = token->next;
+        expect("[");
+        Node* n = expr();
+        expect("]");
+        expect(";");
+        Node* call = create_node(ND_FUNCALL);
+        call->name = "read_ints_dec";
+        call->len = 13;
+        call->args = n;
+        Node* node = create_node(ND_ASSIGN);
+        node->left_child = create_ident_node(var);
+        node->right_child = call;
+        return node;
     } else if (consume_keyword(KW_BREAK)) {
         Node* node = create_node(ND_BREAK);
         expect(";");

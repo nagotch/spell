@@ -53,6 +53,8 @@ Token* tokenize(char* s) {
             "!=",
             "<=",
             ">=",
+            "<<",
+            ">>",
             "&&",
             "||",
             "+=",
@@ -127,6 +129,10 @@ Token* tokenize(char* s) {
             "class",
             "in",
             "elif",
+            "in_str",
+            "in_line",
+            "put",
+            "yn",
         };
         Keyword kinds[] = {
             KW_RETURN,
@@ -140,6 +146,10 @@ Token* tokenize(char* s) {
             KW_CLASS,
             KW_IN,
             KW_ELIF,
+            KW_IN_STR,
+            KW_IN_LINE,
+            KW_PUT,
+            KW_YN,
         };
         bool is_keyword = false;
         size_t keywords_size = sizeof(keywords) / sizeof(keywords[0]);
