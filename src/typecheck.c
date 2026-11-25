@@ -131,6 +131,97 @@ static Type* adopt_type(Type* anno, Type* rhs) {
     return rhs;
 }
 
+static const char* arith_dunder(BinOp op) {
+    switch (op) {
+        case OP_ADD: return "__add__";
+        case OP_SUB: return "__sub__";
+        case OP_MUL: return "__mul__";
+        case OP_DIV: return "__div__";
+        case OP_MOD: return "__mod__";
+        default: return NULL;
+    }
+}
+
+static const char* op_text(BinOp op) {
+    switch (op) {
+        case OP_ADD: return "+";
+        case OP_SUB: return "-";
+        case OP_MUL: return "*";
+        case OP_DIV: return "/";
+        case OP_MOD: return "%";
+        case OP_EQ: return "==";
+        case OP_NE: return "!=";
+        case OP_LT: return "<";
+        case OP_LE: return "<=";
+        default: return "?";
+    }
+}
+
+static bool scalar_compatible(Type* a, Type* b) {
+    if (a->kind == b->kind) {
+        return true;
+    }
+    return (a->kind == TY_INT || a->kind == TY_CHAR) && (b->kind == TY_INT || b->kind == TY_CHAR);
+}
+
+static const char* cmp_dunder(BinOp op) {
+    switch (op) {
+        case OP_EQ: return "__eq__";
+        case OP_NE: return "__ne__";
+        case OP_LT: return "__lt__";
+        case OP_LE: return "__le__";
+        default: return NULL;
+    }
+}
+
+static Type* rewrite_to_mcall(Node* node, Type* lt, Type* rt, const char* name, int len, Function* method) {
+    Class* klass = lt->klass;
+    if (method->nparams != 2) {
+        error_plain("クラス`%.*s`のメソッド`%.*s`の引数は1個ですが、%d個が定義されています", klass->len, klass->name, name, method->nparams - 1);
+    }
+    if (method->param_types[1] && rt->kind != TY_UNKNOWN && !type_equals(method->param_types[1], rt)) {
+        char buf[256];
+        strcpy(buf, type_text(method->param_types[1]));
+        error_plain("クラス`%.*s`のメソッド`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, name, buf, type_text(rt));
+    }
+    node->kind = ND_MCALL;
+    node->name = (char*)name;
+    node->len = len;
+    node->func = method;
+    node->klass = klass;
+    node->args = node->right_child;
+    node->args->next = NULL;
+    return method->return_type ? method->return_type : &ty_unknown;
+}
+
+static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index, Type* it, Type* rhs, Node* value) {
+    Function* method = find_method(klass, "__setitem__", 11);
+    if (!method) {
+        error_plain("クラス`%.*s`に`__setitem__`は定義されていません", klass->len, klass->name);
+    }
+    if (method->nparams != 3) {
+        error_plain("クラス`%.*s`のメソッド`__setitem__`の引数は2個ですが、%d個が定義されています", klass->len, klass->name, method->nparams - 1);
+    }
+    if (method->param_types[1] && it->kind != TY_UNKNOWN && !type_equals(method->param_types[1], it)) {
+        char buf[256];
+        strcpy(buf, type_text(method->param_types[1]));
+        error_plain("クラス`%.*s`のメソッド`__setitem__`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, buf, type_text(it));
+    }
+    if (method->param_types[2] && rhs->kind != TY_UNKNOWN && !type_equals(method->param_types[2], rhs)) {
+        char buf[256];
+        strcpy(buf, type_text(method->param_types[2]));
+        error_plain("クラス`%.*s`のメソッド`__setitem__`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, buf, type_text(rhs));
+    }
+    index->next = value;
+    node->kind = ND_MCALL;
+    node->name = "__setitem__";
+    node->len = 11;
+    node->func = method;
+    node->klass = klass;
+    node->left_child = base;
+    node->args = index;
+}
+
 static Type* check_node(Node* node) {
     if (!node) {
         return &ty_unknown;
@@ -146,24 +237,79 @@ static Type* check_node(Node* node) {
                 result = &ty_unknown;
             }
             break;
-        case ND_BINOP:
-            check_node(node->left_child);
-            check_node(node->right_child);
-            if (node->op.binop == OP_EQ || node->op.binop == OP_NE
-             || node->op.binop == OP_LT || node->op.binop == OP_LE
-             || node->op.binop == OP_OR || node->op.binop == OP_AND) {
-                result = &ty_bool;
-            } else {
+        case ND_BINOP: {
+            Type* lt = check_node(node->left_child);
+            Type* rt = check_node(node->right_child);
+            const char* dunder = arith_dunder(node->op.binop);
+            if (dunder) {
+                if (lt->kind == TY_CLASS) {
+                    Function* method = find_method(lt->klass, (char*)dunder, 7);
+                    if (!method) {
+                        error_plain("クラス`%.*s`に演算子`%s`は定義されていません", lt->klass->len, lt->klass->name, op_text(node->op.binop));
+                    }
+                    result = rewrite_to_mcall(node, lt, rt, dunder, 7, method);
+                    break;
+                }
+                if (lt->kind == TY_ARRAY || rt->kind == TY_ARRAY) {
+                    Type* at = lt->kind == TY_ARRAY ? lt : rt;
+                    error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                }
+                if (lt->kind != TY_UNKNOWN && rt->kind != TY_UNKNOWN && !scalar_compatible(lt, rt)) {
+                    char buf[256];
+                    strcpy(buf, type_text(lt));
+                    error_plain("`%s`型と`%s`型の値に演算子`%s`は使えません", buf, type_text(rt), op_text(node->op.binop));
+                }
                 result = &ty_int;
+                break;
             }
+            const char* cdunder = cmp_dunder(node->op.binop);
+            if (cdunder) {
+                if (lt->kind == TY_CLASS) {
+                    Function* method = find_method(lt->klass, (char*)cdunder, 6);
+                    if (method) {
+                        result = rewrite_to_mcall(node, lt, rt, cdunder, 6, method);
+                        break;
+                    }
+                    if (node->op.binop == OP_LT || node->op.binop == OP_LE) {
+                        error_plain("クラス`%.*s`に演算子`%s`は定義されていません", lt->klass->len, lt->klass->name, op_text(node->op.binop));
+                    }
+                    result = &ty_bool;
+                    break;
+                }
+                if (lt->kind == TY_ARRAY || rt->kind == TY_ARRAY) {
+                    if (node->op.binop == OP_LT || node->op.binop == OP_LE) {
+                        Type* at = lt->kind == TY_ARRAY ? lt : rt;
+                        error_plain("`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
+                    }
+                    result = &ty_bool;
+                    break;
+                }
+                if ((node->op.binop == OP_LT || node->op.binop == OP_LE)
+                        && lt->kind != TY_UNKNOWN && rt->kind != TY_UNKNOWN && !scalar_compatible(lt, rt)) {
+                    char buf[256];
+                    strcpy(buf, type_text(lt));
+                    error_plain("`%s`型と`%s`型の値に演算子`%s`は使えません", buf, type_text(rt), op_text(node->op.binop));
+                }
+                result = &ty_bool;
+                break;
+            }
+            result = &ty_bool;
             break;
-        case ND_ASSIGN:
-            ;
+        }
+        case ND_ASSIGN: {
             Type* rhs = check_node(node->right_child);
             if (node->anno) {
                 rhs = adopt_type(node->anno, rhs);
             }
             Node* lhs = node->left_child;
+            if (lhs->kind == ND_MCALL && node->right_child->kind == ND_BINOP && node->right_child->left_child == lhs) {
+                Node* idx = malloc(sizeof(Node));
+                memcpy(idx, lhs->args, sizeof(Node));
+                idx->next = NULL;
+                rewrite_to_setitem(node, lhs->klass, lhs->left_child, idx, lhs->args->type, rhs, node->right_child);
+                result = rhs;
+                break;
+            }
             if (lhs->kind == ND_LVAR) {
                 Type* recorded = local_types[lhs->offset / 8];
                 if (node->anno && rhs->kind != TY_UNKNOWN && !type_equals(node->anno, rhs)) {
@@ -197,11 +343,17 @@ static Type* check_node(Node* node) {
                 }
                 lhs->type = find_global_type(lhs);
             } else if (lhs->kind == ND_INDEX) {
-                Type* elem = check_node(lhs);
-                if (elem->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(elem, rhs)) {
-                    char expected[256];
-                    strcpy(expected, type_text(elem));
-                    error_plain("配列の要素は`%s`ですが、`%s`が代入されています", expected, type_text(rhs));
+                Type* bt = check_node(lhs->left_child);
+                if (bt->kind == TY_CLASS) {
+                    Type* it = check_node(lhs->right_child);
+                    rewrite_to_setitem(node, bt->klass, lhs->left_child, lhs->right_child, it, rhs, node->right_child);
+                } else {
+                    Type* elem = check_node(lhs);
+                    if (elem->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(elem, rhs)) {
+                        char expected[256];
+                        strcpy(expected, type_text(elem));
+                        error_plain("配列の要素は`%s`ですが、`%s`が代入されています", expected, type_text(rhs));
+                    }
                 }
             } else {
                 check_node(lhs);
@@ -217,6 +369,7 @@ static Type* check_node(Node* node) {
             }
             result = rhs;
             break;
+        }
         case ND_GVAR:
             result = find_global_type(node);
             break;
@@ -309,6 +462,14 @@ static Type* check_node(Node* node) {
             ;
             Type* lt = check_node(node->left_child);
             Type* it = check_node(node->right_child);
+            if (lt->kind == TY_CLASS) {
+                Function* method = find_method(lt->klass, "__getitem__", 11);
+                if (!method) {
+                    error_plain("`%s`型の値に添え字は使えません", type_text(lt));
+                }
+                result = rewrite_to_mcall(node, lt, it, "__getitem__", 11, method);
+                break;
+            }
             if (lt->kind != TY_UNKNOWN && lt->kind != TY_ARRAY) {
                 error_plain("`%s`型の値に添え字は使えません", type_text(lt));
             }
