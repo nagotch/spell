@@ -125,6 +125,9 @@ static Capture* resolve_capture(Token* tok) {
     LambdaParse* chain[64];
     int n = 0;
     for (LambdaParse* p = lambda_stack; p != hit.level; p = p->outer) {
+        if (n >= 64) {
+            error_at(token_start(tok), token_end(tok), "ラムダの入れ子が深すぎます（64段まで）");
+        }
         chain[n++] = p;
     }
     for (int i = n - 1; i >= 0; i--) {

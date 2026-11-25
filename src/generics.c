@@ -83,11 +83,12 @@ static Function* clone_lambda_func(Function* fn, Class* tmpl, Type* targs[]) {
             }
             nc->src_cap = mapped;
         }
-        if (cap_map_n < CAP_MAP_MAX) {
-            cap_map_old[cap_map_n] = c;
-            cap_map_new[cap_map_n] = nc;
-            cap_map_n++;
+        if (cap_map_n >= CAP_MAP_MAX) {
+            error_internal("ジェネリクス実体化での捕捉が多すぎます");
         }
+        cap_map_old[cap_map_n] = c;
+        cap_map_new[cap_map_n] = nc;
+        cap_map_n++;
         *ncap_tail = nc;
         ncap_tail = &nc->next;
     }
