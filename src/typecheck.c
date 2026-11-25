@@ -311,7 +311,9 @@ static Type* check_assign(Node* node) {
         Type* bt = check_node(lhs->left_child);
         if (bt->kind == TY_CLASS) {
             Type* it = check_node(lhs->right_child);
-            rewrite_to_setitem(node, bt->klass, lhs->left_child, lhs->right_child, it, rhs, node->right_child);
+            // ジェネリックなクラスでは実体化したクラスのメソッドを使う
+            // （bt->klass はテンプレートで、引数型が型変数のままになる）
+            rewrite_to_setitem(node, class_of(bt), lhs->left_child, lhs->right_child, it, rhs, node->right_child);
         } else {
             Type* elem = check_node(lhs);
             if (elem->kind != TY_UNKNOWN && rhs->kind != TY_UNKNOWN && !type_equals(elem, rhs)) {
@@ -345,7 +347,7 @@ static Type* check_assign(Node* node) {
     return rhs;
 }
 
-static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int nargs) {
+static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int nargs, Type* expected_ty) {
     if (klass->type->kind != TY_CLASS) {
         error_node(node, "`%.*s`はクラスではありません", klass->len, klass->name);
     }
@@ -355,6 +357,22 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
         if (ginit) {
             for (int i = 0; i < nargs && i + 1 < ginit->nparams; i++) {
                 unify_type(ginit->param_types[i + 1], arg_types[i], klass, gtargs);
+            }
+        }
+        // 引数から決まらなかった型引数は、この構築式への期待型（注釈・
+        // 引数位置・戻り値の型）から補う。同じジェネリッククラス（origin
+        // が一致）で型引数の数が合うときだけに限る。引数側の検査は
+        // この後の通常の検査で必ず行われる
+        if (expected_ty && expected_ty->kind == TY_CLASS
+                && expected_ty->targ_count == klass->tparam_count) {
+            Class* ek = expected_ty->klass->origin ? expected_ty->klass->origin : expected_ty->klass;
+            Class* tk = klass->origin ? klass->origin : klass;
+            if (ek == tk) {
+                for (int i = 0; i < klass->tparam_count; i++) {
+                    if (!gtargs[i]) {
+                        gtargs[i] = expected_ty->targs[i];
+                    }
+                }
             }
         }
         for (int i = 0; i < klass->tparam_count; i++) {
@@ -512,7 +530,7 @@ static Type* check_vcall(Node* node) {
     return lt->func_ret ? lt->func_ret : &ty_unknown;
 }
 
-static Type* check_funcall(Node* node) {
+static Type* check_funcall(Node* node, Type* expected) {
     Function* callee = find_callable(NULL, node->name, node->len);
     Class* klass = callee ? NULL : find_class(node->name, node->len);
     // 引数の期待型を先に用意する（引数位置のラムダの型を決めるため）
@@ -561,7 +579,7 @@ static Type* check_funcall(Node* node) {
     }
     if (!callee) {
         if (klass) {
-            return check_construct(node, klass, arg_types, nargs);
+            return check_construct(node, klass, arg_types, nargs, expected);
         }
         if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
             return &ty_int;
@@ -993,7 +1011,7 @@ static Type* check_input(Node* node) {
     node->kind = ND_FUNCALL;
     node->name = (char*)fname;
     node->len = (int)strlen(fname);
-    return check_funcall(node);
+    return check_funcall(node, NULL);
 }
 
 // put 文: 各値を __str__ で文字列化し、空白区切りで出して改行する
@@ -1053,9 +1071,10 @@ static Type* check_node(Node* node) {
     if (!node) {
         return &ty_unknown;
     }
-    // 期待型は直属のラムダと配列リテラルだけが受け取り、それ以外へは漏らさない
+    // 期待型は直属のラムダ・配列リテラル・構築（関数呼び出し）だけが
+    // 受け取り、それ以外へは漏らさない
     Type* my_expected = NULL;
-    if (node->kind == ND_LAMBDA || node->kind == ND_ARRAY) {
+    if (node->kind == ND_LAMBDA || node->kind == ND_ARRAY || node->kind == ND_FUNCALL) {
         my_expected = expected_type;
     }
     expected_type = NULL;
@@ -1105,7 +1124,7 @@ static Type* check_node(Node* node) {
             }
             break;
         case ND_FUNCALL:
-            result = check_funcall(node);
+            result = check_funcall(node, my_expected);
             break;
         case ND_ARRAY:
             result = check_arraylit(node, my_expected);

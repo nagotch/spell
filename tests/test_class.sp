@@ -347,6 +347,106 @@ def t032() {
     return gi() + s.len;
 }
 
+def t033() {
+    // 辞書: 文字列キーで単語を数える（未存在キーは 0 で生える）
+    cnt: Dict<str, int> = Dict(zero_int);
+    words = ["a", "b", "a", "c", "b", "a"];
+    for w in words { cnt[w]++; }
+    return cnt["a"] * 100 + cnt["b"] * 10 + cnt["c"] + cnt.len;
+}
+
+def t034() {
+    // 辞書: int キー、生やす読み取りと上書き
+    d: Dict<int, int> = Dict(zero_int);
+    d[5]++;
+    d[5]++;
+    d[9] = 10;
+    d[5] = d[5] + d[9];
+    x = d[7];
+    return d[5] * 100 + d[9] * 10 + x * 1000 + d.len;
+}
+
+class Pt {
+    x: int;
+    y: int;
+    def __init__(self, x: int, y: int) { self.x = x; self.y = y; }
+    def __hash__(self) -> int { return self.x * 31 + self.y; }
+    def __eq__(self, o: Pt) -> bool { return self.x == o.x && self.y == o.y; }
+}
+
+def t035() {
+    // 辞書: __hash__/__eq__ を定義した自作クラスがキーになる
+    d: Dict<Pt, int> = Dict(zero_int);
+    d[Pt(1, 2)] = 5;
+    d[Pt(1, 2)] = d[Pt(1, 2)] + 1;
+    d[Pt(3, 4)]++;
+    return d[Pt(1, 2)] * 100 + d[Pt(3, 4)] * 10 + d.len;
+}
+
+def t036() {
+    // 辞書: ファクトリ既定値（キーごとに新しい配列が生える）
+    g: Dict<str, [int]> = Dict(fn() -> [int] { return []; });
+    g["x"] = g["x"] + [7];
+    g["x"] = g["x"] + [8];
+    gy = g["y"];
+    return g["x"].len * 100 + g["x"][0] * 10 + g["x"][1] + gy.len * 1000 + g.len;
+}
+
+def t037() {
+    // 辞書: 挿入順イテレーション（上書きしても位置は変わらない）と keys()
+    d: Dict<int, str> = Dict(zero_str);
+    d[3] = "c";
+    d[1] = "a";
+    d[2] = "b";
+    d[1] = "A";
+    s = 0;
+    for k in d { s = s * 10 + k; }
+    ks = d.keys();
+    v = 0;
+    for k in d { v = v + d[k].len; }
+    if (ks.len != 3 || ks[0] != 3 || ks[1] != 1 || ks[2] != 2) { return 1; }
+    return s * 10 + v;
+}
+
+def t038() {
+    // 辞書: has / len と zero_bool / zero_str の既定値
+    d: Dict<str, bool> = Dict(zero_bool);
+    a = 0;
+    if (d.has("x")) { a = 100; }
+    b = d["x"];
+    if (b) { a = a + 100; }
+    d["x"] = 1 == 1;
+    if (d.has("x")) { a = a + 1; }
+    e: Dict<int, str> = Dict(zero_str);
+    sv = e[42];
+    return a * 100 + d.len * 10 + sv.len;
+}
+
+def t039() {
+    // 辞書: 大量挿入でリハッシュを繰り返したあとの全件検証
+    d: Dict<int, int> = Dict(zero_int);
+    i = 0;
+    while (i < 5000) { d[i] = i * 3; i = i + 1; }
+    s = 0;
+    i = 0;
+    while (i < 5000) { s = s + d[i]; i = i + 1; }
+    if (d.len != 5000) { return 1; }
+    if (d.has(5000)) { return 2; }
+    return s % 1000;
+}
+
+def t040() {
+    // 辞書: bool キーと、値で等しい配列キー
+    d: Dict<bool, int> = Dict(zero_int);
+    d[1 == 1] = 3;
+    d[1 == 0] = 4;
+    a: Dict<[int], int> = Dict(zero_int);
+    a[[1, 2]] = 5;
+    a[[1, 2]] = a[[1, 2]] + 1;
+    a[[3]] = 7;
+    return d[1 == 1] * 100 + d[1 == 0] * 10 + d.len + a[[1, 2]] * 1000 + a.len * 10000;
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -386,6 +486,14 @@ def main() {
     mark(30); fails=fails+check(t030(), 6);
     mark(31); fails=fails+check(t031(), 42);
     mark(32); fails=fails+check(t032(), 44);
+    mark(33); fails=fails+check(t033(), 324);
+    mark(34); fails=fails+check(t034(), 1303);
+    mark(35); fails=fails+check(t035(), 612);
+    mark(36); fails=fails+check(t036(), 280);
+    mark(37); fails=fails+check(t037(), 3123);
+    mark(38); fails=fails+check(t038(), 110);
+    mark(39); fails=fails+check(t039(), 500);
+    mark(40); fails=fails+check(t040(), 26342);
 
     print_str("done"); putchar(10);
     return fails > 0;

@@ -10,6 +10,8 @@ tests=(
     "def main() { s = 0; for i in 1000000 { s = s + 1; } return 0; }|0"
     "x = 30; y = 12; return x + y;|42"
     "class P { x: int; def one(self) -> int { return 1; } } def main() { return 42; }|42"
+    "class B<T> { n: int; def __init__(self) { self.n = 7; } def get(self) -> int { return self.n; } } def main() { b: B<str> = B(); return b.get(); }|7"
+    "class G { a: [int]; def __init__(self) { self.a = []; } def get(self) -> int { x = self.a.len; return x; } } def main() { g = G(); return g.get(); }|0"
 )
 
 error_tests=(
@@ -75,6 +77,8 @@ error_tests=(
     "class P<A, B> { x: A; y: B; def __init__(self, x: A, y: B) { self.x = x; self.y = y; } } def main() { p: P<int> = P(1, 2); return 0; }|型引数は2個ですが、1個が指定されています"
     "def f(p: P<int, int, int, int, int>) -> int { return 1; } class P<A, B, C, D, E> { x: int; } def main() { return 0; }|型パラメータは4個までですが、5個が指定されています"
     "class B1<T> { v: T; def __init__(self, v: T) { self.v = v; } } class B2<T> { v: T; def __init__(self, v: T) { self.v = v; } } class W<T> { v: B1<T>; def __init__(self, v: B1<T>) { self.v = v; } } def main() { w = W(B2(5)); return 0; }|型引数を推論できません"
+    "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { d: Dict<P, int> = Dict(zero_int); d[P(1)] = 1; return 0; }|メソッド\`__hash__\`は定義されていません"
+    "def main() { d = Dict(zero_int); return 0; }|型引数を推論できません"
     "def main() { g = x -> x; return 0; }|ラムダの引数の型が分かりません"
     "def id_str(s: str) -> str { return s; } def main() { f: fn(int) -> int = id_str; return 0; }|fn(int) -> int"
     "def main() { x = 5; return x(1); }|型の値は呼び出せません"
