@@ -24,6 +24,25 @@
   </nav>
 </header>
 
+<div class="layout">
+<aside class="side">
+  <p class="side-h">このページ</p>
+  <ul class="side-list">
+    <li><a href="#s01">最初のプログラム</a></li>
+    <li><a href="#s02">どんな言語か</a></li>
+    <li><a href="#s03">目次</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="index.html" class="here">概要</a></li>
+    <li><a href="guide.html">言語ツアー</a></li>
+    <li><a href="reference.html">リファレンス</a></li>
+    <li><a href="editor.html">エディタ連携</a></li>
+    <li><a href="https://github.com/nagotch/spell/blob/main/docs/language-design.md">設計メモ</a></li>
+  </ul>
+</aside>
+<main class="main">
+
 <p class="eyebrow">自作プログラミング言語</p>
 <h1 class="title">spell</h1>
 <p class="lede">
@@ -40,7 +59,7 @@
   <div><dt>主な用途</dt><dd>競技プログラミング</dd></div>
 </dl>
 
-<h2><span class="no">01</span>最初のプログラム</h2>
+<h2 id="s01"><span class="no">01</span>最初のプログラム</h2>
 <p>
   文頭の <code>&lt;</code> は「式を評価して1行で出す」出力の糖衣です。
   プログラムはトップレベルに文を並べるだけで書けます。<code>main</code> 関数は要りません。
@@ -67,7 +86,7 @@ cc -o hello hello.s tests/funcs.c
   Nix ではリポジトリの flake がパッケージを用意しているので、<code>nix build</code> でも同じものが得られます。
 </p>
 
-<h2><span class="no">02</span>どんな言語か</h2>
+<h2 id="s02"><span class="no">02</span>どんな言語か</h2>
 
 <h3>意味論は Python 式</h3>
 <p>
@@ -112,7 +131,7 @@ cc -o hello hello.s tests/funcs.c
   最適化はまだ最小限で、C の最適化なし（<code>-O0</code>）と比べて数倍の差があります。
 </p>
 
-<h2><span class="no">03</span>目次</h2>
+<h2 id="s03"><span class="no">03</span>目次</h2>
 <div class="toc">
   <a href="guide.html">
     <span class="tno">A</span>
@@ -134,6 +153,9 @@ cc -o hello hello.s tests/funcs.c
     <span class="tt">設計メモ</span>
     <span class="td">言語設計の決定事項とその理由の記録です。仕様の背景を知りたいときに。</span>
   </a>
+</div>
+
+</main>
 </div>
 
 <footer>

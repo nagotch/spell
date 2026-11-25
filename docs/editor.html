@@ -24,13 +24,32 @@
   </nav>
 </header>
 
+<div class="layout">
+<aside class="side">
+  <p class="side-h">このページ</p>
+  <ul class="side-list">
+    <li><a href="#s01">spell-lsp</a></li>
+    <li><a href="#s02">NeoVim の設定</a></li>
+    <li><a href="#s03">制限事項</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="index.html">概要</a></li>
+    <li><a href="guide.html">言語ツアー</a></li>
+    <li><a href="reference.html">リファレンス</a></li>
+    <li><a href="editor.html" class="here">エディタ連携</a></li>
+    <li><a href="https://github.com/nagotch/spell/blob/main/docs/language-design.md">設計メモ</a></li>
+  </ul>
+</aside>
+<main class="main">
+
 <h1 class="page">エディタ連携</h1>
 <p class="lede">
   言語サーバー <code>spell-lsp</code> が、コンパイラの診断をエディタへ返します。
   現在の対応範囲は診断だけです。補完・ホバー・定義ジャンプはまだありません。
 </p>
 
-<h2><span class="no">01</span>spell-lsp</h2>
+<h2 id="s01"><span class="no">01</span>spell-lsp</h2>
 <p>
   <code>spell-lsp</code> はコンパイラと一緒にビルドされる言語サーバーです。
   ファイルを開く・編集するたびに全文をチェックし、構文エラーと型エラーのうち最初の1件を
@@ -46,7 +65,7 @@
 <pre class="plain">make -C src                       # spell と spell-lsp ができる
 cp src/spell-lsp src/prelude.sp ~/.local/bin/</pre>
 
-<h2><span class="no">02</span>NeoVim の設定</h2>
+<h2 id="s02"><span class="no">02</span>NeoVim の設定</h2>
 <p>
   リポジトリの <code>tools/neovim/</code> に、ファイルタイプ検出とシンタックスハイライト、
   サーバー起動のスニペットが入っています。起動スニペットの中身はこれだけです。
@@ -79,7 +98,7 @@ vim.api.nvim_create_autocmd('FileType', {
   シンタックスハイライトは <code>tools/neovim/syntax/spell.vim</code> にあります。
 </p>
 
-<h2><span class="no">03</span>制限事項</h2>
+<h2 id="s03"><span class="no">03</span>制限事項</h2>
 <ul>
   <li>診断は最初の1件のみです。</li>
   <li>ドキュメント同期は全文送信（Full）です。</li>
@@ -90,6 +109,9 @@ vim.api.nvim_create_autocmd('FileType', {
   サーバーの動作確認には <code>python3 tools/neovim/lsp_smoke.py</code> が使えます。
   起動して JSON-RPC を流し、正常系・型エラー・構文エラー・修正で診断が消えること・終了処理を確認します。
 </p>
+
+</main>
+</div>
 
 <footer>
   <span class="fname">spell.</span><br>
