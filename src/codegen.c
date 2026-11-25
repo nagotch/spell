@@ -372,6 +372,24 @@ static void gen_mcall(Node* node) {
     printf("  push rax\n");
 }
 
+// `/` と `%` は Python 式（床除算、剰余は除数と同じ符号）。
+// idiv は切り捨て除算なので、剰余が 0 でなく除数と符号が異なるときだけ直す。
+// 呼び出し時点のレジスタ: rax = 商、rdx = 剰余、rdi = 除数。
+static void emit_divmod_adjust(bool is_mod) {
+    int label = new_label();
+    printf("  test rdx, rdx\n");
+    printf("  je .Ldivmod%d\n", label);
+    printf("  mov rcx, rdx\n");
+    printf("  xor rcx, rdi\n");
+    printf("  jns .Ldivmod%d\n", label);
+    if (is_mod) {
+        printf("  add rdx, rdi\n");
+    } else {
+        printf("  sub rax, 1\n");
+    }
+    printf(".Ldivmod%d:\n", label);
+}
+
 static void gen_binop(Node* node) {
     if (node->op.binop == OP_AND) {
         int label = new_label();
@@ -423,6 +441,7 @@ static void gen_binop(Node* node) {
         case OP_DIV:
             printf("  cqo\n");
             printf("  idiv rdi\n");
+            emit_divmod_adjust(false);
             break;
         case OP_EQ:
             printf("  cmp rax, rdi\n");
@@ -447,6 +466,7 @@ static void gen_binop(Node* node) {
         case OP_MOD:
             printf("  cqo\n");
             printf("  idiv rdi\n");
+            emit_divmod_adjust(true);
             printf("  mov rax, rdx\n");
             break;
         default:

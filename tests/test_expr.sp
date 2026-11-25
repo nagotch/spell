@@ -49,6 +49,22 @@ def t048() { a = 10; a -= 3; return a; }
 def t049() { a = 3; a *= 4; return a; }
 def t050() { a = 20; a /= 3; return a; }
 def t051() { a = 20; a %= 3; return a; }
+def t052() { 7/2; }
+def t053() { (0-7)/2; }
+def t054() { 7/(0-2); }
+def t055() { (0-7)/(0-2); }
+def t056() { 7%2; }
+def t057() { (0-7)%2; }
+def t058() { 7%(0-2); }
+def t059() { (0-7)%(0-2); }
+def t060() { (0-6)/2; }
+def t061() { (0-6)%2; }
+def t062() { 6/(0-2); }
+def t063() { 6%(0-2); }
+def t064() { (0-7)/2*2 + (0-7)%2; }
+def t065() { 7/(0-2)*(0-2) + 7%(0-2); }
+def t066() { a = 0-7; a /= 2; return a; }
+def t067() { a = 0-7; a %= 2; return a; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -104,7 +120,7 @@ def main() {
     mark(39); fails=fails+check(t039(), 1);
     mark(40); fails=fails+check(t040(), 1);
     mark(41); fails=fails+check(t041(), 4);
-    mark(42); fails=fails+check(t042(), -1);
+    mark(42); fails=fails+check(t042(), 2);
     mark(43); fails=fails+check(t043(), 1);
     mark(44); fails=fails+check(t044(), 1);
     mark(45); fails=fails+check(t045(), 0);
@@ -114,6 +130,22 @@ def main() {
     mark(49); fails=fails+check(t049(), 12);
     mark(50); fails=fails+check(t050(), 6);
     mark(51); fails=fails+check(t051(), 2);
+    mark(52); fails=fails+check(t052(), 3);
+    mark(53); fails=fails+check(t053(), -4);
+    mark(54); fails=fails+check(t054(), -4);
+    mark(55); fails=fails+check(t055(), 3);
+    mark(56); fails=fails+check(t056(), 1);
+    mark(57); fails=fails+check(t057(), 1);
+    mark(58); fails=fails+check(t058(), -1);
+    mark(59); fails=fails+check(t059(), -1);
+    mark(60); fails=fails+check(t060(), -3);
+    mark(61); fails=fails+check(t061(), 0);
+    mark(62); fails=fails+check(t062(), -3);
+    mark(63); fails=fails+check(t063(), 0);
+    mark(64); fails=fails+check(t064(), -7);
+    mark(65); fails=fails+check(t065(), 7);
+    mark(66); fails=fails+check(t066(), -4);
+    mark(67); fails=fails+check(t067(), 1);
 
     print_str("done"); putchar(10);
     return fails > 0;
