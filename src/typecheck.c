@@ -95,9 +95,14 @@ static char* type_text_write(Type* type, char* p) {
             break;
         case TY_CLASS:
             p += sprintf(p, "%.*s", type->klass->len, type->klass->name);
+            if (type->targ) {
+                p += sprintf(p, "<");
+                p = type_text_write(type->targ, p);
+                p += sprintf(p, ">");
+            }
             break;
         case TY_VAR:
-            p += sprintf(p, "%.*s", type->klass->len, type->klass->name);
+            p += sprintf(p, "%.*s", type->len, type->name);
             break;
     }
     return p;
