@@ -1,7 +1,6 @@
 #include "spell.h"
 
 Type ty_int = { TY_INT, NULL };
-Type ty_bool = { TY_BOOL, NULL };
 Type ty_array = { TY_ARRAY, NULL };
 Type ty_unknown = { TY_UNKNOWN, NULL };
 
@@ -23,7 +22,6 @@ static Class* class_of(Type* t) {
     switch (t->kind) {
         case TY_CLASS: return t->klass;
         case TY_INT: return find_class("int", 3);
-        case TY_BOOL: return find_class("bool", 4);
         case TY_ARRAY: return find_class("array", 5);
         default: return NULL;
     }
@@ -36,6 +34,22 @@ static Function* find_method(Class* klass, char* name, int len) {
         }
     }
     return NULL;
+}
+
+static Type* bool_type() {
+    Class* klass = find_class("bool", 4);
+    return klass ? klass->type : &ty_int;
+}
+
+static Type* scalar_cmp_result(const char* dunder) {
+    Class* klass = find_class("int", 3);
+    if (klass) {
+        Function* method = find_method(klass, (char*)dunder, 6);
+        if (method && method->return_type) {
+            return method->return_type;
+        }
+    }
+    return &ty_int;
 }
 
 static Function* find_function(Node* node) {
@@ -67,9 +81,6 @@ static char* type_text_write(Type* type, char* p) {
     switch (type->kind) {
         case TY_INT:
             p += sprintf(p, "int");
-            break;
-        case TY_BOOL:
-            p += sprintf(p, "bool");
             break;
         case TY_ARRAY:
             p += sprintf(p, "[");
@@ -320,7 +331,7 @@ static Type* check_node(Node* node) {
                     if (node->op.binop == OP_LT || node->op.binop == OP_LE) {
                         error_plain("クラス`%.*s`に演算子`%s`は定義されていません", lt->klass->len, lt->klass->name, op_text(node->op.binop));
                     }
-                    result = &ty_bool;
+                    result = bool_type();
                     break;
                 }
                 if (lt->kind == TY_ARRAY || rt->kind == TY_ARRAY) {
@@ -337,10 +348,10 @@ static Type* check_node(Node* node) {
                             Function* method = find_method(class_of(lt), "__ne__", 6);
                             result = rewrite_to_mcall(node, lt, rt, "__ne__", 6, method);
                         }
-                        if (result->kind == TY_UNKNOWN) { result = &ty_bool; }
+                        if (result->kind == TY_UNKNOWN) { result = bool_type(); }
                         break;
                     }
-                    result = &ty_bool;
+                    result = bool_type();
                     break;
                 }
                 if ((node->op.binop == OP_LT || node->op.binop == OP_LE)
@@ -349,10 +360,10 @@ static Type* check_node(Node* node) {
                     strcpy(buf, type_text(lt));
                     error_plain("`%s`型と`%s`型の値に演算子`%s`は使えません", buf, type_text(rt), op_text(node->op.binop));
                 }
-                result = &ty_bool;
+                result = scalar_cmp_result(cdunder);
                 break;
             }
-            result = &ty_bool;
+            result = &ty_int;
             break;
         }
         case ND_ASSIGN: {
@@ -434,7 +445,7 @@ static Type* check_node(Node* node) {
             break;
         case ND_UNARY:
             if (node->op.unop == OP_NOT) {
-                result = &ty_bool;
+                result = &ty_int;
             }
             break;
         case ND_FUNCALL: {
