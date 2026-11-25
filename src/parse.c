@@ -295,13 +295,9 @@ static Node* make_for_count(Node* count) {
     // 束縛なしの回数リピートは Range(0, n) の要素走査として扱う
     Node* node = create_node(ND_FOR);
     Node* range_call = create_node(ND_FUNCALL);
-    range_call->name = "Range";
-    range_call->len = 5;
-    Node* zero = create_number_node(0);
-    Node* incl = create_number_node(0);
-    zero->next = count;
-    count->next = incl;
-    range_call->args = zero;
+    range_call->name = "__count_range";
+    range_call->len = 13;
+    range_call->args = count;
     node->init = range_call;
     register_any();
     node->offset = locals->offset;
