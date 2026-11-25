@@ -38,11 +38,11 @@ error_tests=(
     "class P { x: int; ; } def main() { return 0; }|フィールド名が必要ですが"
     "class P { def f() { return 1; } } def main() { return 0; }|最初の引数\`self\`が必要です"
     "class P { x: int; } def f(p: P) { return p.y; } def main() { return 0; }|フィールド\`y\`は定義されていません"
-    "def main() { x = 5; return x.foo; }|型の値にフィールドは使えません"
+    "def main() { x = 5; return x.foo; }|クラス\`int\`にフィールド\`foo\`は定義されていません"
     "class P { x: int; def __init__(self, x: int) { } } def main() { p = P(1, 2); return 0; }|の\`__init__\`の引数は1個ですが、2個が指定されています"
     "class P { x: int; def __init__(self, x: int) { } } def main() { p = P(1 < 2); return 0; }|の\`__init__\`の引数には\`int\`が必要ですが、\`bool\`が指定されています"
     "def f() { c: bool = getchar(); return 1; } def main() { return 0; }|の型は\`bool\`ですが、\`int\`が代入されています"
-    "def main() { x = 5; return x.foo(); }|型の値にメソッドは使えません"
+    "def main() { x = 5; return x.foo(); }|クラス\`int\`にメソッド\`foo\`は定義されていません"
     "class P { x: int; } def f(p: P) { return p.m(); } def main() { return 0; }|メソッド\`m\`は定義されていません"
     "class P { x: int; def add(self, a: int) -> int { return self.x + a; } } def f(p: P) { return p.add(1, 2); } def main() { return 0; }|メソッド\`add\`の引数は1個ですが、2個が指定されています"
     "class P { x: int; def add(self, a: int) -> int { return self.x + a; } } def f(p: P) { return p.add(1 < 2); } def main() { return 0; }|メソッド\`add\`の引数には\`int\`が必要ですが、\`bool\`が指定されています"
@@ -173,7 +173,7 @@ run_selfcheck
 one_io_test "def main() { print_int(42); putchar(10); return 0; }" "" "42\n"
 one_io_test "def main() { print_int(0 - 42); putchar(10); return 0; }" "" "-42\n"
 one_io_test "def main() { b = read_int(); r = read_int(); print_int((30 - b) * (30 - r)); putchar(10); return 0; }" "10 20\n" "200\n"
-one_io_test "def main() { print_int(getchar()==-1); putchar(10); return 0; }" "" "1\n"
+one_io_test "def main() { if (getchar()==-1) { print_int(1); } else { print_int(0); } putchar(10); return 0; }" "" "1\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
