@@ -455,16 +455,74 @@ static Type* check_node(Node* node) {
     return result;
 }
 
-static void check_init_stmts(Node* stmt, bool* assigned) {
-    for (Node* n = stmt; n; n = n->next) {
-        if (n->kind == ND_BLOCK) {
-            check_init_stmts(n->body, assigned);
-        } else if (n->kind == ND_ASSIGN) {
+static void check_init_complete(Class* klass, bool* assigned) {
+    for (Field* f = klass->fields; f; f = f->next) {
+        if (!assigned[f->offset / 8]) {
+            error_plain("クラス`%.*s`の`__init__`で、フィールド`%.*s`が初期化されていません", klass->len, klass->name, f->len, f->name);
+        }
+    }
+}
+
+static bool* copy_assigned(bool* assigned, int nfields) {
+    bool* copy = malloc(nfields * sizeof(bool));
+    memcpy(copy, assigned, nfields * sizeof(bool));
+    return copy;
+}
+
+static bool check_init_stmts(Node* stmt, Class* klass, bool* assigned, int nfields);
+
+static bool check_init_stmt(Node* n, Class* klass, bool* assigned, int nfields) {
+    switch (n->kind) {
+        case ND_ASSIGN: {
             Node* lhs = n->left_child;
             if (lhs->kind == ND_MEMBER && lhs->left_child->kind == ND_LVAR && lhs->left_child->offset == 8) {
                 assigned[lhs->offset / 8] = true;
             }
+            return false;
         }
+        case ND_BLOCK:
+            return check_init_stmts(n->body, klass, assigned, nfields);
+        case ND_RETURN:
+            check_init_complete(klass, assigned);
+            return true;
+        case ND_BREAK:
+        case ND_CONTINUE:
+            return true;
+        case ND_IF: {
+            bool* then_set = copy_assigned(assigned, nfields);
+            bool* else_set = copy_assigned(assigned, nfields);
+            bool then_ends = check_init_stmts(n->then, klass, then_set, nfields);
+            bool else_ends = n->els ? check_init_stmts(n->els, klass, else_set, nfields) : false;
+            if (!then_ends && !else_ends) {
+                for (int i = 0; i < nfields; i++) {
+                    assigned[i] = then_set[i] && else_set[i];
+                }
+            } else if (then_ends && !else_ends) {
+                memcpy(assigned, else_set, nfields * sizeof(bool));
+            } else if (!then_ends && else_ends) {
+                memcpy(assigned, then_set, nfields * sizeof(bool));
+            }
+            free(then_set);
+            free(else_set);
+            return then_ends && else_ends;
+        }
+        case ND_WHILE: {
+            bool* body_set = copy_assigned(assigned, nfields);
+            check_init_stmts(n->body, klass, body_set, nfields);
+            free(body_set);
+            return false;
+        }
+        case ND_FOR: {
+            if (n->init) {
+                check_init_stmt(n->init, klass, assigned, nfields);
+            }
+            bool* body_set = copy_assigned(assigned, nfields);
+            check_init_stmts(n->body, klass, body_set, nfields);
+            free(body_set);
+            return false;
+        }
+        default:
+            return false;
     }
 }
 
@@ -474,14 +532,23 @@ static void check_init(Function* fn) {
     for (Field* f = klass->fields; f; f = f->next) {
         nfields++;
     }
+    if (nfields == 0) {
+        return;
+    }
     bool* assigned = calloc(nfields, sizeof(bool));
-    check_init_stmts(fn->body, assigned);
-    for (Field* f = klass->fields; f; f = f->next) {
-        if (!assigned[f->offset / 8]) {
-            error_plain("クラス`%.*s`の`__init__`で、フィールド`%.*s`が初期化されていません", klass->len, klass->name, f->len, f->name);
-        }
+    if (!check_init_stmts(fn->body, klass, assigned, nfields)) {
+        check_init_complete(klass, assigned);
     }
     free(assigned);
+}
+
+static bool check_init_stmts(Node* stmt, Class* klass, bool* assigned, int nfields) {
+    for (Node* n = stmt; n; n = n->next) {
+        if (check_init_stmt(n, klass, assigned, nfields)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void typecheck(Function* prog) {
