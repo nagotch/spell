@@ -405,8 +405,9 @@ static void gen_construct(Node* node) {
         size = 8;
     }
     int label = max_label++;
-    printf("  mov rdi, %d\n", size);
-    call(label, 6, "malloc");
+    printf("  mov rdi, 1\n");
+    printf("  mov rsi, %d\n", size);
+    call(label, 6, "calloc");
     printf("  push rax\n");
     printf("  pop rdi\n");
     int i = args_cnt - 1;
