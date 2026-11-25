@@ -5,6 +5,11 @@
 static void gen(Node* node);
 
 static int max_label = 0;
+
+// 新しいラベル番号を1つ取る
+static int new_label() {
+    return max_label++;
+}
 static int break_label = -1;
 static int continue_label = -1;
 
@@ -52,32 +57,38 @@ static void print_klass_label(Class* klass) {
 }
 
 // rsp の 16 バイト境界をそろえてから call する。klass があればメソッド呼び出し
+static void print_call_target(Class* klass, int len, char* name) {
+    printf("  call ");
+    if (klass) {
+        print_klass_label(klass);
+        printf(".");
+    }
+    printf("%.*s\n", len, name);
+}
+
 static void emit_call(int label, Class* klass, int len, char* name) {
     printf("  mov rax, rsp\n");
     printf("  and rax, 15\n");
     printf("  jnz .Lcall%d\n", label);
     printf("  mov rax, 0\n");
-    printf("  call ");
-    if (klass) {
-        print_klass_label(klass);
-        printf(".");
-    }
-    printf("%.*s\n", len, name);
+    print_call_target(klass, len, name);
     printf("  jmp .Lend%d\n", label);
     printf(".Lcall%d:\n", label);
     printf("  sub rsp, 8\n");
     printf("  mov rax, 0\n");
-    printf("  call ");
-    if (klass) {
-        print_klass_label(klass);
-        printf(".");
-    }
-    printf("%.*s\n", len, name);
+    print_call_target(klass, len, name);
     printf("  add rsp, 8\n");
     printf(".Lend%d:\n", label);
 }
 
 // ---- アドレスの生成 ----
+
+// スタック上の引数を arg_regs[offset] から逆順に pop する
+static void pop_args(int n, int offset) {
+    for (int i = n - 1; i >= 0; i--) {
+        printf("  pop %s\n", arg_regs[i + offset]);
+    }
+}
 
 static void gen_index_addr(Node* node) {
     gen(node->left_child);
@@ -203,8 +214,7 @@ static void gen_len(Node* node) {
 }
 
 static void gen_newarray(Node* node) {
-    int label = max_label;
-    max_label++;
+    int label = new_label();
     gen(node->left_child);
     gen(node->right_child);
     printf("  pop rax\n");
@@ -219,8 +229,7 @@ static void gen_newarray(Node* node) {
     printf("  pop rsi\n");
     printf("  add rax, 8\n");
     printf("  push rax\n");
-    label = max_label;
-    max_label++;
+    label = new_label();
     printf("  mov rdx, rax\n");
     printf(".Lbegin%d:\n", label);
     printf("  cmp rcx, 0\n");
@@ -233,8 +242,7 @@ static void gen_newarray(Node* node) {
 }
 
 static void gen_if(Node* node) {
-    int label = max_label;
-    max_label++;
+    int label = new_label();
     gen(node->cond);
     printf("  pop rax\n");
     printf("  cmp rax, 0\n");
@@ -251,8 +259,7 @@ static void gen_if(Node* node) {
 }
 
 static void gen_while(Node* node) {
-    int label = max_label;
-    max_label++;
+    int label = new_label();
     int saved_break = break_label;
     int saved_continue = continue_label;
     break_label = label;
@@ -273,8 +280,7 @@ static void gen_while(Node* node) {
 }
 
 static void gen_for(Node* node) {
-    int label = max_label;
-    max_label++;
+    int label = new_label();
     int saved_break = break_label;
     int saved_continue = continue_label;
     break_label = label;
@@ -330,18 +336,16 @@ static void gen_construct(Node* node) {
     if (size == 0) {
         size = 8;
     }
-    int label = max_label++;
+    int label = new_label();
     printf("  mov rdi, 1\n");
     printf("  mov rsi, %d\n", size);
     emit_call(label, NULL, 6, "calloc");
     printf("  push rax\n");
     printf("  pop rdi\n");
-    for (int k = args_cnt - 1; k >= 0; k--) {
-        printf("  pop %s\n", arg_regs[k+1]);
-    }
+    pop_args(args_cnt, 1);
     printf("  push rdi\n");
     if (node->func) {
-        emit_call(max_label++, node->func->klass, node->func->len, node->func->name);
+        emit_call(new_label(), node->func->klass, node->func->len, node->func->name);
     }
 }
 
@@ -350,8 +354,7 @@ static void gen_funcall(Node* node) {
         gen_construct(node);
         return;
     }
-    int label = max_label;
-    max_label++;
+    int label = new_label();
     Node* head = node->args;
     int args_cnt = 0;
     while (head) {
@@ -362,9 +365,7 @@ static void gen_funcall(Node* node) {
     if (args_cnt > 6) {
         error_plain("関数に渡せる引数は6個までですが、%d個が指定されています", args_cnt);
     }
-    for (int i = args_cnt - 1; i >= 0; i--) {
-        printf("  pop %s\n", arg_regs[i]);
-    }
+    pop_args(args_cnt, 0);
     emit_call(label, NULL, node->len, node->name);
     if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
         printf("  movsxd rax, eax\n");
@@ -376,7 +377,7 @@ static void gen_member(Node* node) {
     gen(node->left_child);
     if (node->func) {
         printf("  pop rdi\n");
-        emit_call(max_label++, node->func->klass, node->func->len, node->func->name);
+        emit_call(new_label(), node->func->klass, node->func->len, node->func->name);
         printf("  push rax\n");
         return;
     }
@@ -395,18 +396,15 @@ static void gen_mcall(Node* node) {
     if (args_cnt > 5) {
         error_plain("メソッドに渡せる引数は5個までですが、%d個が指定されています", args_cnt);
     }
-    for (int k = args_cnt - 1; k >= 0; k--) {
-        printf("  pop %s\n", arg_regs[k + 1]);
-    }
+    pop_args(args_cnt, 1);
     printf("  pop rdi\n");
-    emit_call(max_label++, node->func->klass, node->func->len, node->func->name);
+    emit_call(new_label(), node->func->klass, node->func->len, node->func->name);
     printf("  push rax\n");
 }
 
 static void gen_binop(Node* node) {
     if (node->op.binop == OP_AND) {
-        int label = max_label;
-        max_label++;
+        int label = new_label();
         gen(node->left_child);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
@@ -422,8 +420,7 @@ static void gen_binop(Node* node) {
         printf(".Lend%d:", label);
         return;
     } else if (node->op.binop == OP_OR) {
-        int label = max_label;
-        max_label++;
+        int label = new_label();
         gen(node->left_child);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
