@@ -37,9 +37,9 @@ static void print_type_label(Type* t) {
             break;
         case TY_CLASS:
             printf("%.*s", t->klass->len, t->klass->name);
-            if (t->targ) {
+            for (int i = 0; i < t->targ_count; i++) {
                 printf("$");
-                print_type_label(t->targ);
+                print_type_label(t->targs[i]);
             }
             break;
         default:
@@ -51,8 +51,10 @@ static void print_type_label(Type* t) {
 static void print_klass_label(Class* klass) {
     printf("%.*s", klass->len, klass->name);
     if (klass->origin) {
-        printf("$");
-        print_type_label(klass->targ);
+        for (int i = 0; i < klass->targ_count; i++) {
+            printf("$");
+            print_type_label(klass->targs[i]);
+        }
     }
 }
 
@@ -531,7 +533,7 @@ void codegen(Function* prog) {
         printf(".text\n");
     }
     while (prog) {
-        if (prog->klass && prog->klass->tparam) {
+        if (prog->klass && prog->klass->tparam_count > 0) {
             prog = prog->next;
             continue;
         }

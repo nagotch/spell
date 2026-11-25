@@ -312,18 +312,20 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
     if (klass->type->kind != TY_CLASS) {
         error_node(node, "`%.*s`はクラスではありません", klass->len, klass->name);
     }
-    if (klass->tparam) {
+    if (klass->tparam_count > 0) {
         Function* ginit = find_callable(klass, "__init__", 8);
-        Type* gtarg = NULL;
+        Type* gtargs[MAX_TPARAMS] = {};
         if (ginit) {
             for (int i = 0; i < nargs && i + 1 < ginit->nparams; i++) {
-                gtarg = unify_type(ginit->param_types[i + 1], arg_types[i], gtarg);
+                unify_type(ginit->param_types[i + 1], arg_types[i], klass, gtargs);
             }
         }
-        if (!gtarg) {
-            error_node(node, "クラス`%.*s`の型引数を推論できません", klass->len, klass->name);
+        for (int i = 0; i < klass->tparam_count; i++) {
+            if (!gtargs[i]) {
+                error_node(node, "クラス`%.*s`の型引数を推論できません", klass->len, klass->name);
+            }
         }
-        klass = instantiate(klass, gtarg);
+        klass = instantiate(klass, gtargs, klass->tparam_count);
     }
     node->klass = klass;
     Function* init = find_callable(klass, "__init__", 8);
@@ -1024,7 +1026,7 @@ static bool check_init_stmts(Node* stmt, Class* klass, bool* assigned, int nfiel
 void typecheck(Function* prog) {
     functions = prog;
     for (Function* fn = prog; fn; fn = fn->next) {
-        if (fn->klass && fn->klass->tparam) {
+        if (fn->klass && fn->klass->tparam_count > 0) {
             continue;
         }
         memset(local_types, 0, sizeof(local_types));
@@ -1041,7 +1043,7 @@ void typecheck(Function* prog) {
     }
 
     for (Function* fn = prog; fn; fn = fn->next) {
-        if (fn->klass && fn->klass->tparam) {
+        if (fn->klass && fn->klass->tparam_count > 0) {
             continue;
         }
         if (fn->klass && fn->len == 8 && !memcmp(fn->name, "__init__", 8)) {

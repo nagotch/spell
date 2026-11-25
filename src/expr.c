@@ -519,6 +519,17 @@ static Node* array_literal() {
     return node;
 }
 
+// 型引数の閉じ括弧。入れ子（GBox<Pair<int, str>>）では >> と1トークンに
+// なるため、>> の前半だけを消費して後半を > として残す
+static void expect_type_end() {
+    if (token->kind == TK_SYMBOL && token->len == 2 && !memcmp(token->str, ">>", 2)) {
+        token->str++;
+        token->len = 1;
+        return;
+    }
+    expect(">");
+}
+
 Type* parse_type() {
     if (consume("[")) {
         Type* elem = parse_type();
@@ -532,12 +543,16 @@ Type* parse_type() {
         }
         error_at(token_start(token), token_end(token), "型名が必要ですが、%sが見つかりました", token_text(token));
     }
-    if (parsing_klass && parsing_klass->tparam_len == ident->len && !memcmp(ident->str, parsing_klass->tparam, ident->len)) {
-        Type* var = calloc(1, sizeof(Type));
-        var->kind = TY_VAR;
-        var->name = ident->str;
-        var->len = ident->len;
-        return var;
+    if (parsing_klass) {
+        for (int i = 0; i < parsing_klass->tparam_count; i++) {
+            if (parsing_klass->tparam_lens[i] == ident->len && !memcmp(ident->str, parsing_klass->tparams[i], ident->len)) {
+                Type* var = calloc(1, sizeof(Type));
+                var->kind = TY_VAR;
+                var->name = ident->str;
+                var->len = ident->len;
+                return var;
+            }
+        }
     }
     Type* anno = NULL;
     char* type_name[] = {
@@ -559,8 +574,18 @@ Type* parse_type() {
                 Type* applied = calloc(1, sizeof(Type));
                 applied->kind = TY_CLASS;
                 applied->klass = klass;
-                applied->targ = parse_type();
-                expect(">");
+                do {
+                    if (applied->targ_count < MAX_TPARAMS) {
+                        applied->targs[applied->targ_count] = parse_type();
+                    } else {
+                        parse_type();
+                    }
+                    applied->targ_count++;
+                } while (consume(","));
+                expect_type_end();
+                if (applied->targ_count != klass->tparam_count) {
+                    error_at(token_start(ident), token_end(ident), "クラス`%.*s`の型引数は%d個ですが、%d個が指定されています", klass->len, klass->name, klass->tparam_count, applied->targ_count);
+                }
                 return applied;
             }
             anno = klass->type;

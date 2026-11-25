@@ -71,6 +71,9 @@ typedef union {
     UnaryOp unop;
 } Op;
 
+// ジェネリックなクラスの型パラメータ・型引数の上限
+#define MAX_TPARAMS 4
+
 typedef enum {
     TY_UNKNOWN,
     TY_INT,
@@ -83,7 +86,8 @@ struct Type {
     TypeKind kind;
     Type* elem;
     Class* klass;
-    Type* targ;
+    Type* targs[MAX_TPARAMS];
+    int targ_count;
     char* name;
     int len;
 };
@@ -176,10 +180,12 @@ struct Class {
     int len;
     Field* fields;
     Type* type;
-    char* tparam;
-    int tparam_len;
+    char* tparams[MAX_TPARAMS];
+    int tparam_lens[MAX_TPARAMS];
+    int tparam_count;
     Class* origin;
-    Type* targ;
+    Type* targs[MAX_TPARAMS];
+    int targ_count;
 };
 
 extern Token* token;
