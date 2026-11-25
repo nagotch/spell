@@ -249,17 +249,30 @@ void error_plain(char* fmt, ...);
 void error_plain_v(char* fmt, va_list ap);
 void error_internal(char* fmt, ...);
 
-// エラーの回収（LSP サーバー用）。error_capture_begin が返す jmp_buf へ
-// setjmp しておくと、キャプチャ有効中のエラーは表示も exit もせず、
-// 内容を下の変数へ記録して longjmp で戻る。通常モードでは無効で、
-// 従来どおり表示して exit(1) する
+// エラーの回収（LSP サーバー用）。キャプチャ有効中のエラーは表示も
+// exit もせず、下の診断リストへ記録される。記録したあとの振る舞いは
+// 状況で変わる: parse 中は文単位のリカバリ先（error_capture_set_recover）
+// へ longjmp し、typecheck 等で継続モード（error_capture_set_continue）
+// の間は呼び出し側へ戻って検査を続け、それ以外（字句解析中や上限到達、
+// 内部エラー）は error_capture_begin の jmp_buf へ longjmp して
+// チェック全体を打ち切る。通常モードでは無効で、従来どおり表示して
+// exit(1) する
+#define ERROR_DIAG_MAX 50
+typedef struct {
+    char message[4096];
+    long start;
+    long end;
+    bool has_pos;
+    char* src;
+} ErrorDiag;
+extern ErrorDiag error_diags[ERROR_DIAG_MAX];
+extern int error_diag_count;
+
 jmp_buf* error_capture_begin(void);
 void error_capture_end(void);
-extern char error_captured_message[4096];
-extern long error_captured_start;
-extern long error_captured_end;
-extern bool error_captured_has_pos;
-extern char* error_captured_src;
+bool error_capture_enabled(void);
+void error_capture_set_continue(bool enabled);
+jmp_buf* error_capture_set_recover(jmp_buf* jb);
 
 // コンパイルのパイプライン（main.c）。LSP サーバーからも使う
 Function* load_program(char* path);

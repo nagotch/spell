@@ -141,6 +141,78 @@ if os.path.exists(PRELUDE_PATH):
     diags = wait_diagnostics()
     check("didClose（prelude.sp）: 空の診断", diags == [], json.dumps(diags, ensure_ascii=False))
 
+# 5.6 複数診断（型エラー×3）: 別々の関数の独立した型エラーが全部返る
+MULTI_TYPE_PROGRAM = (
+    "def fa() -> int {\n"
+    "    x: int = 1 < 2;\n"
+    "    return 0;\n"
+    "}\n"
+    "def fb() -> int {\n"
+    "    y: str = 42;\n"
+    "    return 0;\n"
+    "}\n"
+    "def fc() -> int {\n"
+    "    return \"abc\";\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 5},
+                 "contentChanges": [{"text": MULTI_TYPE_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（型エラー×3）: 診断3件", len(diags) == 3, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 3:
+    lines = sorted(d["range"]["start"]["line"] for d in diags)
+    check("型エラー×3: 行は 1, 5, 9", lines == [1, 5, 9], json.dumps(lines))
+    msgs = [d["message"] for d in diags]
+    check("型エラー×3: 代入エラー2件と戻り値エラー1件",
+          sum("が代入されています" in m for m in msgs) == 2
+          and sum("が返されています" in m for m in msgs) == 1,
+          json.dumps(msgs, ensure_ascii=False))
+    check("型エラー×3: severity は全て Error(1)", all(d.get("severity") == 1 for d in diags))
+
+# 5.7 複数診断（構文エラー×2＋型エラー）: 文単位リカバリで全部返る
+MIXED_ERROR_PROGRAM = (
+    "def main() {\n"
+    "    a = (1 + 2;\n"
+    "    b: int = 1 < 2;\n"
+    "    c = 3 + ;\n"
+    "    return 0;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 6},
+                 "contentChanges": [{"text": MIXED_ERROR_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（構文×2＋型×1）: 診断3件", len(diags) == 3, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 3:
+    msgs = [d["message"] for d in diags]
+    check("構文×2＋型×1: 構文エラー2件と型エラー1件",
+          sum("が必要ですが" in m for m in msgs) == 2
+          and sum("が代入されています" in m for m in msgs) == 1,
+          json.dumps(msgs, ensure_ascii=False))
+    lines = sorted(d["range"]["start"]["line"] for d in diags)
+    check("構文×2＋型×1: 行は 1, 2, 3", lines == [1, 2, 3], json.dumps(lines))
+
+# 5.8 カスケード抑制: 悪い代入1件の下流利用では追加の診断が出ない。
+# 代入先 x は注釈の int として記録されるため、x を使う後続の文は
+# そのまま検査が通り、診断は元の1件だけになるのが正しい
+CASCADE_PROGRAM = (
+    "def main() {\n"
+    "    x: int = 1 < 2;\n"
+    "    y = x + 1;\n"
+    "    z = y * 2;\n"
+    "    return z;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 7},
+                 "contentChanges": [{"text": CASCADE_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（カスケード）: 診断1件だけ", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 1:
+    check("カスケード: 元の代入エラーだけ",
+          "が代入されています" in diags[0]["message"], diags[0]["message"])
+
 # 6. didClose: 空の診断が送られて消える
 send({"jsonrpc": "2.0", "method": "textDocument/didClose",
       "params": {"textDocument": {"uri": URI}}})
