@@ -292,6 +292,13 @@ Type* parse_type() {
         }
         error_at(token_start(token), token_end(token), "型名が必要ですが、%sが見つかりました", token_text(token));
     }
+    if (parsing_klass && parsing_klass->tparam_len == ident->len && !memcmp(ident->str, parsing_klass->tparam, ident->len)) {
+        Type* var = calloc(1, sizeof(Type));
+        var->kind = TY_VAR;
+        var->name = ident->str;
+        var->len = ident->len;
+        return var;
+    }
     Type* anno = NULL;
     char* type_name[] = {
         "int",
@@ -308,6 +315,14 @@ Type* parse_type() {
     if (!anno) {
         Class* klass = find_class(ident->str, ident->len);
         if (klass) {
+            if (consume("<")) {
+                Type* applied = calloc(1, sizeof(Type));
+                applied->kind = TY_CLASS;
+                applied->klass = klass;
+                applied->targ = parse_type();
+                expect(">");
+                return applied;
+            }
             anno = klass->type;
         }
     }

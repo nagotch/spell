@@ -68,12 +68,16 @@ typedef enum {
     TY_INT,
     TY_ARRAY,
     TY_CLASS,
+    TY_VAR,
 } TypeKind;
 typedef struct Type Type;
 struct Type {
     TypeKind kind;
     Type* elem;
     Class* klass;
+    Type* targ;
+    char* name;
+    int len;
 };
 
 typedef enum {
@@ -159,6 +163,10 @@ struct Class {
     int len;
     Field* fields;
     Type* type;
+    char* tparam;
+    int tparam_len;
+    Class* origin;
+    Type* targ;
 };
 
 extern Token* token;
@@ -166,6 +174,8 @@ extern LVar* locals;
 extern LVar* globals;
 extern char* src;
 extern char* src_name;
+
+extern Class* parsing_klass;
 
 extern Type ty_int;
 extern Type ty_array;
