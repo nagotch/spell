@@ -28,6 +28,9 @@ void error_capture_end(void) {
     capture_enabled = false;
 }
 
+// 注意: ここから longjmp するため、呼び出し側（error_at 等）の
+// va_end は実行されない。対象環境（gcc/glibc）では va_end は
+// 無処理なので実害はないが、規格厳密には未定義寄りの使い方
 static void capture_error(long start, long end, bool has_pos, char* fmt, va_list ap) {
     vsnprintf(error_captured_message, sizeof(error_captured_message), fmt, ap);
     error_captured_start = start;
