@@ -104,6 +104,8 @@ typedef enum {
     ND_CONTINUE,
     ND_MEMBER,
     ND_MCALL,
+    ND_MULTIASSIGN,
+    ND_CHAIN,
 } NodeKind;
 typedef struct Node Node;
 struct Node {

@@ -168,6 +168,12 @@ class Countdown {
 }
 
 def t023() { s = 0; for i in Countdown(4) { s = s + i; } return s; }
+class Cmp {
+    v: int;
+    def __init__(self, v: int) { self.v = v; }
+    def __lt__(self, o: Cmp) -> bool { return self.v < o.v; }
+}
+def t024() { if (Cmp(1) < Cmp(2) < Cmp(3)) { return 1; } return 0; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -282,6 +288,7 @@ def main() {
     mark(21); fails=fails+check(t021(), 9);
     mark(22); fails=fails+check(t022(), 4);
     mark(23); fails=fails+check(t023(), 6);
+    mark(24); fails=fails+check(t024(), 1);
 
     print_str("done"); putchar(10);
     return fails > 0;
