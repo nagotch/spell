@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
     }
 
     char prelude_path[4096];
-    ssize_t path_len = readlink("/proc/self/exe", prelude_path, sizeof(prelude_path));
+    ssize_t path_len = readlink("/proc/self/exe", prelude_path, sizeof(prelude_path) - 16);
     if (path_len < 0) {
         error_plain("コンパイラの実行ファイルの場所を特定できませんでした");
     }
