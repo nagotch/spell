@@ -342,9 +342,17 @@ static void class_decl(Function** cur) {
     Class* klass = calloc(1, sizeof(Class));
     klass->name = tok->str;
     klass->len = tok->len;
-    klass->type = calloc(1, sizeof(Type));
-    klass->type->kind = TY_CLASS;
-    klass->type->klass = klass;
+    if (klass->len == 3 && !memcmp(klass->name, "int", 3)) {
+        klass->type = &ty_int;
+    } else if (klass->len == 4 && !memcmp(klass->name, "bool", 4)) {
+        klass->type = &ty_bool;
+    } else if (klass->len == 5 && !memcmp(klass->name, "array", 5)) {
+        klass->type = array_type(&ty_unknown);
+    } else {
+        klass->type = calloc(1, sizeof(Type));
+        klass->type->kind = TY_CLASS;
+        klass->type->klass = klass;
+    }
     klass->next = classes;
     classes = klass;
     expect("{");
