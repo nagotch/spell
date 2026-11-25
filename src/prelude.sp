@@ -1,7 +1,7 @@
 class str {
-    chars: [char];
+    chars: [int];
 
-    def __init__(self, chars: [char]) {
+    def __init__(self, chars: [int]) {
         self.chars = chars;
     }
 
@@ -9,7 +9,7 @@ class str {
         return self.chars.len;
     }
 
-    def __getitem__(self, i: int) -> char {
+    def __getitem__(self, i: int) -> int {
         return self.chars[i];
     }
 
@@ -63,12 +63,6 @@ class bool {
     def __str__(self) -> str {
         if (self) { return "true"; }
         return "false";
-    }
-}
-
-class char {
-    def __str__(self) -> str {
-        return str([self]);
     }
 }
 

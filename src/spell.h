@@ -67,7 +67,6 @@ typedef enum {
     TY_UNKNOWN,
     TY_INT,
     TY_BOOL,
-    TY_CHAR,
     TY_ARRAY,
     TY_CLASS,
 } TypeKind;
@@ -171,7 +170,6 @@ extern char* src_name;
 
 extern Type ty_int;
 extern Type ty_bool;
-extern Type ty_char;
 extern Type ty_array;
 extern Type ty_unknown;
 

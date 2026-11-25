@@ -2,7 +2,6 @@
 
 Type ty_int = { TY_INT, NULL };
 Type ty_bool = { TY_BOOL, NULL };
-Type ty_char = { TY_CHAR, NULL };
 Type ty_array = { TY_ARRAY, NULL };
 Type ty_unknown = { TY_UNKNOWN, NULL };
 
@@ -61,9 +60,6 @@ static char* type_text_write(Type* type, char* p) {
             break;
         case TY_BOOL:
             p += sprintf(p, "bool");
-            break;
-        case TY_CHAR:
-            p += sprintf(p, "char");
             break;
         case TY_ARRAY:
             p += sprintf(p, "[");
@@ -158,10 +154,7 @@ static const char* op_text(BinOp op) {
 }
 
 static bool scalar_compatible(Type* a, Type* b) {
-    if (a->kind == b->kind) {
-        return true;
-    }
-    return (a->kind == TY_INT || a->kind == TY_CHAR) && (b->kind == TY_INT || b->kind == TY_CHAR);
+    return a->kind == b->kind;
 }
 
 static const char* cmp_dunder(BinOp op) {
