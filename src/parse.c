@@ -355,6 +355,8 @@ static Class* register_class(char* name, int len) {
     return klass;
 }
 
+Class* parsing_klass = NULL;
+
 static void class_decl(Function** cur) {
     consume_keyword(KW_CLASS);
     Token* tok = consume_ident();
@@ -362,8 +364,15 @@ static void class_decl(Function** cur) {
         error_at(token_start(token), token_end(token), "クラス名が必要ですが、%sが見つかりました", token_text(token));
     }
     Class* klass = register_class(tok->str, tok->len);
+    if (consume("<")) {
+        Token* tparam = consume_ident();
+        klass->tparam = tparam->str;
+        klass->tparam_len = tparam->len;
+        expect(">");
+    }
     expect("{");
     int offset = 0;
+    parsing_klass = klass;
     while (!consume("}")) {
         if (token->kind == TK_KEYWORD && token->keyword == KW_DEF) {
             (*cur)->next = function(klass);

@@ -279,6 +279,8 @@ static Node* array_literal() {
     return node;
 }
 
+Type ty_var = { TY_VAR, NULL };
+
 Type* parse_type() {
     if (consume("[")) {
         Type* elem = parse_type();
@@ -291,6 +293,13 @@ Type* parse_type() {
             error_at(token_start(token), token_end(token), "型名が必要ですが、ファイルの末尾に達しました");
         }
         error_at(token_start(token), token_end(token), "型名が必要ですが、%sが見つかりました", token_text(token));
+    }
+    if (parsing_klass->tparam_len == ident->len && !memcmp(ident->str, parsing_klass->tparam, ident->len)) {
+        return &ty_var;
+    }
+    if (ident->kind == TY_CLASS && consume("<")) {
+        return parse_type();
+        expect(">");
     }
     Type* anno = NULL;
     char* type_name[] = {

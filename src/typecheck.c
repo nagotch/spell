@@ -62,6 +62,9 @@ static Function* find_function(Node* node) {
 }
 
 static bool type_equals(Type* a, Type* b) {
+    if (a->kind == TY_VAR && b->kind == TY_VAR && a->len == b->len && !memcmp(a->name, b->name, a->len)) {
+        return true;
+    }
     if (a->kind == TY_UNKNOWN || b->kind == TY_UNKNOWN) {
         return true;
     }
@@ -91,6 +94,9 @@ static char* type_text_write(Type* type, char* p) {
             p += sprintf(p, "unknown");
             break;
         case TY_CLASS:
+            p += sprintf(p, "%.*s", type->klass->len, type->klass->name);
+            break;
+        case TY_VAR:
             p += sprintf(p, "%.*s", type->klass->len, type->klass->name);
             break;
     }
@@ -808,6 +814,9 @@ static void check_init(Function* fn) {
 
 static bool check_init_stmts(Node* stmt, Class* klass, bool* assigned, int nfields) {
     for (Node* n = stmt; n; n = n->next) {
+        if (klass->tparam) {
+            continue;
+        }
         if (check_init_stmt(n, klass, assigned, nfields)) {
             return true;
         }
