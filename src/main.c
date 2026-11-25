@@ -1,33 +1,52 @@
+#define _POSIX_C_SOURCE 200809L
 #include "spell.h"
+#include <unistd.h>
 
 char* src;
 char* src_name;
 
 static char* read_file(char* src_name);
+static Function* load_program(char* path);
 
 int main(int argc, char **argv) {
     bool only_assembly = false;
     char* output_name = "a.out";
     src_name = NULL;
+    char* input_name = NULL;
     for (int i=1; i<argc; i++) {
         if (strlen(argv[i]) == 2 && !memcmp(argv[i], "-S", 2)) {
             only_assembly = true;
         } else if (strlen(argv[i]) == 2 && !memcmp(argv[i], "-o", 2)) {
             output_name = argv[++i];
         } else {
-            src_name = argv[i];
+            input_name = argv[i];
         }
     }
 
-    if (!src_name) {
+    if (!input_name) {
         error_plain("入力ファイルが指定されていません");
     }
 
-    src = read_file(src_name);
+    char prelude_path[4096];
+    ssize_t path_len = readlink("/proc/self/exe", prelude_path, sizeof(prelude_path) - 16);
+    if (path_len < 0) {
+        error_plain("コンパイラの実行ファイルの場所を特定できませんでした");
+    }
+    prelude_path[path_len] = '\0';
+    char* slash = strrchr(prelude_path, '/');
+    strcpy(slash + 1, "prelude.sp");
 
-    token = tokenize(src);
-
-    Function* prog = program();
+    Function* prog = load_program(prelude_path);
+    Function* user_prog = load_program(input_name);
+    if (prog) {
+        Function* tail = prog;
+        while (tail->next) {
+            tail = tail->next;
+        }
+        tail->next = user_prog;
+    } else {
+        prog = user_prog;
+    }
     desugar(prog);
     typecheck(prog);
 
@@ -72,4 +91,11 @@ static char* read_file(char* src_name) {
     src[size] = '\0';
     fclose(fp);
     return src;
+}
+
+static Function* load_program(char* path) {
+    src_name = path;
+    src = read_file(path);
+    token = tokenize(src);
+    return program();
 }
