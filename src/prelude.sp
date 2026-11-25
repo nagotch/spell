@@ -55,7 +55,7 @@ class int {
     def __le__(self, o: int) -> bool { return self <= o; }
 
     def __iter__(self) -> RangeIter {
-        return RangeIter(0, self, 1);
+        return RangeIter(0, self, 1, 0);
     }
     def __str__(self) -> str {
         n = self;
@@ -178,22 +178,36 @@ class RangeIter {
     cur: int;
     end: int;
     step: int;
+    incl: int;
+    fin: int;
 
-    def __init__(self, cur: int, end: int, step: int) {
+    def __init__(self, cur: int, end: int, step: int, incl: int) {
         self.cur = cur;
         self.end = end;
         self.step = step;
+        self.incl = incl;
+        self.fin = 0;
     }
 
     def __has_next__(self) -> bool {
-        if (self.step > 0) { return self.cur < self.end; }
-        return self.cur > self.end;
+        // 終端を含む範囲では、端の値を返した後に cur が巻き戻っても
+        // 継続と誤判定しないよう、返し終えたことを fin で覚える
+        if (self.fin == 1) { return 1 == 0; }
+        if (self.step > 0) { return self.cur < self.end || (self.incl == 1 && self.cur == self.end); }
+        return self.cur > self.end || (self.incl == 1 && self.cur == self.end);
     }
 
     def __next__(self) -> int {
         if (self.step > 0) {
             v = self.cur;
             self.cur = self.cur + 1;
+            if (self.incl == 1 && v == self.end) { self.fin = 1; }
+            return v;
+        }
+        if (self.incl == 1) {
+            v = self.cur;
+            self.cur = self.cur - 1;
+            if (v == self.end) { self.fin = 1; }
             return v;
         }
         self.cur = self.cur - 1;
@@ -214,9 +228,9 @@ class Range {
 
     def __iter__(self) -> RangeIter {
         if (self.lo <= self.hi) {
-            return RangeIter(self.lo, self.hi + self.incl, 1);
+            return RangeIter(self.lo, self.hi, 1, self.incl);
         }
-        return RangeIter(self.lo + self.incl, self.hi, -1);
+        return RangeIter(self.lo, self.hi, -1, self.incl);
     }
 
     def rev(self) -> Range {
@@ -242,6 +256,11 @@ class ArrayIter<T> {
         self.i = self.i + 1;
         return v;
     }
+}
+
+def __count_range(n: int) -> Range {
+    if (n < 0) { return Range(0, 0, 0); }
+    return Range(0, n, 0);
 }
 
 def read_int() -> int {

@@ -42,6 +42,8 @@ def t041() { x = 5; x++; x++; x--; a = [10]; a[0]++; return x * 100 + a[0]; }
 def t042() { t = 0; i@5 { t = t + i; } u = 0; i@1..4 { u = u + i; } v = 0; @3 { v = v + 2; } return t * 100 + u * 10 + v; }
 def t043() { s = 0; for i in 1..=3 { s = s + i; } for i in 3..=3 { s = s + i; } return s; }
 def t044() { r = 0; for i in 3..0 { r = r * 10 + i; } q = 0; for i in 5..=2 { q = q * 10 + i; } return r * 10000 + q; }
+def t045() { c = 0; @-2 { c++; } for -3 { c++; } return c; }
+def t046() { m = 1; for i in 62 { m = m * 2; } m = m * 2 - 1; c = 0; for i in m..=m { c++; } d = 0; for i in m..=(m - 2) { d++; } return c * 10 + d; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -100,6 +102,8 @@ def main() {
     mark(42); fails=fails+check(t042(), 1066);
     mark(43); fails=fails+check(t043(), 9);
     mark(44); fails=fails+check(t044(), 2105432);
+    mark(45); fails=fails+check(t045(), 0);
+    mark(46); fails=fails+check(t046(), 13);
 
     print_str("done"); putchar(10);
     return fails > 0;
