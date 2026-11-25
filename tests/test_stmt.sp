@@ -36,6 +36,14 @@ def t035() { s = 0; for i in 1..5 { s = s + i; } return s; }
 def t036() { s = 0; for 4 { s = s + 3; } return s; }
 def t037() { for i in 3 { } return i; }
 def t038() { s = 0; for i in 3 { i = 99; s = s + 1; } return s; }
+def t039() { x = 2; if (x == 1) { return 1; } elif (x == 2) { return 2; } else { return 3; } }
+def t040() { s = 0; i = 0; while (i < 10) { i++; if (i == 3) { ^; } if (i == 6) { !; } s = s + i; } return s; }
+def t041() { x = 5; x++; x++; x--; a = [10]; a[0]++; return x * 100 + a[0]; }
+def t042() { t = 0; i@5 { t = t + i; } u = 0; i@1..4 { u = u + i; } v = 0; @3 { v = v + 2; } return t * 100 + u * 10 + v; }
+def t043() { s = 0; for i in 1..=3 { s = s + i; } for i in 3..=3 { s = s + i; } return s; }
+def t044() { r = 0; for i in 3..0 { r = r * 10 + i; } q = 0; for i in 5..=2 { q = q * 10 + i; } return r * 10000 + q; }
+def t045() { c = 0; @-2 { c++; } for -3 { c++; } return c; }
+def t046() { m = 1; for i in 62 { m = m * 2; } m = m * 2 - 1; c = 0; for i in m..=m { c++; } d = 0; for i in m..=(m - 2) { d++; } return c * 10 + d; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -88,6 +96,14 @@ def main() {
     mark(36); fails=fails+check(t036(), 12);
     mark(37); fails=fails+check(t037(), 2);
     mark(38); fails=fails+check(t038(), 3);
+    mark(39); fails=fails+check(t039(), 2);
+    mark(40); fails=fails+check(t040(), 12);
+    mark(41); fails=fails+check(t041(), 611);
+    mark(42); fails=fails+check(t042(), 1066);
+    mark(43); fails=fails+check(t043(), 9);
+    mark(44); fails=fails+check(t044(), 2105432);
+    mark(45); fails=fails+check(t045(), 0);
+    mark(46); fails=fails+check(t046(), 13);
 
     print_str("done"); putchar(10);
     return fails > 0;
