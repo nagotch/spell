@@ -126,6 +126,21 @@ send({"jsonrpc": "2.0", "method": "textDocument/didChange",
 diags = wait_diagnostics()
 check("didChange（修正後）: 診断ゼロ", diags == [], json.dumps(diags, ensure_ascii=False))
 
+# 5.5 prelude.sp 自身を開く: 組み込み prelude と二重定義にならず診断ゼロ
+PRELUDE_PATH = os.path.join(HERE, "..", "..", "src", "prelude.sp")
+if os.path.exists(PRELUDE_PATH):
+    with open(PRELUDE_PATH, encoding="utf-8") as f:
+        prelude_text = f.read()
+    PRELUDE_URI = "file:///tmp/prelude.sp"
+    send({"jsonrpc": "2.0", "method": "textDocument/didOpen",
+          "params": {"textDocument": {"uri": PRELUDE_URI, "languageId": "spell", "version": 1, "text": prelude_text}}})
+    diags = wait_diagnostics()
+    check("didOpen（prelude.sp 自身）: 診断ゼロ", diags == [], json.dumps(diags, ensure_ascii=False))
+    send({"jsonrpc": "2.0", "method": "textDocument/didClose",
+          "params": {"textDocument": {"uri": PRELUDE_URI}}})
+    diags = wait_diagnostics()
+    check("didClose（prelude.sp）: 空の診断", diags == [], json.dumps(diags, ensure_ascii=False))
+
 # 6. didClose: 空の診断が送られて消える
 send({"jsonrpc": "2.0", "method": "textDocument/didClose",
       "params": {"textDocument": {"uri": URI}}})
