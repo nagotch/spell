@@ -914,23 +914,55 @@ static void emit_rt_write_file_chars() {
     printf("  ret\n");
 }
 
-// 文字コード列を fd 2（stderr）へ書く。戻り値は書けたバイト数
+// 文字コード列を fd 2（stderr）へ書く。write は部分的にしか書けない
+// ことがあるので、全部書けるまで繰り返す。戻り値は書けたバイト数
 static void emit_rt_stderr_chars() {
     printf("__rt_spell_stderr_chars:\n");
     printf("  push rbp\n");
     printf("  mov rbp, rsp\n");
+    printf("  push rbx\n");
+    printf("  push r12\n");
+    printf("  push r13\n");
+    printf("  sub rsp, 8\n");
     printf("  call __rt_spell_chars_to_bytes\n");
-    printf("  mov rsi, rax\n");
+    printf("  mov rbx, rax\n");
+    printf("  mov r12, rdx\n");
+    printf("  xor r13, r13\n");
+    printf(".Lrt_stderr_loop:\n");
+    printf("  test r12, r12\n");
+    printf("  je .Lrt_stderr_done\n");
     printf("  mov rdi, 2\n");
+    printf("  mov rsi, rbx\n");
+    printf("  mov rdx, r12\n");
     printf("  call write\n");
+    printf("  cmp rax, 0\n");
+    printf("  jle .Lrt_stderr_done\n");
+    printf("  add rbx, rax\n");
+    printf("  add r13, rax\n");
+    printf("  sub r12, rax\n");
+    printf("  jmp .Lrt_stderr_loop\n");
+    printf(".Lrt_stderr_done:\n");
+    printf("  mov rax, r13\n");
+    printf("  add rsp, 8\n");
+    printf("  pop r13\n");
+    printf("  pop r12\n");
+    printf("  pop rbx\n");
     printf("  pop rbp\n");
     printf("  ret\n");
 }
 
+// 終了コードは rdi。libc の exit を名前で呼ぶと、利用者が同名の関数を
+// 定義していた場合にそちらへ束縛されてしまうため、fflush(NULL) で
+// stdio を流してから _exit で終わる（生成コードは atexit を登録しない
+// ので、観測できる挙動は exit と同じ）
 static void emit_rt_exit() {
     printf("__rt_spell_exit:\n");
+    printf("  push rdi\n");
+    printf("  xor edi, edi\n");
+    printf("  call fflush\n");
+    printf("  pop rdi\n");
     printf("  sub rsp, 8\n");
-    printf("  call exit\n");
+    printf("  call _exit\n");
 }
 
 static void emit_runtime_helpers() {
