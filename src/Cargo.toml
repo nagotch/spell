@@ -1,0 +1,18 @@
+[package]
+name = "spell"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+
+[[bin]]
+name = "spell"
+path = "main.rs"
+
+[[bin]]
+name = "spell-lsp"
+path = "lsp.rs"
+
+[profile.release]
+debug = true
