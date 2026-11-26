@@ -114,13 +114,13 @@ def t013() {
     return b.v;
 }
 
-class Vec {
+class Vec2 {
     x: int;
     y: int;
     def __init__(self, x: int, y: int) { self.x = x; self.y = y; }
-    def __add__(self, o: Vec) -> Vec { return Vec(self.x + o.x, self.y + o.y); }
-    def __eq__(self, o: Vec) -> bool { return self.x == o.x && self.y == o.y; }
-    def __lt__(self, o: Vec) -> bool { return self.x < o.x; }
+    def __add__(self, o: Vec2) -> Vec2 { return Vec2(self.x + o.x, self.y + o.y); }
+    def __eq__(self, o: Vec2) -> bool { return self.x == o.x && self.y == o.y; }
+    def __lt__(self, o: Vec2) -> bool { return self.x < o.x; }
 }
 
 class Arr {
@@ -131,12 +131,12 @@ class Arr {
 }
 
 def t014() {
-    v = Vec(1, 2) + Vec(3, 4);
+    v = Vec2(1, 2) + Vec2(3, 4);
     return v.x * 100 + v.y;
 }
 
 def t015() {
-    a = Vec(1, 2); b = Vec(2, 1); c = Vec(1, 2);
+    a = Vec2(1, 2); b = Vec2(2, 1); c = Vec2(1, 2);
     r = 0;
     if (a < b) { r = r + 1; }
     if (b > a) { r = r + 2; }
@@ -475,6 +475,61 @@ def t042() {
     return p.sum()
 }
 
+def make_pt() -> Pt { return Pt(0, 0); }
+
+def t043() {
+    // Vec: 容量の倍増（8→16→32→64）をまたいでも順序と値が保たれる
+    v: Vec<int> = Vec(zero_int);
+    i = 0;
+    while (i < 50) { v.append(i); i = i + 1; }
+    s = 0;
+    j = 0;
+    while (j < 50) { s = s + v[j] * (j + 1); j = j + 1; }
+    return s;
+}
+
+def t044() {
+    // Vec: len と添字の読み書き、to_array
+    v: Vec<int> = Vec(zero_int);
+    v.append(10);
+    v.append(20);
+    v.append(30);
+    v[1] = 99;
+    a = v.to_array();
+    return v.len * 1000 + v[0] * 100 + v[1] + a[2];
+}
+
+def t045() {
+    // Vec: 反復は論理長ぶんだけ（容量ではない）
+    v: Vec<int> = Vec(zero_int);
+    i = 0;
+    while (i < 20) { v.append(1); i = i + 1; }
+    s = 0;
+    cnt = 0;
+    for x in v { s = s + x; cnt = cnt + 1; }
+    return s * 100 + cnt;
+}
+
+def t046() {
+    // Vec: str の Vec
+    v: Vec<str> = Vec(zero_str);
+    v.append("ab");
+    v.append("cde");
+    v.append("f");
+    s = "";
+    for x in v { s = s + x; }
+    return s.len * 10 + v[1].len;
+}
+
+def t047() {
+    // Vec: クラスの Vec（ファクトリで Pt を生やす）
+    v: Vec<Pt> = Vec(make_pt);
+    v.append(Pt(1, 2));
+    v.append(Pt(3, 4));
+    v[0] = Pt(10, 20);
+    return v[0].x * 100 + v[1].y * 10 + v.len;
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -524,6 +579,11 @@ def main() {
     mark(40); fails=fails+check(t040(), 26342);
     mark(41); fails=fails+check(t041(), 7);
     mark(42); fails=fails+check(t042(), 3);
+    mark(43); fails=fails+check(t043(), 41650);
+    mark(44); fails=fails+check(t044(), 4129);
+    mark(45); fails=fails+check(t045(), 2020);
+    mark(46); fails=fails+check(t046(), 63);
+    mark(47); fails=fails+check(t047(), 1042);
 
     print_str("done"); putchar(10);
     return fails > 0;

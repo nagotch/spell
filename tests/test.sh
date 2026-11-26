@@ -88,6 +88,8 @@ error_tests=(
     "def main() { x = 5; return x(1); }|型の値は呼び出せません"
     "def twice(x: int) -> int { return x * 2; } def main() { twice += 1; return 0; }|fn(int) -> int\`型と"
     "def main() { for i in 0..3 { i = 1; } return 0; }|書き戻されないため、代入できません"
+    "def main() { x = __spell_argc(1); return 0; }|引数は0個ですが、1個が指定されています"
+    "def main() { x = __spell_read_file_chars(\"s\"); return 0; }|ですが、\`str\`が指定されています"
 )
 
 cc -c -o funcs.o funcs.c
@@ -229,6 +231,33 @@ one_io_test "def main() { a- = in[3]; print(a); return 0; }" "1 2 3\n" "0 1 2\n"
 one_io_test "def main() { print_int(0 - 10); putchar(10); print_int(0 - 100); putchar(10); print_int(0 - 1); putchar(10); return 0; }" "" "-10\n-100\n-1\n"
 one_io_test "def main() { x = in; print_int(x); putchar(10); return 0; }" "-9223372036854775808\n" "-9223372036854775808\n"
 one_io_test "def main() { s = in_str; for x in s { if (x != \"A\") { x = \".\"; } } print(s); return 0; }" "ABCA\n" "A..A\n"
+
+# ドライバ層（step 59）のテスト。引数・標準出力・標準エラー・終了コードを
+# 別々に照合する。$1=ソース $2=期待する標準出力 $3=期待する標準エラー
+# $4=期待する終了コード 残り=プログラムへの引数
+one_driver_test() {
+    printf '%s' "$1" > drv.sp
+    "$SPELL" -S -o drv drv.sp
+    cc -o drv drv.s funcs.o
+    local expected_out="$2" expected_err="$3" expected_code="$4"
+    shift 4
+    ./drv "$@" > drv.out 2> drv.err
+    local code=$?
+    printf '%b' "$expected_out" > drv.expout
+    printf '%b' "$expected_err" > drv.experr
+    if [ "$code" != "$expected_code" ] || ! cmp -s drv.expout drv.out || ! cmp -s drv.experr drv.err; then
+        echo "driver test failed: $1 (exit $code)"
+        fail_count=$((fail_count+1))
+    fi
+    n=$((n+1))
+    rm -f drv.sp drv drv.s drv.out drv.err drv.expout drv.experr drv_data.txt
+}
+
+one_driver_test "def main() { a = args(); print(a[1]); print(a[2]); return 0; }" "hello\nworld\n" "" 0 hello world
+one_driver_test "def main() { ok = write_file(\"drv_data.txt\", \"roundtrip 59\\n\"); d = read_file(\"drv_data.txt\"); print(ok); print(d.ok); print(d.text); return 0; }" "true\ntrue\nroundtrip 59\n\n" "" 0
+one_driver_test "def main() { d = read_file(\"drv_missing.txt\"); print(d.ok); print(d.text.len); return 0; }" "false\n0\n" "" 0
+one_driver_test "def main() { print(\"out\"); eprint(\"err\"); eprint(42); return 0; }" "out\n" "err\n42\n" 0
+one_driver_test "def main() { print(\"before\"); exit(3); print(\"after\"); return 0; }" "before\n" "" 3
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

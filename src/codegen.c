@@ -361,9 +361,41 @@ static void gen_construct(Node* node) {
     }
 }
 
+// 組み込みプリミティブ（step 59）の呼び出し先ラベル。利用者や libc の
+// シンボルと衝突しないよう `__rt_spell_` を付ける
+static char* builtin_rt_name(int builtin) {
+    switch (builtin) {
+        case BUILTIN_ARGC: return "__rt_spell_argc";
+        case BUILTIN_ARGV_CHARS: return "__rt_spell_argv_chars";
+        case BUILTIN_READ_FILE_CHARS: return "__rt_spell_read_file_chars";
+        case BUILTIN_IO_OK: return "__rt_spell_io_ok";
+        case BUILTIN_WRITE_FILE_CHARS: return "__rt_spell_write_file_chars";
+        case BUILTIN_STDERR_CHARS: return "__rt_spell_stderr_chars";
+        case BUILTIN_EXIT: return "__rt_spell_exit";
+    }
+    return NULL;
+}
+
 static void gen_funcall(Node* node) {
     if (node->klass) {
         gen_construct(node);
+        return;
+    }
+    if (node->builtin) {
+        // プリミティブは通常の関数呼び出しと同じ形で、呼び出し先だけ
+        // ランタイムヘルパに替える
+        int label = new_label();
+        Node* head = node->args;
+        int args_cnt = 0;
+        while (head) {
+            gen(head);
+            head = head->next;
+            args_cnt++;
+        }
+        pop_args(args_cnt, 0);
+        char* rt = builtin_rt_name(node->builtin);
+        emit_call(label, NULL, (int)strlen(rt), rt);
+        printf("  push rax\n");
         return;
     }
     int label = new_label();
@@ -625,6 +657,293 @@ static void gen(Node* node) {
     }
 }
 
+// ---- ランタイムヘルパ（step 59） ----
+//
+// 組み込みプリミティブの実体。prelude のラッパ関数が常に出力される以上、
+// ヘルパも常に出す（prelude 本体と同じ扱い）。配列のレイアウトは
+// コンパイラが作るものと同一（要素の8バイト手前に長さ）で、[int] の
+// 文字コード配列と int だけを相手にする。libc のデータシンボルには
+// 触らない（stderr へは fd 2 への write で出す）。一時バッファは
+// 解放しない（生成コードは全体にそういう方針）
+// ponytail: 一時バッファはリークする。ドライバ用途では問題にならない
+
+// [int]（文字コード列）を NUL 終端のバイト列へ変換する。
+// 入力 rdi = 文字コード配列、出力 rax = バイト列、rdx = 長さ
+static void emit_rt_chars_to_bytes() {
+    printf("__rt_spell_chars_to_bytes:\n");
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    printf("  push rbx\n");
+    printf("  push r12\n");
+    printf("  mov rbx, rdi\n");
+    printf("  mov r12, [rdi-8]\n");
+    printf("  lea rdi, [r12+1]\n");
+    printf("  call malloc\n");
+    printf("  xor rcx, rcx\n");
+    printf(".Lrt_c2b_loop:\n");
+    printf("  cmp rcx, r12\n");
+    printf("  jae .Lrt_c2b_done\n");
+    printf("  mov rdx, [rbx+rcx*8]\n");
+    printf("  mov [rax+rcx], dl\n");
+    printf("  inc rcx\n");
+    printf("  jmp .Lrt_c2b_loop\n");
+    printf(".Lrt_c2b_done:\n");
+    printf("  mov byte ptr [rax+r12], 0\n");
+    printf("  mov rdx, r12\n");
+    printf("  pop r12\n");
+    printf("  pop rbx\n");
+    printf("  pop rbp\n");
+    printf("  ret\n");
+}
+
+static void emit_rt_argc() {
+    printf("__rt_spell_argc:\n");
+    printf("  mov rax, [rip + __spell_argc]\n");
+    printf("  ret\n");
+}
+
+// argv[i] を文字コード配列として返す。範囲外は空配列
+static void emit_rt_argv_chars() {
+    printf("__rt_spell_argv_chars:\n");
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    printf("  push rbx\n");
+    printf("  push r12\n");
+    printf("  push r13\n");
+    printf("  push r14\n");
+    printf("  mov rax, [rip + __spell_argv]\n");
+    printf("  test rax, rax\n");
+    printf("  je .Lrt_argv_empty\n");
+    printf("  cmp rdi, 0\n");
+    printf("  jl .Lrt_argv_empty\n");
+    printf("  cmp rdi, [rip + __spell_argc]\n");
+    printf("  jae .Lrt_argv_empty\n");
+    printf("  mov rbx, [rax+rdi*8]\n");
+    printf("  xor r12, r12\n");
+    printf(".Lrt_argv_len:\n");
+    printf("  cmp byte ptr [rbx+r12], 0\n");
+    printf("  je .Lrt_argv_alloc\n");
+    printf("  inc r12\n");
+    printf("  jmp .Lrt_argv_len\n");
+    printf(".Lrt_argv_alloc:\n");
+    printf("  mov rdi, r12\n");
+    printf("  imul rdi, 8\n");
+    printf("  add rdi, 8\n");
+    printf("  call malloc\n");
+    printf("  mov r13, rax\n");
+    printf("  mov [r13], r12\n");
+    printf("  xor r14, r14\n");
+    printf(".Lrt_argv_fill:\n");
+    printf("  cmp r14, r12\n");
+    printf("  jae .Lrt_argv_ret\n");
+    printf("  movzx rcx, byte ptr [rbx+r14]\n");
+    printf("  mov [r13+r14*8+8], rcx\n");
+    printf("  inc r14\n");
+    printf("  jmp .Lrt_argv_fill\n");
+    printf(".Lrt_argv_ret:\n");
+    printf("  lea rax, [r13+8]\n");
+    printf("  jmp .Lrt_argv_epilogue\n");
+    printf(".Lrt_argv_empty:\n");
+    printf("  mov rdi, 8\n");
+    printf("  call malloc\n");
+    printf("  mov qword ptr [rax], 0\n");
+    printf("  add rax, 8\n");
+    printf(".Lrt_argv_epilogue:\n");
+    printf("  pop r14\n");
+    printf("  pop r13\n");
+    printf("  pop r12\n");
+    printf("  pop rbx\n");
+    printf("  pop rbp\n");
+    printf("  ret\n");
+}
+
+// ファイル全体を文字コード配列として読む。成否は __spell_io_status へ
+// （1 = 読めた、0 = 開けない・読み取りエラー）。失敗時は空配列を返す
+static void emit_rt_read_file_chars() {
+    printf("__rt_spell_read_file_chars:\n");
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    printf("  push rbx\n");
+    printf("  push r12\n");
+    printf("  push r13\n");
+    printf("  sub rsp, 24\n");
+    printf("  call __rt_spell_chars_to_bytes\n");
+    printf("  mov [rsp], rax\n");
+    printf("  mov word ptr [rsp+8], 0x6272\n");
+    printf("  mov byte ptr [rsp+10], 0\n");
+    printf("  mov rdi, [rsp]\n");
+    printf("  lea rsi, [rsp+8]\n");
+    printf("  call fopen\n");
+    printf("  test rax, rax\n");
+    printf("  je .Lrt_read_fail\n");
+    printf("  mov [rsp], rax\n");
+    printf("  xor rbx, rbx\n");
+    printf("  xor r12, r12\n");
+    printf("  xor r13, r13\n");
+    printf(".Lrt_read_loop:\n");
+    printf("  mov rdi, [rsp]\n");
+    printf("  call fgetc\n");
+    printf("  cmp eax, -1\n");
+    printf("  je .Lrt_read_eof\n");
+    printf("  mov [rsp+8], eax\n");
+    printf("  cmp r12, r13\n");
+    printf("  jb .Lrt_read_store\n");
+    printf("  cmp r13, 0\n");
+    printf("  jne .Lrt_read_double\n");
+    printf("  mov r13, 256\n");
+    printf("  jmp .Lrt_read_grow\n");
+    printf(".Lrt_read_double:\n");
+    printf("  add r13, r13\n");
+    printf(".Lrt_read_grow:\n");
+    printf("  mov rdi, rbx\n");
+    printf("  mov rsi, r13\n");
+    printf("  call realloc\n");
+    printf("  test rax, rax\n");
+    printf("  je .Lrt_read_oom\n");
+    printf("  mov rbx, rax\n");
+    printf(".Lrt_read_store:\n");
+    printf("  mov eax, [rsp+8]\n");
+    printf("  mov [rbx+r12], al\n");
+    printf("  inc r12\n");
+    printf("  jmp .Lrt_read_loop\n");
+    printf(".Lrt_read_eof:\n");
+    printf("  mov rdi, [rsp]\n");
+    printf("  call ferror\n");
+    printf("  mov [rsp+16], rax\n");
+    printf("  mov rdi, [rsp]\n");
+    printf("  call fclose\n");
+    printf("  mov rax, [rsp+16]\n");
+    printf("  test rax, rax\n");
+    printf("  jne .Lrt_read_fail\n");
+    printf("  mov qword ptr [rip + __spell_io_status], 1\n");
+    printf("  mov rdi, r12\n");
+    printf("  imul rdi, 8\n");
+    printf("  add rdi, 8\n");
+    printf("  call malloc\n");
+    printf("  mov [rax], r12\n");
+    printf("  xor rcx, rcx\n");
+    printf(".Lrt_read_fill:\n");
+    printf("  cmp rcx, r12\n");
+    printf("  jae .Lrt_read_ret\n");
+    printf("  movzx rdx, byte ptr [rbx+rcx]\n");
+    printf("  mov [rax+rcx*8+8], rdx\n");
+    printf("  inc rcx\n");
+    printf("  jmp .Lrt_read_fill\n");
+    printf(".Lrt_read_ret:\n");
+    printf("  add rax, 8\n");
+    printf("  jmp .Lrt_read_epilogue\n");
+    printf(".Lrt_read_oom:\n");
+    printf("  mov rdi, [rsp]\n");
+    printf("  call fclose\n");
+    printf(".Lrt_read_fail:\n");
+    printf("  mov qword ptr [rip + __spell_io_status], 0\n");
+    printf("  mov rdi, 8\n");
+    printf("  call malloc\n");
+    printf("  mov qword ptr [rax], 0\n");
+    printf("  add rax, 8\n");
+    printf(".Lrt_read_epilogue:\n");
+    printf("  add rsp, 24\n");
+    printf("  pop r13\n");
+    printf("  pop r12\n");
+    printf("  pop rbx\n");
+    printf("  pop rbp\n");
+    printf("  ret\n");
+}
+
+static void emit_rt_io_ok() {
+    printf("__rt_spell_io_ok:\n");
+    printf("  mov rax, [rip + __spell_io_status]\n");
+    printf("  ret\n");
+}
+
+// 文字コード列をファイルへ書く。戻り値と __spell_io_status に成否
+// （1 = 全部書けて閉じられた、0 = 失敗）
+static void emit_rt_write_file_chars() {
+    printf("__rt_spell_write_file_chars:\n");
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    printf("  push rbx\n");
+    printf("  push r12\n");
+    printf("  push r13\n");
+    printf("  push r14\n");
+    printf("  push r15\n");
+    printf("  sub rsp, 8\n");
+    printf("  mov r15, rsi\n");
+    printf("  call __rt_spell_chars_to_bytes\n");
+    printf("  mov r14, rax\n");
+    printf("  mov rdi, r15\n");
+    printf("  call __rt_spell_chars_to_bytes\n");
+    printf("  mov r12, rax\n");
+    printf("  mov r13, rdx\n");
+    printf("  mov word ptr [rsp], 0x6277\n");
+    printf("  mov byte ptr [rsp+2], 0\n");
+    printf("  mov rdi, r14\n");
+    printf("  lea rsi, [rsp]\n");
+    printf("  call fopen\n");
+    printf("  mov rbx, rax\n");
+    printf("  test rax, rax\n");
+    printf("  je .Lrt_write_fail\n");
+    printf("  mov rdi, r12\n");
+    printf("  mov rsi, 1\n");
+    printf("  mov rdx, r13\n");
+    printf("  mov rcx, rbx\n");
+    printf("  call fwrite\n");
+    printf("  cmp rax, r13\n");
+    printf("  jne .Lrt_write_bad\n");
+    printf("  mov rdi, rbx\n");
+    printf("  call fclose\n");
+    printf("  cmp eax, 0\n");
+    printf("  jne .Lrt_write_fail\n");
+    printf("  mov qword ptr [rip + __spell_io_status], 1\n");
+    printf("  mov rax, 1\n");
+    printf("  jmp .Lrt_write_epilogue\n");
+    printf(".Lrt_write_bad:\n");
+    printf("  mov rdi, rbx\n");
+    printf("  call fclose\n");
+    printf(".Lrt_write_fail:\n");
+    printf("  mov qword ptr [rip + __spell_io_status], 0\n");
+    printf("  xor rax, rax\n");
+    printf(".Lrt_write_epilogue:\n");
+    printf("  add rsp, 8\n");
+    printf("  pop r15\n");
+    printf("  pop r14\n");
+    printf("  pop r13\n");
+    printf("  pop r12\n");
+    printf("  pop rbx\n");
+    printf("  pop rbp\n");
+    printf("  ret\n");
+}
+
+// 文字コード列を fd 2（stderr）へ書く。戻り値は書けたバイト数
+static void emit_rt_stderr_chars() {
+    printf("__rt_spell_stderr_chars:\n");
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    printf("  call __rt_spell_chars_to_bytes\n");
+    printf("  mov rsi, rax\n");
+    printf("  mov rdi, 2\n");
+    printf("  call write\n");
+    printf("  pop rbp\n");
+    printf("  ret\n");
+}
+
+static void emit_rt_exit() {
+    printf("__rt_spell_exit:\n");
+    printf("  sub rsp, 8\n");
+    printf("  call exit\n");
+}
+
+static void emit_runtime_helpers() {
+    emit_rt_chars_to_bytes();
+    emit_rt_argc();
+    emit_rt_argv_chars();
+    emit_rt_read_file_chars();
+    emit_rt_io_ok();
+    emit_rt_write_file_chars();
+    emit_rt_stderr_chars();
+    emit_rt_exit();
+}
+
 // ---- 関数ごとの出力 ----
 
 void codegen(Function* prog) {
@@ -634,14 +953,20 @@ void codegen(Function* prog) {
             has_init = true;
         }
     }
+    printf(".bss\n");
+    printf("__spell_argc:\n");
+    printf("  .zero 8\n");
+    printf("__spell_argv:\n");
+    printf("  .zero 8\n");
+    printf("__spell_io_status:\n");
+    printf("  .zero 8\n");
     if (globals) {
-        printf(".bss\n");
         for (LVar* var = globals; var; var = var->next) {
             printf("%.*s:\n", var->len, var->name);
             printf("  .zero 8\n");
         }
-        printf(".text\n");
     }
+    printf(".text\n");
     while (prog) {
         if (prog->klass && prog->klass->tparam_count > 0) {
             prog = prog->next;
@@ -656,6 +981,13 @@ void codegen(Function* prog) {
         } else {
             printf(".global %.*s\n", prog->len, prog->name);
             printf("%.*s:\n", prog->len, prog->name);
+        }
+        if (!prog->klass && prog->len == 4 && memcmp(prog->name, "main", 4) == 0) {
+            // プロセスの入口: argc（rdi）と argv（rsi）を、プリミティブが
+            // 読めるよう .bss へ退避する。引数レジスタはこの後も書き換え
+            // られるため、プロローグより前に置く
+            printf("  mov [rip + __spell_argc], rdi\n");
+            printf("  mov [rip + __spell_argv], rsi\n");
         }
         printf("  push rbp\n");
         printf("  mov rbp, rsp\n");
@@ -687,4 +1019,5 @@ void codegen(Function* prog) {
         printf("  ret\n");
         prog = prog->next;
     }
+    emit_runtime_helpers();
 }

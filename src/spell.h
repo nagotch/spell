@@ -115,6 +115,22 @@ struct Capture {
     Capture* next;
 };
 
+// コンパイラ組み込みプリミティブ（step 59）。セルフホスト向けに、
+// ドライバ層の機能（argv・ファイル入出力・stderr・終了）を [int] の
+// 文字コード配列と int だけで扱える形で用意する。呼び出しは typecheck が
+// この列挙で印を付け、codegen がランタイムヘルパ（__rt_spell_*）への
+// 呼び出しとして出す。名前は予約済みの `__spell_` 名前空間に置く
+typedef enum {
+    BUILTIN_NONE = 0,
+    BUILTIN_ARGC,
+    BUILTIN_ARGV_CHARS,
+    BUILTIN_READ_FILE_CHARS,
+    BUILTIN_IO_OK,
+    BUILTIN_WRITE_FILE_CHARS,
+    BUILTIN_STDERR_CHARS,
+    BUILTIN_EXIT,
+} SpellBuiltin;
+
 typedef enum {
     ND_NUM,
     ND_ASSIGN, 
@@ -172,6 +188,8 @@ struct Node {
     Token* tok;
     // ND_LAMBDA のときだけ使う: このラムダの捕捉一覧
     Capture* captures;
+    // ND_FUNCALL のときだけ使う: 組み込みプリミティブならその種類
+    int builtin;
 };
 
 struct Function {

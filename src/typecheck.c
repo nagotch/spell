@@ -10,6 +10,43 @@ static Function* current_fn;
 static Type* current_return;
 Function* functions;
 
+// プリミティブの署名表。引数と戻り値の型は呼び出しのたびに組み立てる
+// （[int] は array_type で新しく作る。型の同一性は構造で判定される）
+static Type* bool_type();
+typedef struct {
+    char* name;
+    int id;         // SpellBuiltin
+    int nparams;
+    Type* params[2];
+    Type* ret;
+} BuiltinInfo;
+
+static BuiltinInfo* find_builtin(char* name, int len) {
+    static BuiltinInfo table[7];
+    static bool initialized = false;
+    if (!initialized) {
+        Type* chars = array_type(&ty_int);
+        Type* bool_ty = bool_type();
+        table[0] = (BuiltinInfo){ "__spell_argc", BUILTIN_ARGC, 0, { NULL, NULL }, &ty_int };
+        table[1] = (BuiltinInfo){ "__spell_argv_chars", BUILTIN_ARGV_CHARS, 1, { &ty_int, NULL }, chars };
+        table[2] = (BuiltinInfo){ "__spell_read_file_chars", BUILTIN_READ_FILE_CHARS, 1, { chars, NULL }, chars };
+        table[3] = (BuiltinInfo){ "__spell_io_ok", BUILTIN_IO_OK, 0, { NULL, NULL }, bool_ty };
+        table[4] = (BuiltinInfo){ "__spell_write_file_chars", BUILTIN_WRITE_FILE_CHARS, 2, { chars, chars }, &ty_int };
+        table[5] = (BuiltinInfo){ "__spell_stderr_chars", BUILTIN_STDERR_CHARS, 1, { chars, NULL }, &ty_int };
+        // __spell_exit は戻らない。戻り値の型は unknown にして、文としての
+        // 使用を妨げない（式の位置で使うと型は分からないものとして扱う）
+        table[6] = (BuiltinInfo){ "__spell_exit", BUILTIN_EXIT, 1, { &ty_int, NULL }, &ty_unknown };
+        initialized = true;
+    }
+    for (int i = 0; i < 7; i++) {
+        int nlen = (int)strlen(table[i].name);
+        if (nlen == len && !memcmp(table[i].name, name, len)) {
+            return &table[i];
+        }
+    }
+    return NULL;
+}
+
 // 式に期待される型（双方向の型制約）。注釈つき代入の右辺・呼び出しの引数・
 // 戻り値など、期待が分かる場所でだけ直前にセットし、ND_LAMBDA が消費する。
 // check_node は入口でこれを取り込み、それ以外のノードでは子へ漏らさない
@@ -555,11 +592,16 @@ static Type* check_vcall(Node* node) {
 static Type* check_funcall(Node* node, Type* expected) {
     Function* callee = find_callable(NULL, node->name, node->len);
     Class* klass = callee ? NULL : find_class(node->name, node->len);
+    BuiltinInfo* builtin = (callee || klass) ? NULL : find_builtin(node->name, node->len);
     // 引数の期待型を先に用意する（引数位置のラムダの型を決めるため）
     Type* expected_list[6] = {};
     if (callee) {
         for (int i = 0; i < callee->nparams && i < 6; i++) {
             expected_list[i] = callee->param_types[i];
+        }
+    } else if (builtin) {
+        for (int i = 0; i < builtin->nparams; i++) {
+            expected_list[i] = builtin->params[i];
         }
     } else if (klass) {
         Function* init = find_callable(klass, "__init__", 8);
@@ -571,21 +613,23 @@ static Type* check_funcall(Node* node, Type* expected) {
     }
     Type* arg_types[6];
     int nargs = check_args_expected(node->args, arg_types, expected_list);
-    if (node->len == 5 && !memcmp(node->name, "print", 5) && !callee && !klass) {
+    bool is_print = node->len == 5 && !memcmp(node->name, "print", 5);
+    bool is_eprint = node->len == 6 && !memcmp(node->name, "eprint", 6);
+    if ((is_print || is_eprint) && !callee && !klass) {
         if (nargs != 1) {
-            error_node(node, "`print`の引数は1個ですが、%d個が指定されています", nargs);
+            error_node(node, "`%.*s`の引数は1個ですが、%d個が指定されています", node->len, node->name, nargs);
             // 引数が無い場合は arg_types[0] が未初期化なので打ち切る
             return &ty_unknown;
         }
         Type* at = arg_types[0];
         if (at->kind == TY_UNKNOWN) {
-            error_node(node, "型が分からない値は print できません");
+            error_node(node, "型が分からない値は %.*s できません", node->len, node->name);
             return &ty_unknown;
         }
         Class* klass = class_of(at);
         Function* method = klass ? find_callable(klass, "__str__", 7) : NULL;
         if (!method) {
-            error_node(node, "`%s`型の値は print できません", type_text(at));
+            error_node(node, "`%s`型の値は %.*s できません", type_text(at), node->len, node->name);
             return &ty_unknown;
         }
         if (method->nparams != 1 || (method->return_type && method->return_type->kind != TY_UNKNOWN && !(method->return_type->kind == TY_CLASS && method->return_type->klass == find_class("str", 3)))) {
@@ -599,13 +643,47 @@ static Type* check_funcall(Node* node, Type* expected) {
         conv->klass = klass;
         conv->func = method;
         node->args = conv;
-        node->name = "__println";
-        node->len = 9;
+        if (is_eprint) {
+            node->name = "__eprintln";
+            node->len = 10;
+        } else {
+            node->name = "__println";
+            node->len = 9;
+        }
+        return &ty_unknown;
+    }
+    // exit は prelude 関数にはしない。spell 関数のラベル `exit` が libc の
+    // exit と衝突し、ヘルパからの呼び出しが自分自身へ戻ってしまうため、
+    // print と同じく型検査でプリミティブ呼び出しへ書き換える
+    if (node->len == 4 && !memcmp(node->name, "exit", 4) && !callee && !klass) {
+        if (nargs != 1) {
+            error_node(node, "関数`exit`の引数は1個ですが、%d個が指定されています", nargs);
+            return &ty_unknown;
+        }
+        if (arg_types[0]->kind != TY_UNKNOWN && !type_equals(&ty_int, arg_types[0])) {
+            error_node(node, "関数`exit`の引数には`int`が必要ですが、`%s`が指定されています", type_text(arg_types[0]));
+        }
+        node->name = "__spell_exit";
+        node->len = 12;
+        node->builtin = BUILTIN_EXIT;
         return &ty_unknown;
     }
     if (!callee) {
         if (klass) {
             return check_construct(node, klass, arg_types, nargs, expected);
+        }
+        if (builtin) {
+            node->builtin = builtin->id;
+            if (nargs != builtin->nparams) {
+                error_node(node, "関数`%.*s`の引数は%d個ですが、%d個が指定されています", node->len, node->name, builtin->nparams, nargs);
+            }
+            for (int i = 0; i < nargs && i < builtin->nparams; i++) {
+                Type* pt = builtin->params[i];
+                if (pt && arg_types[i]->kind != TY_UNKNOWN && !type_equals(pt, arg_types[i])) {
+                    error_node(node, "関数`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", node->len, node->name, type_text(pt), type_text(arg_types[i]));
+                }
+            }
+            return builtin->ret;
         }
         if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
             return &ty_int;
