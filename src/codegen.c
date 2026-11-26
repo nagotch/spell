@@ -11,6 +11,8 @@ static void gen(Node* node);
 static void gen_rax(Node* node);
 static void gen_discard(Node* node);
 static void gen_push(Node* node);
+static void gen_rax_num(Node* node);
+static bool fits_imm32(long val);
 
 static int max_label = 0;
 
@@ -276,6 +278,107 @@ static void gen_newarray(Node* node) {
     printf(".Lend%d:\n", label);
 }
 
+// ---- 呼び出しの引数（step 61） ----
+//
+// 引数を評価して arg_regs[offset..] へ入れる。評価順は従来どおり左から右。
+// レジスタへ書くのは全引数の評価が終わってから（従来の pop_args と同じ
+// 時点）なので、後の引数の評価が前の引数を壊すことはない。ただし:
+//  - 全引数がリーフ（即値に収まるリテラル・単純なローカル/グローバル
+//    読み）なら副作用もスタック操作も無いので、直接レジスタへ mov する
+//  - 引数が 1 個だけなら rax 経由で渡す（push / pop の往復を省く）
+//  - それ以外は最後の引数だけ rax に残し、残りを従来どおり push する
+static bool arg_is_leaf(Node* arg) {
+    if (arg->kind == ND_NUM) {
+        return fits_imm32(arg->val);
+    }
+    return arg->kind == ND_LVAR || arg->kind == ND_GVAR;
+}
+
+static void emit_leaf_to_reg(Node* arg, char* reg) {
+    if (arg->kind == ND_NUM) {
+        printf("  mov %s, %ld\n", reg, arg->val);
+    } else if (arg->kind == ND_LVAR) {
+        printf("  mov %s, [rbp-%d]\n", reg, arg->offset);
+    } else {
+        printf("  mov %s, [rip + %.*s]\n", reg, arg->len, arg->name);
+    }
+}
+
+static void gen_call_args(Node* args, int n, int offset) {
+    if (n == 0) {
+        return;
+    }
+    bool all_leaf = true;
+    for (Node* a = args; a; a = a->next) {
+        if (!arg_is_leaf(a)) {
+            all_leaf = false;
+            break;
+        }
+    }
+    if (all_leaf) {
+        int i = 0;
+        for (Node* a = args; a; a = a->next) {
+            emit_leaf_to_reg(a, arg_regs[offset + i]);
+            i++;
+        }
+        return;
+    }
+    if (n == 1) {
+        gen_rax(args);
+        printf("  mov %s, rax\n", arg_regs[offset]);
+        return;
+    }
+    Node* last = args;
+    while (last->next) {
+        last = last->next;
+    }
+    for (Node* a = args; a != last; a = a->next) {
+        gen(a);
+    }
+    gen_rax(last);
+    pop_args(n - 1, offset);
+    printf("  mov %s, rax\n", arg_regs[offset + n - 1]);
+}
+
+// __init__ の本体が「self.<フィールド> = 引数かリテラル」という代入文
+// だけからなるか。構築地点では calloc の直後に引数がレジスタへ揃うので、
+// その形なら __init__ を呼ばずに代入文をそのまま書き込める。少しでも
+// 違う形（条件分岐・呼び出しを含む右辺・他オブジェクトへの代入など）
+// なら false を返し、従来どおり __init__ を呼ぶ（保守的な判定）
+// ponytail: 対象は引数とリテラルだけ。引数への単純な演算まで広げるなら
+// 評価用レジスタの割り当てが要るので、実測で必要になってから
+static bool init_is_trivial(Function* init, int nargs) {
+    if (!init) {
+        return false;
+    }
+    for (Node* st = init->body; st; st = st->next) {
+        if (st->kind != ND_ASSIGN) {
+            return false;
+        }
+        Node* lhs = st->left_child;
+        if (lhs->kind != ND_MEMBER || lhs->func) {
+            return false;
+        }
+        Node* self = lhs->left_child;
+        if (self->kind != ND_LVAR || self->offset != 8) {
+            return false;
+        }
+        Node* rhs = st->right_child;
+        if (rhs->kind == ND_NUM) {
+            continue;
+        }
+        if (rhs->kind == ND_LVAR && rhs->offset % 8 == 0) {
+            // 引数 p（self が 0）の置き場所はオフセット (p+1)*8
+            int p = rhs->offset / 8 - 1;
+            if (1 <= p && p <= nargs) {
+                continue;
+            }
+        }
+        return false;
+    }
+    return true;
+}
+
 static void gen_construct(Node* node) {
     int args_cnt = 0;
     for (Node* arg = node->args; arg; arg = arg->next) {
@@ -296,11 +399,29 @@ static void gen_construct(Node* node) {
     printf("  mov rdi, 1\n");
     printf("  mov rsi, %d\n", size);
     emit_call(label, NULL, 6, "calloc");
-    printf("  push rax\n");
-    printf("  pop rdi\n");
+    bool inlined = init_is_trivial(node->func, args_cnt);
+    printf("  mov rdi, rax\n");
     pop_args(args_cnt, 1);
+    if (inlined) {
+        // calloc のゼロ埋めの上に __init__ の代入文をそのまま書き込む。
+        // 引数 p は arg_regs[p] にある（self が rdi のため 1 つずれる）。
+        // 代入文の順序も、同じフィールドへの再代入の上書きも、呼び出し時
+        // と同じになる
+        for (Node* st = node->func->body; st; st = st->next) {
+            Node* rhs = st->right_child;
+            int foff = st->left_child->offset;
+            if (rhs->kind == ND_LVAR) {
+                printf("  mov [rdi + %d], %s\n", foff, arg_regs[rhs->offset / 8 - 1]);
+            } else if (fits_imm32(rhs->val)) {
+                printf("  mov qword ptr [rdi + %d], %ld\n", foff, rhs->val);
+            } else {
+                gen_rax_num(rhs);
+                printf("  mov [rdi + %d], rax\n", foff);
+            }
+        }
+    }
     printf("  push rdi\n");
-    if (node->func) {
+    if (node->func && !inlined) {
         emit_call(new_label(), node->func->klass, node->func->len, node->func->name);
     }
 }
@@ -329,31 +450,25 @@ static void gen_funcall(Node* node) {
         // プリミティブは通常の関数呼び出しと同じ形で、呼び出し先だけ
         // ランタイムヘルパに替える
         int label = new_label();
-        Node* head = node->args;
         int args_cnt = 0;
-        while (head) {
-            gen(head);
-            head = head->next;
+        for (Node* a = node->args; a; a = a->next) {
             args_cnt++;
         }
-        pop_args(args_cnt, 0);
+        gen_call_args(node->args, args_cnt, 0);
         char* rt = builtin_rt_name(node->builtin);
         emit_call(label, NULL, (int)strlen(rt), rt);
         printf("  push rax\n");
         return;
     }
     int label = new_label();
-    Node* head = node->args;
     int args_cnt = 0;
-    while (head) {
-        gen(head);
-        head = head->next;
+    for (Node* a = node->args; a; a = a->next) {
         args_cnt++;
     }
     if (args_cnt > 6) {
         error_plain("関数に渡せる引数は6個までですが、%d個が指定されています", args_cnt);
     }
-    pop_args(args_cnt, 0);
+    gen_call_args(node->args, args_cnt, 0);
     emit_call(label, NULL, node->len, node->name);
     if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
         printf("  movsxd rax, eax\n");
@@ -413,13 +528,12 @@ static void gen_vcall(Node* node) {
     gen(node->left_child);
     int args_cnt = 0;
     for (Node* arg = node->args; arg; arg = arg->next) {
-        gen(arg);
         args_cnt++;
     }
     if (args_cnt > 6) {
         error_plain("関数に渡せる引数は6個までですが、%d個が指定されています", args_cnt);
     }
-    pop_args(args_cnt, 0);
+    gen_call_args(node->args, args_cnt, 0);
     printf("  pop rax\n");
     printf("  mov r11, [rax]\n");
     printf("  mov r10, [rax + 8]\n");
@@ -444,13 +558,12 @@ static void gen_mcall(Node* node) {
     gen(node->left_child);
     int args_cnt = 0;
     for (Node* arg = node->args; arg; arg = arg->next) {
-        gen(arg);
         args_cnt++;
     }
     if (args_cnt > 5) {
         error_plain("メソッドに渡せる引数は5個までですが、%d個が指定されています", args_cnt);
     }
-    pop_args(args_cnt, 1);
+    gen_call_args(node->args, args_cnt, 1);
     printf("  pop rdi\n");
     emit_call(new_label(), node->func->klass, node->func->len, node->func->name);
     printf("  push rax\n");
