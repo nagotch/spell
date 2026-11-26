@@ -400,7 +400,23 @@ class Dict<K, V> {
 
     def has(self, key: K) -> bool {
         if (self.cap == 0) { return 1 == 0; }
-        return self.find_slot(key, self.mixed_hash(key)) >= 0;
+        // mixed_hash と find_slot の中身をここへ埋め込んである（呼び出し
+        // の段数を減らすため）。ハッシュの値も探査の順序も、元の
+        // mixed_hash / find_slot と完全に同じ
+        m = (1481765933 * 65536) * 65536 + 1284865837;
+        a = (335903614 * 65536) * 65536 - 144211633;
+        h = key.__hash__() * m + a;
+        i = h % self.cap;
+        s = 0;
+        while (1 == 1) {
+            sv = self.slots[i];
+            if (sv == 0) { s = -i - 1; break; }
+            e = sv - 1;
+            if (self.hs[e] == h && self.ks[e] == key) { s = i; break; }
+            i = i + 1;
+            if (i == self.cap) { i = 0; }
+        }
+        return s >= 0;
     }
 
     def keys(self) -> [K] {
@@ -415,15 +431,37 @@ class Dict<K, V> {
     }
 
     def __getitem__(self, key: K) -> V {
-        h = self.mixed_hash(key);
+        // mixed_hash と find_slot の中身をここへ埋め込んである（has と
+        // 同じ形。ハッシュの値も探査の順序も元のメソッドと同じ）
+        m = (1481765933 * 65536) * 65536 + 1284865837;
+        a = (335903614 * 65536) * 65536 - 144211633;
+        h = key.__hash__() * m + a;
         if (self.cap > 0) {
-            s = self.find_slot(key, h);
+            i = h % self.cap;
+            s = 0;
+            while (1 == 1) {
+                sv = self.slots[i];
+                if (sv == 0) { s = -i - 1; break; }
+                e = sv - 1;
+                if (self.hs[e] == h && self.ks[e] == key) { s = i; break; }
+                i = i + 1;
+                if (i == self.cap) { i = 0; }
+            }
             if (s >= 0) { return self.vs[self.slots[s] - 1]; }
         }
         v = self.factory();
         // ファクトリが同じ辞書にこのキーを入れていたら、そちらを返す
         if (self.cap > 0) {
-            s = self.find_slot(key, h);
+            i = h % self.cap;
+            s = 0;
+            while (1 == 1) {
+                sv = self.slots[i];
+                if (sv == 0) { s = -i - 1; break; }
+                e = sv - 1;
+                if (self.hs[e] == h && self.ks[e] == key) { s = i; break; }
+                i = i + 1;
+                if (i == self.cap) { i = 0; }
+            }
             if (s >= 0) { return self.vs[self.slots[s] - 1]; }
         }
         self.insert_entry(key, h, v);
@@ -431,10 +469,23 @@ class Dict<K, V> {
     }
 
     def __setitem__(self, key: K, v: V) {
-        h = self.mixed_hash(key);
+        // mixed_hash と find_slot の中身をここへ埋め込んである（has と
+        // 同じ形。ハッシュの値も探査の順序も元のメソッドと同じ）
+        m = (1481765933 * 65536) * 65536 + 1284865837;
+        a = (335903614 * 65536) * 65536 - 144211633;
+        h = key.__hash__() * m + a;
         done = 0;
         if (self.cap > 0) {
-            s = self.find_slot(key, h);
+            i = h % self.cap;
+            s = 0;
+            while (1 == 1) {
+                sv = self.slots[i];
+                if (sv == 0) { s = -i - 1; break; }
+                e = sv - 1;
+                if (self.hs[e] == h && self.ks[e] == key) { s = i; break; }
+                i = i + 1;
+                if (i == self.cap) { i = 0; }
+            }
             if (s >= 0) {
                 // 上書きではキーの並び（挿入位置）は変えない
                 self.vs[self.slots[s] - 1] = v;
@@ -461,7 +512,9 @@ class Dict<K, V> {
 
     def find_slot(self, key: K, h: int) -> int {
         // 戻り値: キーがあればそのスロット位置、なければ -(挿入位置) - 1。
-        // cap > 0 のときだけ呼ぶこと
+        // cap > 0 のときだけ呼ぶこと。has / __getitem__ / __setitem__ は
+        // 呼び出しの段数を減らすため、この探査を各々の中へ埋め込んである
+        // （insert_entry は引き続きこちらを使う）
         i = h % self.cap;
         while (1 == 1) {
             s = self.slots[i];

@@ -23,6 +23,18 @@ tests=(
     "def one(v: int) -> int { return v; } def main() { s = 0; i = 0; while (i + one(0) < 5) { s = s + one(i); i = i + 1; } return s; }|10"
     "def plus(a: int, b: int) -> int { return a + b; } def inc(v: int) -> int { return v + 1; } def main() { f = plus; g = inc; return f(g(10), 5); }|16"
     "def add2(a: int, b: int) -> int { return a + b; } def main() { base = 100; f = fn(v: int) -> int { return v + base; }; return f(add2(1, 2)); }|103"
+    # step 61: 引数の評価順（リーフな前の引数は、後の引数の代入より先に読まれる）
+    "def two(a: int, b: int) -> int { return a * 100 + b; } def main() { x = 1; r = two(x, x = 7); return r; }|107"
+    # step 61: 単純な __init__ の埋め込み（引数の入れ替え・同じフィールドへの再代入）
+    "class P { x: int; y: int; def __init__(self, a: int, b: int) { self.y = b; self.x = a; } } def main() { p = P(3, 4); return p.x * 10 + p.y; }|34"
+    "class P { x: int; def __init__(self, a: int) { self.x = 1; self.x = a; } } def main() { p = P(42); return p.x; }|42"
+    "class B<T> { v: T; def __init__(self, v: T) { self.v = v; } def get(self) -> int { return self.v; } } def main() { b: B<int> = B(42); return b.get(); }|42"
+    # step 61: 埋め込み対象外の __init__ は従来どおり呼ばれる（式の右辺・副作用・条件分岐）
+    "class P { x: int; def __init__(self, a: int) { self.x = a + 1; } } def main() { p = P(41); return p.x; }|42"
+    "cnt = 0; def bump() -> int { cnt = cnt + 1; return 7; } class P { x: int; def __init__(self) { self.x = bump(); } } def main() { p = P(); q = P(); return cnt * 10 + p.x + q.x; }|34"
+    "class P { x: int; y: int; def __init__(self, c: int) { self.x = 1; if (c > 0) { self.y = 2; } else { self.y = 3; } } } def main() { p = P(1); q = P(0); return p.y * 10 + q.y; }|23"
+    # step 61: __init__ を普通のメソッドとして明示的に呼ぶこともできる
+    "class P { x: int; def __init__(self, a: int) { self.x = a; } } def main() { p = P(1); p.__init__(5); return p.x; }|5"
 )
 
 error_tests=(
