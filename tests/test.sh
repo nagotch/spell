@@ -15,6 +15,14 @@ tests=(
     "def main() { print(42); }|0"
     "def main() { putchar(65); }|0"
     "def main() -> int { return 3; }|3"
+    # step 60: rax 経路の評価順・位置合わせの回帰テスト
+    "g = 0; def f() -> int { g = 100; return 1; } def main() { g = 10; r = g + f(); return r; }|11"
+    "def main() { x = 5; y = (x = 9) - x; return y; }|0"
+    "def main() { x = 5; y = (x = 9) + x; return y; }|18"
+    "def one(v: int) -> int { return v; } def two(a: int, b: int) -> int { return a * 10 + b; } def main() { return two(one(1) + one(2), one(3) + one(4) * one(5)); }|53"
+    "def one(v: int) -> int { return v; } def main() { s = 0; i = 0; while (i + one(0) < 5) { s = s + one(i); i = i + 1; } return s; }|10"
+    "def plus(a: int, b: int) -> int { return a + b; } def inc(v: int) -> int { return v + 1; } def main() { f = plus; g = inc; return f(g(10), 5); }|16"
+    "def add2(a: int, b: int) -> int { return a + b; } def main() { base = 100; f = fn(v: int) -> int { return v + base; }; return f(add2(1, 2)); }|103"
 )
 
 error_tests=(
@@ -231,6 +239,24 @@ one_io_test "def main() { a- = in[3]; print(a); return 0; }" "1 2 3\n" "0 1 2\n"
 one_io_test "def main() { print_int(0 - 10); putchar(10); print_int(0 - 100); putchar(10); print_int(0 - 1); putchar(10); return 0; }" "" "-10\n-100\n-1\n"
 one_io_test "def main() { x = in; print_int(x); putchar(10); return 0; }" "-9223372036854775808\n" "-9223372036854775808\n"
 one_io_test "def main() { s = in_str; for x in s { if (x != \"A\") { x = \".\"; } } print(s); return 0; }" "ABCA\n" "A..A\n"
+# step 60: 短絡評価と連鎖比較の副作用回数（中間項はちょうど1回だけ評価される）
+one_io_test "cnt = 0;
+def inc(v: int) -> int { cnt = cnt + 1; return v; }
+def main() {
+    a = (inc(0) == 1) && (inc(5) == 5);
+    print(cnt);
+    b = (inc(2) == 2) || (inc(5) == 5);
+    print(cnt);
+    d = (inc(3) == 3) && (inc(4) == 4);
+    print(cnt);
+    e = inc(1) < inc(2) < inc(3);
+    print(cnt);
+    print(a);
+    print(b);
+    print(d);
+    print(e);
+    return 0;
+}" "" "1\n2\n4\n7\nfalse\ntrue\ntrue\ntrue\n"
 
 # ドライバ層（step 59）のテスト。引数・標準出力・標準エラー・終了コードを
 # 別々に照合する。$1=ソース $2=期待する標準出力 $3=期待する標準エラー

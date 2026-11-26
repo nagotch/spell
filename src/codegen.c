@@ -1,8 +1,16 @@
 // コード生成: 型検査済みの AST から x86-64 アセンブリ（GAS 形式）を標準出力へ出す。
-// スタックマシン方式で、各 gen_* は「式の値を 1 つ push した状態」で戻る。
+// 値の受け渡しは3通りある:
+//   gen(node)       … 式の値を 1 つ push した状態で戻る（従来のスタックマシン方式）
+//   gen_rax(node)   … 式の値を rax に入れて戻る（スタック増減なし）
+//   gen_discard(node) … 文として評価し、値は捨てる（スタック増減なし。評価自体は省略しない）
+// 移行済みのノード種別では gen は gen_rax + push として定義され、
+// gen_rax のフォールバックは未移行の種別に対してだけ gen + pop を使う（片方向）。
 #include "spell.h"
 
 static void gen(Node* node);
+static void gen_rax(Node* node);
+static void gen_discard(Node* node);
+static void gen_push(Node* node);
 
 static int max_label = 0;
 
@@ -187,13 +195,6 @@ static void gen_unary(Node* node) {
     }
 }
 
-static void gen_var(Node* node) {
-    gen_addr(node);
-    printf("  pop rax\n");
-    printf("  mov rax, [rax]\n");
-    printf("  push rax\n");
-}
-
 static void gen_assign(Node* node) {
     gen_addr(node->left_child);
     gen(node->right_child);
@@ -205,14 +206,6 @@ static void gen_assign(Node* node) {
 
 static void gen_num(Node* node) {
     printf("  push %ld\n", node->val);
-}
-
-static void gen_return(Node* node) {
-    gen(node->left_child);
-    printf("  pop rax\n");
-    printf("  mov rsp, rbp\n");
-    printf("  pop rbp\n");
-    printf("  ret\n");
 }
 
 static void gen_array(Node* node) {
@@ -281,55 +274,6 @@ static void gen_newarray(Node* node) {
     printf("  sub rcx, 1\n");
     printf("  jmp .Lbegin%d\n", label);
     printf(".Lend%d:\n", label);
-}
-
-static void gen_if(Node* node) {
-    int label = new_label();
-    gen(node->cond);
-    printf("  pop rax\n");
-    printf("  cmp rax, 0\n");
-    printf("  je .Lelse%d\n", label);
-    gen(node->then);
-    printf("  jmp .Lend%d\n", label);
-    printf(".Lelse%d:\n", label);
-    if (node->els) {
-        gen(node->els);
-    } else {
-        printf("  push 0\n");
-    }
-    printf(".Lend%d:\n", label);
-}
-
-static void gen_while(Node* node) {
-    int label = new_label();
-    int saved_break = break_label;
-    int saved_continue = continue_label;
-    break_label = label;
-    continue_label = label;
-    printf(".Lbegin%d:\n", label);
-    printf(".Lcont%d:\n", label);
-    gen(node->cond);
-    printf("  pop rax\n");
-    printf("  cmp rax, 0\n");
-    printf("  je .Lend%d\n", label);
-    gen(node->then);
-    printf("  pop rax\n");
-    break_label = saved_break;
-    continue_label = saved_continue;
-    printf("  jmp .Lbegin%d\n", label);
-    printf(".Lend%d:\n", label);
-    printf("  push 0\n");
-}
-
-
-static void gen_block(Node* node) {
-    Node* block_head = node->body;
-    while (block_head) {
-        gen(block_head);
-        block_head = block_head->next;
-        printf("  pop rax\n");
-    }
-    printf("  push rax\n");
 }
 
 static void gen_construct(Node* node) {
@@ -530,115 +474,310 @@ static void emit_divmod_adjust(bool is_mod) {
     printf(".Ldivmod%d:\n", label);
 }
 
-static void gen_binop(Node* node) {
-    if (node->op.binop == OP_AND) {
-        int label = new_label();
-        gen(node->left_child);
-        printf("  pop rax\n");
-        printf("  cmp rax, 0\n");
-        printf("  je .Lfalse%d\n", label);
-        gen(node->right_child);
-        printf("  pop rax\n");
-        printf("  cmp rax, 0\n");
-        printf("  je .Lfalse%d\n", label);
-        printf("  push 1\n");
-        printf("  jmp .Lend%d\n", label);
-        printf(".Lfalse%d:\n", label);
-        printf("  push 0\n");
-        printf(".Lend%d:", label);
-        return;
-    } else if (node->op.binop == OP_OR) {
-        int label = new_label();
-        gen(node->left_child);
-        printf("  pop rax\n");
-        printf("  cmp rax, 0\n");
-        printf("  jne .Ltrue%d\n", label);
-        gen(node->right_child);
-        printf("  pop rax\n");
-        printf("  cmp rax, 0\n");
-        printf("  jne .Ltrue%d\n", label);
-        printf("  push 0\n");
-        printf("  jmp .Lend%d\n", label);
-        printf(".Ltrue%d:\n", label);
-        printf("  push 1\n");
-        printf(".Lend%d:", label);
+// ---- rax 経路（step 60） ----
+//
+// 移行済みのノード種別は、値をスタックではなく rax で受け渡す。
+// 不変条件: gen_rax / gen_discard はどの実行経路でもスタック増減ゼロで戻る。
+// レジスタ規約: rax = 結果、rcx = 二項演算の右辺の一時置き場。
+// rcx は再帰的な生成をまたいで生きていることは決してない（右辺の生成が
+// 終わった直後にだけ使い、生成の前に必要な値は push で退避する）。
+
+// 符号付き 32 ビット即値に収まるか（push / mov の符号拡張即値と同じ範囲）
+static bool fits_imm32(long val) {
+    return val >= INT32_MIN && val <= INT32_MAX;
+}
+
+static void gen_rax_num(Node* node) {
+    if (fits_imm32(node->val)) {
+        printf("  mov rax, %ld\n", node->val);
         return;
     }
-    gen(node->left_child);
-    gen(node->right_child);
-    printf("  pop rdi\n");
+    // 即値に収まらないリテラルは従来の push 経路のままにする
+    // （`push` の大きな即値をアセンブラが受け付けない点まで含め、挙動を変えない）
+    gen_num(node);
     printf("  pop rax\n");
-    switch (node->op.binop) {
+}
+
+static void gen_rax_var(Node* node) {
+    if (node->kind == ND_LVAR) {
+        printf("  mov rax, [rbp-%d]\n", node->offset);
+        return;
+    }
+    if (node->kind == ND_GVAR) {
+        printf("  mov rax, [rip + %.*s]\n", node->len, node->name);
+        return;
+    }
+    // ND_CAPVAR: フレームに退避済みの環境ポインタ経由で読む
+    printf("  mov rax, [rbp-%d]\n", current_env_offset);
+    printf("  mov rax, [rax + %d]\n", node->offset);
+}
+
+static void gen_rax_assign(Node* node) {
+    Node* left = node->left_child;
+    if (left->kind == ND_LVAR) {
+        // 単純なローカル代入: アドレスは rbp からの定数オフセットで副作用が
+        // ないため、右辺を rax で評価してそのままストアできる
+        gen_rax(node->right_child);
+        printf("  mov [rbp-%d], rax\n", left->offset);
+        return;
+    }
+    if (left->kind == ND_GVAR) {
+        // グローバルのアドレスも同様に副作用がない
+        gen_rax(node->right_child);
+        printf("  mov [rip + %.*s], rax\n", left->len, left->name);
+        return;
+    }
+    // 複雑な左辺（メンバ・添字・捕捉変数など）は従来の push 経路のまま。
+    // 左辺のアドレス計算が右辺より先に走る評価順も従来どおり
+    // ponytail: 複雑な左辺の rax 化は次ステップ送り
+    gen_assign(node);
+    printf("  pop rax\n");
+}
+
+static void gen_rax_return(Node* node) {
+    gen_rax(node->left_child);
+    printf("  mov rsp, rbp\n");
+    printf("  pop rbp\n");
+    printf("  ret\n");
+}
+
+static void gen_rax_if(Node* node) {
+    int label = new_label();
+    gen_rax(node->cond);
+    printf("  cmp rax, 0\n");
+    printf("  je .Lelse%d\n", label);
+    gen_rax(node->then);
+    printf("  jmp .Lend%d\n", label);
+    printf(".Lelse%d:\n", label);
+    if (node->els) {
+        gen_rax(node->els);
+    } else {
+        printf("  mov rax, 0\n");
+    }
+    printf(".Lend%d:\n", label);
+}
+
+static void gen_rax_while(Node* node) {
+    int label = new_label();
+    int saved_break = break_label;
+    int saved_continue = continue_label;
+    break_label = label;
+    continue_label = label;
+    printf(".Lbegin%d:\n", label);
+    printf(".Lcont%d:\n", label);
+    gen_rax(node->cond);
+    printf("  cmp rax, 0\n");
+    printf("  je .Lend%d\n", label);
+    gen_discard(node->then);
+    break_label = saved_break;
+    continue_label = saved_continue;
+    printf("  jmp .Lbegin%d\n", label);
+    printf(".Lend%d:\n", label);
+    printf("  mov rax, 0\n");
+}
+
+static void gen_rax_block(Node* node) {
+    Node* tail = node->body;
+    if (!tail) {
+        // 空ブロックの値は従来どおり「その時点の rax」（push rax していた）
+        return;
+    }
+    while (tail->next) {
+        gen_discard(tail);
+        tail = tail->next;
+    }
+    gen_rax(tail);
+}
+
+// 除算・剰余以外の二項演算を `op rax, <operand>` の形で出す。
+// operand は即値・ローカルのメモリ参照・rcx のいずれかで、
+// 読み取りは左辺の評価が終わった後に行われる（従来の評価順と同じ）
+static void emit_binop_operand(BinOp op, char* operand) {
+    switch (op) {
         case OP_ADD:
-            printf("  add rax, rdi\n");
+            printf("  add rax, %s\n", operand);
             break;
         case OP_SUB:
-            printf("  sub rax, rdi\n");
+            printf("  sub rax, %s\n", operand);
             break;
         case OP_MUL:
-            printf("  imul rax, rdi\n");
-            break;
-        case OP_DIV:
-            printf("  cqo\n");
-            printf("  idiv rdi\n");
-            emit_divmod_adjust(false);
+            printf("  imul rax, %s\n", operand);
             break;
         case OP_EQ:
-            printf("  cmp rax, rdi\n");
+            printf("  cmp rax, %s\n", operand);
             printf("  sete al\n");
             printf("  movzb rax, al\n");
             break;
         case OP_NE:
-            printf("  cmp rax, rdi\n");
+            printf("  cmp rax, %s\n", operand);
             printf("  setne al\n");
             printf("  movzb rax, al\n");
             break;
         case OP_LT:
-            printf("  cmp rax, rdi\n");
+            printf("  cmp rax, %s\n", operand);
             printf("  setl al\n");
             printf("  movzb rax, al\n");
             break;
         case OP_LE:
-            printf("  cmp rax, rdi\n");
+            printf("  cmp rax, %s\n", operand);
             printf("  setle al\n");
             printf("  movzb rax, al\n");
-            break;
-        case OP_MOD:
-            printf("  cqo\n");
-            printf("  idiv rdi\n");
-            emit_divmod_adjust(true);
-            printf("  mov rax, rdx\n");
             break;
         default:
             error_internal("二項演算の処理で想定外の演算子を検出しました");
             break;
     }
-    printf("  push rax\n");
 }
 
-static void gen(Node* node) {
+static void gen_rax_binop(Node* node) {
+    if (node->op.binop == OP_AND) {
+        int label = new_label();
+        gen_rax(node->left_child);
+        printf("  cmp rax, 0\n");
+        printf("  je .Lfalse%d\n", label);
+        gen_rax(node->right_child);
+        printf("  cmp rax, 0\n");
+        printf("  je .Lfalse%d\n", label);
+        printf("  mov rax, 1\n");
+        printf("  jmp .Lend%d\n", label);
+        printf(".Lfalse%d:\n", label);
+        printf("  mov rax, 0\n");
+        printf(".Lend%d:\n", label);
+        return;
+    } else if (node->op.binop == OP_OR) {
+        int label = new_label();
+        gen_rax(node->left_child);
+        printf("  cmp rax, 0\n");
+        printf("  jne .Ltrue%d\n", label);
+        gen_rax(node->right_child);
+        printf("  cmp rax, 0\n");
+        printf("  jne .Ltrue%d\n", label);
+        printf("  mov rax, 0\n");
+        printf("  jmp .Lend%d\n", label);
+        printf(".Ltrue%d:\n", label);
+        printf("  mov rax, 1\n");
+        printf(".Lend%d:\n", label);
+        return;
+    }
+    Node* right = node->right_child;
+    bool divmod = node->op.binop == OP_DIV || node->op.binop == OP_MOD;
+    gen_rax(node->left_child);
+    if (!divmod && right->kind == ND_NUM && fits_imm32(right->val)) {
+        // 右辺がリテラルなら即値オペランドにする（評価するものはない）
+        char operand[32];
+        snprintf(operand, sizeof(operand), "%ld", right->val);
+        emit_binop_operand(node->op.binop, operand);
+        return;
+    }
+    if (!divmod && right->kind == ND_LVAR) {
+        // 右辺が単純なローカル読みならメモリオペランドにする。
+        // 読み取りは左辺の評価の後なので、左辺が同じ変数を書き換えても
+        // 従来どおり新しい値が見える
+        char operand[32];
+        snprintf(operand, sizeof(operand), "[rbp-%d]", right->offset);
+        emit_binop_operand(node->op.binop, operand);
+        return;
+    }
+    if (divmod && right->kind == ND_NUM && fits_imm32(right->val)) {
+        printf("  mov rdi, %ld\n", right->val);
+    } else if (divmod && right->kind == ND_LVAR) {
+        printf("  mov rdi, [rbp-%d]\n", right->offset);
+    } else {
+        // 一般形: 左辺を退避してから右辺を評価し、rcx へ移す
+        printf("  push rax\n");
+        gen_rax(right);
+        printf("  mov rcx, rax\n");
+        printf("  pop rax\n");
+        if (!divmod) {
+            emit_binop_operand(node->op.binop, "rcx");
+            return;
+        }
+        printf("  mov rdi, rcx\n");
+    }
+    // ここへ来るのは除算・剰余だけ。除数は rdi にあり、rax が被除数
+    printf("  cqo\n");
+    printf("  idiv rdi\n");
+    emit_divmod_adjust(node->op.binop == OP_MOD);
+    if (node->op.binop == OP_MOD) {
+        printf("  mov rax, rdx\n");
+    }
+}
+
+// 値を rax に入れて戻る（スタック増減なし）。
+// 移行済みの種別だけをここで扱い、それ以外は gen + pop に落とす。
+// gen は移行済みの種別に対してだけ gen_rax を呼ぶので、互いに
+// 再帰し合うことはない（種別ごとに片方向）
+static void gen_rax(Node* node) {
     switch (node->kind) {
-        case ND_UNARY: gen_unary(node); break;
+        case ND_NUM: gen_rax_num(node); break;
         case ND_LVAR:
         case ND_GVAR:
-        case ND_CAPVAR: gen_var(node); break;
+        case ND_CAPVAR: gen_rax_var(node); break;
+        case ND_ASSIGN: gen_rax_assign(node); break;
+        case ND_RETURN: gen_rax_return(node); break;
+        case ND_IF: gen_rax_if(node); break;
+        case ND_WHILE: gen_rax_while(node); break;
+        case ND_BLOCK: gen_rax_block(node); break;
+        case ND_BINOP: gen_rax_binop(node); break;
+        default:
+            gen(node);
+            printf("  pop rax\n");
+            break;
+    }
+}
+
+// 文として評価し、値を捨てる（スタック増減なし）。評価自体は省略しない
+static void gen_discard(Node* node) {
+    if (node->kind == ND_BLOCK) {
+        for (Node* tail = node->body; tail; tail = tail->next) {
+            gen_discard(tail);
+        }
+        return;
+    }
+    gen_rax(node);
+}
+
+// 値を 1 つ push して戻る（従来の契約）。
+// 移行済みの種別は gen_rax + push として定義し、それ以外は gen_push に落とす
+static void gen(Node* node) {
+    switch (node->kind) {
+        case ND_NUM:
+        case ND_LVAR:
+        case ND_GVAR:
+        case ND_CAPVAR:
+        case ND_ASSIGN:
+        case ND_IF:
+        case ND_WHILE:
+        case ND_BLOCK:
+        case ND_BINOP:
+            gen_rax(node);
+            printf("  push rax\n");
+            break;
+        case ND_RETURN:
+            // return は値を push しない（従来どおり独自のエピローグで戻る）
+            gen_rax(node);
+            break;
+        default:
+            gen_push(node);
+            break;
+    }
+}
+
+// 未移行の種別だけを扱う従来の push 方式の生成。
+// 移行済みの種別は gen が先に捌くので、ここへは来ない
+static void gen_push(Node* node) {
+    switch (node->kind) {
+        case ND_UNARY: gen_unary(node); break;
         case ND_FUNCREF: gen_funcref(node); break;
         case ND_LAMBDA: gen_lambda(node); break;
         case ND_VCALL: gen_vcall(node); break;
-        case ND_ASSIGN: gen_assign(node); break;
-        case ND_NUM: gen_num(node); break;
-        case ND_RETURN: gen_return(node); break;
         case ND_ARRAY: gen_array(node); break;
         case ND_INDEX: gen_index(node); break;
         case ND_LEN: gen_len(node); break;
         case ND_NEWARRAY: gen_newarray(node); break;
-        case ND_IF: gen_if(node); break;
-        case ND_WHILE: gen_while(node); break;
-        case ND_BLOCK: gen_block(node); break;
         case ND_FUNCALL: gen_funcall(node); break;
         case ND_MEMBER: gen_member(node); break;
         case ND_MCALL: gen_mcall(node); break;
-        case ND_BINOP: gen_binop(node); break;
         case ND_BREAK:
             if (break_label < 0) {
                 error_plain("ここでは`break`を使えません");
@@ -1037,9 +1176,8 @@ void codegen(Function* prog) {
         }
         Node* tail = prog->body;
         while (tail) {
-            gen(tail);
+            gen_discard(tail);
             tail = tail->next;
-            printf("  pop rax\n");
         }
         if (!prog->klass && prog->len == 4 && memcmp(prog->name, "main", 4) == 0) {
             // C の main と同じく、末尾まで落ちたら 0 を返す。return 文は
