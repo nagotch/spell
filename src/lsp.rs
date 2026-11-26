@@ -714,8 +714,11 @@ fn run_check_child(text: &[u8], is_prelude: bool) -> i32 {
             let prelude_path = cx.spell_prelude_path()?;
             prog = cx.load_program(&prelude_path)?;
         }
-        let user_prog = cx.load_program_text(text.to_vec(), b"spell-lsp".to_vec())?;
+        // エラーで打ち切られても、診断の src 判定のために現在の
+        // ソースだけは先に控える（C ではポインタ比較で判定する）
+        let user_prog = cx.load_program_text(text.to_vec(), b"spell-lsp".to_vec());
         user_src = cx.cur_src;
+        let user_prog = user_prog?;
         let prog = spell::driver::chain_programs(&mut cx, prog, user_prog);
         cx.error_capture_set_continue(true);
         cx.desugar(prog);
