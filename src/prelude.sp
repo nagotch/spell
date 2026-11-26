@@ -525,6 +525,66 @@ def zero_int() -> int { return 0; }
 def zero_bool() -> bool { return 1 == 0; }
 def zero_str() -> str { return ""; }
 
+// 伸びる配列。末尾への追加が容量の倍増で均し定数時間になる。生成は
+// Dict と同じく既定値ファクトリを受け取る（広げた領域の埋め草に使う）。
+// len と反復と to_array が見るのは論理長 n で、容量ではない（添字の
+// 範囲チェックは言語全体として未実装で、通常の配列と同じ）。反復は
+// 開始時点のスナップショットに対するもの（書き戻しもスナップショット側）
+class Vec<T> {
+    factory: fn() -> T;
+    buf: [T];
+    n: int;
+
+    def __init__(self, factory: fn() -> T) {
+        self.factory = factory;
+        self.buf = [];
+        self.n = 0;
+    }
+
+    def len(self) -> int {
+        return self.n;
+    }
+
+    def append(self, v: T) {
+        if (self.n == self.buf.len) {
+            cap = self.buf.len * 2;
+            if (cap == 0) { cap = 8; }
+            nb = [self.factory(); cap];
+            i = 0;
+            while (i < self.n) {
+                nb[i] = self.buf[i];
+                i = i + 1;
+            }
+            self.buf = nb;
+        }
+        self.buf[self.n] = v;
+        self.n = self.n + 1;
+    }
+
+    def __getitem__(self, i: int) -> T {
+        return self.buf[i];
+    }
+
+    def __setitem__(self, i: int, v: T) {
+        self.buf[i] = v;
+    }
+
+    def __iter__(self) -> ArrayIter<T> {
+        return ArrayIter(self.to_array());
+    }
+
+    def to_array(self) -> [T] {
+        if (self.n == 0) { return []; }
+        r = [self.buf[0]; self.n];
+        i = 0;
+        while (i < self.n) {
+            r[i] = self.buf[i];
+            i = i + 1;
+        }
+        return r;
+    }
+}
+
 def read_ints(n: int) -> [int] {
     a = [0; n];
     for i in n { a[i] = read_int(); }
@@ -657,4 +717,51 @@ def print_str(s: str) {
 def __println(s: str) {
     print_str(s);
     putchar(10);
+}
+
+// ドライバ層（step 59）。コンパイラ組み込みプリミティブ（__spell_*）の
+// 薄いラッパで、argv・ファイル・stderr・終了コードを扱う
+
+// コマンドライン引数。[0] はプログラム名（C / sys.argv と同じ）
+def args() -> [str] {
+    n = __spell_argc();
+    if (n == 0) { return []; }
+    r = [""; n];
+    i = 0;
+    while (i < n) {
+        r[i] = str(__spell_argv_chars(i));
+        i = i + 1;
+    }
+    return r;
+}
+
+// read_file の結果。ok は、開けて最後まで読めたときだけ true。
+// 空のファイルは ok = true で text = ""
+class FileData {
+    ok: bool;
+    text: str;
+
+    def __init__(self, ok: bool, text: str) {
+        self.ok = ok;
+        self.text = text;
+    }
+}
+
+def read_file(path: str) -> FileData {
+    chars = __spell_read_file_chars(path.chars);
+    // __spell_io_ok は直前の読み書きの結果を返すので、他のプリミティブを
+    // 挟まずにここで読む
+    ok = __spell_io_ok();
+    return FileData(ok, str(chars));
+}
+
+// 全部書けて閉じられたら true
+def write_file(path: str, text: str) -> bool {
+    return __spell_write_file_chars(path.chars, text.chars) == 1;
+}
+
+// eprint の実体（print の __println に相当）。文字列化は型検査側で済み、
+// ここでは改行を付けて stderr へ出す
+def __eprintln(s: str) {
+    __spell_stderr_chars(s.chars + [10]);
 }
