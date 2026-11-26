@@ -84,6 +84,27 @@ moji
   配列は要素を空白区切りで並べた形になります。
 </p>
 
+<p>
+  <code>eprint</code> は <code>print</code> の標準エラー版です。文字列化と改行は <code>print</code> と同じで、行き先だけが標準エラーになります。
+  デバッグ出力や診断を、答えの標準出力と混ぜずに出したいときに使います。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>print("hyoujun");
+eprint("eraa");</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>標準出力</figcaption>
+<pre>hyoujun</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>標準エラー</figcaption>
+<pre>eraa</pre>
+</figure>
+
 <h2 id="s02"><span class="no">02</span>変数と型</h2>
 <p>
   変数は代入で生まれます。型は初期値から推論されるのが基本で、必要なら <code>x: int = 式</code> のように
@@ -448,6 +469,34 @@ false</pre>
   生成には型の手がかり（注釈など）が要ります。辞書自体に文字列化は無いので、そのまま <code>put</code> には渡せません。
 </p>
 
+<h3>Vec（伸びる配列）</h3>
+<p>
+  <code>Vec&lt;T&gt;</code> は末尾へ追加していける配列です。通常の配列は長さが作った時点で決まりますが、
+  <code>Vec</code> は <code>append</code> で伸びます（容量は倍々に広がるので、追加は均し定数時間です）。
+  生成には <code>Dict</code> と同じく既定値ファクトリを渡します。添字と <code>len</code> が見るのは論理長で、
+  反復は開始時点のスナップショットをたどります。配列として取り出すには <code>to_array()</code> を使います。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>v: Vec&lt;int&gt; = Vec(zero_int);
+v.append(3);
+v.append(1);
+v.append(4);
+put v.len;
+put v.to_array();
+s = 0;
+for x in v { s += x; }
+put s;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3
+3 1 4
+8</pre>
+</figure>
+
 <h2 id="s11"><span class="no">11</span>入力</h2>
 <p>
   標準入力は代入の右辺で <code>in</code> と書きます。<code>in[n]</code> は整数を n 個読んで配列にし、
@@ -491,6 +540,34 @@ put a;</pre>
 <p>
   Yes / No の出力には <code>yn</code> があります。<code>yn 条件;</code> で、真なら <code>Yes</code>、偽なら <code>No</code> を出します。
 </p>
+
+<h3>ファイルとコマンドライン引数</h3>
+<p>
+  プログラムへの引数は <code>args()</code> で <code>[str]</code> として受け取ります。<code>args()[0]</code> はプログラム名です。
+  ファイルは <code>read_file(path)</code> が全体を読み、結果を <code>FileData</code>（<code>ok: bool</code> と <code>text: str</code>）で返します。
+  開けなかったり読み切れなかったりしたときは <code>ok</code> が <code>false</code> になります（空のファイルは <code>ok</code> が <code>true</code> で <code>text</code> が空です）。
+  <code>write_file(path, text)</code> は全体を書き、全部書けて閉じられたら <code>true</code> を返します。
+  <code>exit(code)</code> はその場でプロセスを終わらせます（出力は flush されます）。
+</p>
+
+<figure class="code">
+  <figcaption>例 — 引数を1つ受け取って実行したとき</figcaption>
+<pre>a = args();
+put a.len;
+put a[1];
+ok = write_file("memo.txt", "hi");
+d = read_file("memo.txt");
+put d.ok;
+put d.text;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2
+xyz
+true
+hi</pre>
+</figure>
 
 <h2 id="s12"><span class="no">12</span>エラー</h2>
 <p>
