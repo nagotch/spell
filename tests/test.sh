@@ -143,6 +143,8 @@ def main():
     "def f() -> [int] { return [1]; } def main() { f().append(1); return 0; }|の対象は変数・フィールド・配列の要素でなければなりません"
     "def main() { a = [1]; a.append(1, 2); return 0; }|\`append\`の引数は1個ですが、2個が指定されています"
     "def main() { a = [1]; a.append(1 < 2); return 0; }|\`append\`の引数には\`int\`が必要ですが、\`bool\`が指定されています"
+    # step 71: 文頭 `<` の出力糖衣は削除された（`<<` は残る）
+    "def main() { < \"hi\"; return 0; }|数値が必要ですが、\`<\`が見つかりました"
     # step 66: 矢印は dunder プロトコルへの書き換え。持たない型には使えない
     "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { p = P(1); p <- 1; return 0; }|値に演算子\`<-\`は使えません"
     "def main() { v: Vec<int> = Vec(zero_int); v <- 1; return 0; }|値に演算子\`<-\`は使えません"
@@ -292,7 +294,7 @@ one_io_test "def main() { arr = [0, 0, 0]; >> arr[0], n; print(arr[0] + n); retu
 one_io_test "class P { v: int; def __init__(self) { self.v = 0; } } def main() { p = P(); >> p.v, n; print(p.v + n); return 0; }" "10 20\n" "30\n"
 one_io_test "def main() { >> a, b
     print(a + b); return 0; }" "3 4\n" "7\n"
-one_io_test "def main() { < \"hi\"; return 0; }" "" "hi\n"
+one_io_test "def main() { << \"hi\"; return 0; }" "" "hi\n"
 one_io_test "def main() { put 1, 2; return 0; }" "" "1 2\n"
 one_io_test "def main() { yn 1 < 2; yn 1 > 2; return 0; }" "" "Yes\nNo\n"
 one_io_test "def main() { a- = in[3]; print(a); return 0; }" "1 2 3\n" "0 1 2\n"

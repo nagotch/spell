@@ -482,8 +482,8 @@ static Node* stmt() {
         Token* var = consume_ident();
         consume("@");
         return make_for_iter(var, header_expr(), start);
-    } else if (consume("<<") || consume("<")) {
-        // 出力の省略形: << 式 / < 式（print と同じ）
+    } else if (consume("<<")) {
+        // 出力の省略形: << 式（print と同じ）
         Node* node = create_node(ND_FUNCALL);
         node->name = "print";
         node->len = 5;

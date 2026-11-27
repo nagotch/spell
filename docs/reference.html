@@ -89,9 +89,9 @@
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>put 2147483647;
-x = 1000000 * 1000000;
-put x;</pre>
+<pre>put 2147483647
+x = 1000000 * 1000000
+put x</pre>
 </figure>
 
 <figure class="out">
@@ -118,10 +118,10 @@ put x;</pre>
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>s = "a\tb\nc";
-put s;
-put "q\"q";
-put "a\rb";</pre>
+<pre>s = "a\tb\nc"
+put s
+put "q\"q"
+put "a\rb"</pre>
 </figure>
 
 <figure class="out">
@@ -158,9 +158,9 @@ arb</pre>
 
 <figure class="code">
   <figcaption>例 — 除算・剰余と比較の連鎖</figcaption>
-<pre>put 7 / 2, -7 / 2, 7 / -2, -7 % 2, 7 % -2;
-x = 5;
-put 0 &lt; x &lt; 10, 0 &lt; x &lt; 5, 10 &gt; x &gt; 0;</pre>
+<pre>put 7 / 2, -7 / 2, 7 / -2, -7 % 2, 7 % -2
+x = 5
+put 0 &lt; x &lt; 10, 0 &lt; x &lt; 5, 10 &gt; x &gt; 0</pre>
 </figure>
 
 <figure class="out">
@@ -187,9 +187,9 @@ true false true</pre>
 
 <figure class="code">
   <figcaption>例 — int 同士の矢印は比較</figcaption>
-<pre>a = 3;
-b = 5;
-put a &lt;- b, a -&gt; b, a &lt; -b, a &gt; -b;</pre>
+<pre>a = 3
+b = 5
+put a &lt;- b, a -&gt; b, a &lt; -b, a &gt; -b</pre>
 </figure>
 
 <figure class="out">
@@ -232,15 +232,15 @@ put a &lt;- b, a -&gt; b, a &lt; -b, a &gt; -b;</pre>
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>p, q = 1, 2;
-p, q = q, p;
-put p, q;
-a = b = 3;
-put a, b;
-x: int = 5;
-s: str = "hi";
-arr: [int] = [1, 2];
-put x, s, arr;</pre>
+<pre>p, q = 1, 2
+p, q = q, p
+put p, q
+a = b = 3
+put a, b
+x: int = 5
+s: str = "hi"
+arr: [int] = [1, 2]
+put x, s, arr</pre>
 </figure>
 
 <figure class="out">
@@ -296,15 +296,15 @@ if (1 &lt; 2): put 5</pre>
 <pre>// 行コメント
 /* 複数行
    コメント */
-a = 1; b = 2; put a + b;
+a = 1; b = 2; put a + b
 x = 1 +
-    2;
-put x;
+    2
+put x
 z = [
     1,
     2
-];
-put z;</pre>
+]
+put z</pre>
 </figure>
 
 <figure class="out">
@@ -320,23 +320,23 @@ put z;</pre>
   <tr><td>条件分岐</td><td><code>if 式 ブロック</code>、<code>elif</code>、<code>else</code></td><td>条件の括弧は任意（<code>if (式)</code> とも書ける）。<code>elif</code> は <code>else</code> の中の <code>if</code> と同じ</td></tr>
   <tr><td>繰り返し</td><td><code>while 式 ブロック</code></td><td>条件の括弧は任意。<code>while</code> に <code>else</code> は無い</td></tr>
   <tr><td>反復</td><td><code>for 変数 in 式 ブロック</code>、<code>for 式 ブロック</code>（回数）</td><td>反復プロトコルは <a href="#s10">§10</a>。<code>else</code> を付けると、<code>break</code> しなかったときだけ <code>else</code> 側が実行される（for...else）</td></tr>
-  <tr><td>脱出</td><td><code>break;</code>、<code>continue;</code></td><td>糖衣として <code>!;</code>（break）と <code>^;</code>（continue）もある（<a href="sugar.html">糖衣集</a>）</td></tr>
-  <tr><td>復帰</td><td><code>return 式;</code></td><td>式は必須（<code>return;</code> はエラー）</td></tr>
+  <tr><td>脱出</td><td><code>break</code>、<code>continue</code></td><td>糖衣として <code>!;</code>（break）と <code>^;</code>（continue）もある（<a href="sugar.html">糖衣集</a>）</td></tr>
+  <tr><td>復帰</td><td><code>return 式</code></td><td>式は必須（<code>return;</code> はエラー）</td></tr>
 </table>
 
 <figure class="code">
   <figcaption>例 — for...else</figcaption>
 <pre>for i in 0 {
-    put 999;
+    put 999
 } else {
-    put 7;
+    put 7
 }
 for i in 3 {
-    if (i == 1) { break; }
+    if (i == 1) { break }
 } else {
-    put 8;
+    put 8
 }
-put 10;</pre>
+put 10</pre>
 </figure>
 
 <figure class="out">
@@ -363,19 +363,19 @@ put 10;</pre>
 <figure class="code">
   <figcaption>例</figcaption>
 <pre>def fib(n: int) -&gt; int {
-    if (n &lt; 2) { return n; }
-    return fib(n - 1) + fib(n - 2);
+    if (n &lt; 2) { return n }
+    return fib(n - 1) + fib(n - 2)
 }
-put fib(10);
-g = 10;
-def getg() -&gt; int { return g; }
-def setg(v: int) { g = v; }
-put getg();
-setg(33);
-put getg();
+put fib(10)
+g = 10
+def getg() -&gt; int { return g }
+def setg(v: int) { g = v }
+put getg()
+setg(33)
+put getg()
 def main() -&gt; int {
-    put 100;
-    return 7;
+    put 100
+    return 7
 }</pre>
 </figure>
 
@@ -411,24 +411,27 @@ def main() -&gt; int {
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>def apply(f: fn(int) -&gt; int, v: int) -&gt; int { return f(v); }
-put apply(x -&gt; x * 2, 21);
-sq: fn(int) -&gt; int = x -&gt; x * x;
-put sq(9);
+<pre>def apply(f: fn(int) -&gt; int, v: int) -&gt; int { return f(v) }
+put apply(x -&gt; x * 2, 21)
+sq: fn(int) -&gt; int = x -&gt; x * x
+put sq(9)
 def make() -&gt; fn(int) -&gt; int {
-    base = 100;
-    h = fn(v: int) -&gt; int { return v + base; };
-    base = 200;
-    return h;
+    base = 100
+    h = fn(v: int) -&gt; int { return v + base }
+    base = 200
+    return h
 }
-f = make();
-put f(1);
+f = make()
+put f(1)
 def counter() -&gt; fn() -&gt; int {
-    n = 0;
-    return fn() -&gt; int { n = n + 1; return n; };
+    n = 0
+    return fn() -&gt; int {
+        n = n + 1
+        return n
+    }
 }
-c = counter();
-put c(), c(), c();</pre>
+c = counter()
+put c(), c(), c()</pre>
 </figure>
 
 <figure class="out">
@@ -564,14 +567,14 @@ a 7</pre>
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>s = "hello";
-put s.len, s[0], s[4];
-put s + " " + "world";
-put s == "hello", s != "bye";
-t = "ABCA";
-for c in t { if (c != "A") { c = "."; } }
-put t;
-put "abc".rev;</pre>
+<pre>s = "hello"
+put s.len, s[0], s[4]
+put s + " " + "world"
+put s == "hello", s != "bye"
+t = "ABCA"
+for c in t { if (c != "A") { c = "." } }
+put t
+put "abc".rev</pre>
 </figure>
 
 <figure class="out">
@@ -607,15 +610,15 @@ cba</pre>
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>a = [1, 2, 3];
-r = a.append(4);
-put a, r;
-b = a;
-a.append(5);
-put a.len, b.len;
-e: [int] = [];
-for i in 20 { e.append(i); }
-put e.len;</pre>
+<pre>a = [1, 2, 3]
+r = a.append(4)
+put a, r
+b = a
+a.append(5)
+put a.len, b.len
+e: [int] = []
+for i in 20 { e.append(i) }
+put e.len</pre>
 </figure>
 
 <figure class="out">
@@ -637,10 +640,10 @@ put e.len;</pre>
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>for i in 5..0 { put i; }
-put 99;
-r = 1..4;
-for i in r.rev { put i; }</pre>
+<pre>for i in 5..0 { put i }
+put 99
+r = 1..4
+for i in r.rev { put i }</pre>
 </figure>
 
 <figure class="out">
@@ -681,16 +684,19 @@ for i in r.rev { put i; }</pre>
   <figcaption>例 — 自作イテレータ</figcaption>
 <pre>class Count {
     n: int
-    def __init__(self, n: int) { self.n = n; }
-    def __iter__(self) -&gt; CountIter { return CountIter(self.n); }
+    def __init__(self, n: int) { self.n = n }
+    def __iter__(self) -&gt; CountIter { return CountIter(self.n) }
 }
 class CountIter {
     left: int
-    def __init__(self, n: int) { self.left = n; }
-    def __has_next__(self) -&gt; bool { return self.left &gt; 0; }
-    def __next__(self) -&gt; int { self.left = self.left - 1; return self.left; }
+    def __init__(self, n: int) { self.left = n }
+    def __has_next__(self) -&gt; bool { return self.left &gt; 0 }
+    def __next__(self) -&gt; int {
+        self.left = self.left - 1
+        return self.left
+    }
 }
-for v in Count(3) { put v; }</pre>
+for v in Count(3) { put v }</pre>
 </figure>
 
 <figure class="out">
@@ -726,7 +732,7 @@ for v in Count(3) { put v; }</pre>
   <figcaption>例 — 数え上げ</figcaption>
 <pre>cnt: Dict&lt;int, int&gt; = Dict(zero_int)
 a = [1, 2, 2, 3, 3, 3]
-for v in a { cnt[v] = cnt[v] + 1; }
+for v in a { cnt[v] = cnt[v] + 1 }
 put cnt[1], cnt[2], cnt[3], cnt[9], cnt.len
 d: Dict&lt;str, int&gt; = Dict(zero_int)
 d["a"] = 5
@@ -831,8 +837,8 @@ put y, q.to_array()</pre>
 <table>
   <tr><th>形</th><th>内容</th></tr>
   <tr><td><code>print(x)</code></td><td>値を文字列化して改行つきで出す。文字列化の規則: 文字列はそのまま、数値は10進、<code>bool</code> は <code>true</code> / <code>false</code>、配列は要素を空白区切り（入れ子も平らに）、クラスは <code>__str__</code> の結果。<code>__str__</code> の無い型（<code>Range</code>、<code>Dict</code> など）はエラー</td></tr>
-  <tr><td><code>put x, y, ...;</code></td><td><code>print</code> の文形。複数の引数を空白区切りで並べて改行まで出す。引数は1つ以上</td></tr>
-  <tr><td><code>&lt;&lt; x;</code> / 文頭の <code>&lt; x;</code></td><td><code>print(x)</code> の糖衣（<a href="sugar.html">糖衣集</a>）</td></tr>
+  <tr><td><code>put x, y, ...</code></td><td><code>print</code> の文形。複数の引数を空白区切りで並べて改行まで出す。引数は1つ以上</td></tr>
+  <tr><td><code>&lt;&lt; x</code></td><td><code>print(x)</code> の糖衣（<a href="sugar.html">糖衣集</a>）</td></tr>
   <tr><td><code>eprint(x)</code></td><td><code>print</code> と同じ文字列化で、標準エラー出力へ改行つきで出す</td></tr>
 </table>
 
@@ -845,12 +851,12 @@ put y, q.to_array()</pre>
   <tr><td><code>in</code></td><td>整数を1つ読む。負数も読める</td></tr>
   <tr><td><code>in[n]</code></td><td>整数を n 個読んで <code>[int]</code> にする</td></tr>
   <tr><td><code>in[h][w]</code></td><td>整数を h 行 × w 列読んで <code>[[int]]</code> にする（出力すると平らに並ぶ）</td></tr>
-  <tr><td><code>a- = in[n];</code></td><td><code>in[n]</code> の読み取りに <code>-</code> 修飾を付けた形。読んだ各値から 1 を引いて代入する</td></tr>
+  <tr><td><code>a- = in[n]</code></td><td><code>in[n]</code> の読み取りに <code>-</code> 修飾を付けた形。読んだ各値から 1 を引いて代入する</td></tr>
   <tr><td><code>in_str</code></td><td>空白区切りのトークンを1つ読む</td></tr>
   <tr><td><code>in_str[n]</code></td><td>トークンを n 個読んで <code>[str]</code> にする</td></tr>
   <tr><td><code>in_line</code></td><td>1行をそのまま読む（行末の改行は含まない）</td></tr>
-  <tr><td><code>&gt;&gt; a, b, c;</code></td><td><code>a = in; b = in; c = in;</code> の糖衣。左から順に読む。対象は複数代入の左辺と同じ形が使える</td></tr>
-  <tr><td><code>yn 式;</code></td><td>式が真なら <code>Yes</code>、偽なら <code>No</code> を1行出す糖衣</td></tr>
+  <tr><td><code>&gt;&gt; a, b, c</code></td><td><code>a = in; b = in; c = in</code> の糖衣。左から順に読む。対象は複数代入の左辺と同じ形が使える</td></tr>
+  <tr><td><code>yn 式</code></td><td>式が真なら <code>Yes</code>、偽なら <code>No</code> を1行出す糖衣</td></tr>
 </table>
 <p>
   整数の読み取りは、先行する空白を読み飛ばしません。読み取りのたびに区切り文字が1つ消費されるため、
@@ -860,17 +866,17 @@ put y, q.to_array()</pre>
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>n = in;
-a, b = in;
-grid = in[2][3];
-s = in_str;
-toks = in_str[2];
-line = in_line;
-put n, a + b;
-put grid;
-put s, toks, line;
-z = in + 5;
-put z;</pre>
+<pre>n = in
+a, b = in
+grid = in[2][3]
+s = in_str
+toks = in_str[2]
+line = in_line
+put n, a + b
+put grid
+put s, toks, line
+z = in + 5
+put z</pre>
 </figure>
 
 <figure class="out">
@@ -904,13 +910,13 @@ tok foo bar hello world foo
 
 <figure class="code">
   <figcaption>例 — 引数を1つ受け取って実行した場合</figcaption>
-<pre>a = args();
-put a.len, a[1];
-ok = write_file("memo.txt", "abc");
-f = read_file("memo.txt");
-put ok, f.ok, f.text;
-g = read_file("nope.txt");
-put g.ok, g.text.len;</pre>
+<pre>a = args()
+put a.len, a[1]
+ok = write_file("memo.txt", "abc")
+f = read_file("memo.txt")
+put ok, f.ok, f.text
+g = read_file("nope.txt")
+put g.ok, g.text.len</pre>
 </figure>
 
 <figure class="out">
