@@ -226,6 +226,63 @@ def t076() { s = "ABCA"; for x in s { if (x != "A") { x = "."; } } if (s == "A..
 
 def t077() { s = "abc"; n = 0; for x in s { n = n + x.len; } return n; }
 
+def t078() { x = 2; r = 0; if x == 1 { r = 1; } elif x == 2 { r = 2; } else { r = 3; } if x == 2 { r = r + 10; } return r; }
+
+def t079() {
+    x = 5
+    r = 0
+    if x < 0:
+        r = 1
+    elif x < 10:
+        r = 2
+    else:
+        r = 3
+    if x == 5: r = r + 20
+    return r
+}
+
+def t080() {
+    i = 0
+    s = 0
+    while i < 5:
+        s = s + i
+        i = i + 1
+    j = 0
+    while j < 3 { s = s + 100; j = j + 1; }
+    return s * 100 + i * 10 + j
+}
+
+def t081() { a = 2; b = 3; r = 0; if (a + b) * 2 > 9 { r = 1; } if (a + b) * 2 == 10: r = r + 2; return r; }
+
+def t082() { x = 3; r = 0; if 0 <= x < 4 { r = r + 1; } if 0 <= x && x < 4: r = r + 2; if 1 < x < 3 { r = r + 4; } if x < 2 || x > 2 { r = r + 8; } return r; }
+
+def t083() { done = 1 > 2; r = 0; if !done { r = 1; } i = 0; while sum2(i, 1) < 5 { i = i + 1; } return r * 10 + i; }
+
+def pairp(n: int) -> int { s = 0; i = 0; while (i < n) { if (i % 2 == 0) { s = s + i; } i = i + 1; } return s; }
+
+def pairn(n: int) -> int:
+    s = 0
+    i = 0
+    while i < n:
+        if i % 2 == 0: s = s + i
+        i = i + 1
+    return s
+
+def t084() { return pairp(10) * 1000 + pairn(10); }
+
+def t085() {
+    a = 1
+    b = 2
+    r = 0
+    if a == 1 &&
+        b == 2
+        r = 5
+    i = 0
+    while i < 3 &&
+        r == 5 { i = i + 1; }
+    return r * 10 + i
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -316,6 +373,14 @@ def main() {
     mark(75); fails=fails+check(t075(), 1342);
     mark(76); fails=fails+check(t076(), 1);
     mark(77); fails=fails+check(t077(), 3);
+    mark(78); fails=fails+check(t078(), 12);
+    mark(79); fails=fails+check(t079(), 22);
+    mark(80); fails=fails+check(t080(), 31053);
+    mark(81); fails=fails+check(t081(), 3);
+    mark(82); fails=fails+check(t082(), 11);
+    mark(83); fails=fails+check(t083(), 14);
+    mark(84); fails=fails+check(t084(), 20020);
+    mark(85); fails=fails+check(t085(), 53);
 
     print_str("done"); putchar(10);
     return fails > 0;

@@ -396,6 +396,7 @@ static Node* make_for_count(Node* count, Token* kw);
 static Node* stmt_branch(Token* hdr);
 static Node* suite_body(Token* hdr);
 static Node* header_expr();
+static Node* cond_expr();
 
 // 文（やフィールド）の終わり。`;` があれば消費する。なければ、次の
 // トークンが改行の後か、`}` か、ファイル末尾でなければならない
@@ -793,6 +794,7 @@ static Node* suite_body(Token* hdr) {
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
         int saved_depth = expr_depth;
+        bool saved_anno = suppress_anno;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             Node* s = stmt();
@@ -805,6 +807,7 @@ static Node* suite_body(Token* hdr) {
             globals = saved_globals;
             lambda_stack = saved_lambda;
             expr_depth = saved_depth;
+            suppress_anno = saved_anno;
             if (token->kind == TK_EOF) {
                 break;
             }
@@ -835,6 +838,7 @@ static Node* parse_stmt_list() {
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
         int saved_depth = expr_depth;
+        bool saved_anno = suppress_anno;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             Node* s = stmt();
@@ -847,6 +851,7 @@ static Node* parse_stmt_list() {
             globals = saved_globals;
             lambda_stack = saved_lambda;
             expr_depth = saved_depth;
+            suppress_anno = saved_anno;
             if (at_eof()) {
                 break;
             }
@@ -876,11 +881,7 @@ static Node* stmt_if(Token* kw) {
     Node* node;
     node = create_node(ND_IF);
     node->tok = kw;
-    expect("(");
-    expr_depth++;
-    node->cond = expr();
-    expr_depth--;
-    expect(")");
+    node->cond = cond_expr();
     node->then = stmt_branch(kw);
     Token* else_tok = token;
     if (consume_keyword(KW_ELSE)) {
@@ -897,11 +898,7 @@ static Node* stmt_while(Token* kw) {
     Node* node;
     node = create_node(ND_WHILE);
     node->tok = kw;
-    expect("(");
-    expr_depth++;
-    node->cond = expr();
-    expr_depth--;
-    expect(")");
+    node->cond = cond_expr();
     node->then = stmt_branch(kw);
     return node;
 }
@@ -945,6 +942,20 @@ static Node* make_for_count(Node* count, Token* kw) {
         node->val = locals->offset;
         node->els = stmt_branch(else_tok);
     }
+    return node;
+}
+
+// if / elif / while の条件を読む（step 69: 条件の括弧は任意）。
+// 条件は通常の完全な式として読み、終わりはブロックの開始（`{` か
+// `:`）で判断する。括弧形は primary の括弧式としてそのまま読める
+// ため、従来の書き方もそのまま動く。for の頭と同じく、直後の `:`
+// が suite の区切りと競合するため、型注釈の `:` は「型 = 」と
+// 続く場合だけ注釈として扱う（expr.c の suppress_anno）
+static Node* cond_expr() {
+    bool saved = suppress_anno;
+    suppress_anno = true;
+    Node* node = expr();
+    suppress_anno = saved;
     return node;
 }
 
@@ -1266,6 +1277,7 @@ static void class_colon_body(Function** cur, Class* klass, int* offset, Token* h
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
         int saved_depth = expr_depth;
+        bool saved_anno = suppress_anno;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             class_member(cur, klass, offset);
@@ -1276,6 +1288,7 @@ static void class_colon_body(Function** cur, Class* klass, int* offset, Token* h
             globals = saved_globals;
             lambda_stack = saved_lambda;
             expr_depth = saved_depth;
+            suppress_anno = saved_anno;
             if (token->kind == TK_EOF) {
                 break;
             }
@@ -1338,6 +1351,7 @@ static void class_decl(Function** cur) {
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
         int saved_depth = expr_depth;
+        bool saved_anno = suppress_anno;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             class_member(cur, klass, &offset);
@@ -1348,6 +1362,7 @@ static void class_decl(Function** cur) {
             globals = saved_globals;
             lambda_stack = saved_lambda;
             expr_depth = saved_depth;
+            suppress_anno = saved_anno;
             if (at_eof()) {
                 break;
             }
@@ -1520,6 +1535,7 @@ Function* program() {
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
         int saved_depth = expr_depth;
+        bool saved_anno = suppress_anno;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             parse_top_item(&cur, &stmt_cur);
@@ -1530,6 +1546,7 @@ Function* program() {
             globals = saved_globals;
             lambda_stack = saved_lambda;
             expr_depth = saved_depth;
+            suppress_anno = saved_anno;
             is_top_level = false;
             if (at_eof()) {
                 break;

@@ -6,9 +6,10 @@ static Node* array_literal();
 // 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数なしなら NULL
 static bool suppress_multi = false;
 
-// for の頭の式（反復対象・回数）を読んでいる間は真。その位置では
-// 式の直後の `:` が suite の区切りと競合するため、型注釈の `:` は
-// 「型 = 」と続く場合だけ注釈として扱う（annotation_ahead）
+// for の頭の式（反復対象・回数）と if / while の条件を読んでいる
+// 間は真。その位置では式の直後の `:` が suite の区切りと競合する
+// ため、型注釈の `:` は「型 = 」と続く場合だけ注釈として扱う
+// （annotation_ahead）
 bool suppress_anno = false;
 
 int expr_depth = 0;
