@@ -584,6 +584,11 @@ static Node* stmt() {
         return stmt_return(start);
     } else if (consume_keyword(KW_IF)) {
         return stmt_if(start);
+    } else if (consume("?")) {
+        // 文頭の `?` は if の糖衣（step 73）。条件・ブロック・elif /
+        // else の連鎖まで通常の if 文と同一（stmt_if をそのまま使う）。
+        // `?` が使えるのは文の頭だけで、式の中では定義しない
+        return stmt_if(start);
     } else if (consume_keyword(KW_WHILE)) {
         return stmt_while(start);
     } else if (consume_keyword(KW_FOR)) {

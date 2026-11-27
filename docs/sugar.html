@@ -500,6 +500,34 @@ put f(5), f(0)</pre>
 <pre>1 2</pre>
 </figure>
 
+<h3>文頭の <code>?</code>（if の糖衣）</h3>
+<table>
+  <tr><th>記号形</th><th>正規形</th></tr>
+  <tr><td><code>? 条件:</code> 文...</td><td><code>if 条件:</code> 文...</td></tr>
+</table>
+<p>
+  文の頭の <code>?</code> は <code>if</code> の別名です。条件の括弧は任意で、ブロックは <code>:</code> 形式と <code>{ }</code> 形式のどちらでも書けます。
+  後ろに <code>elif</code> / <code>else</code> を続けることもできます。<code>?</code> が使えるのは文の頭だけで、式の中では使えません。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>x = 7
+? x &gt; 10:
+    put 1
+elif x &gt; 5:
+    put 2
+else:
+    put 3
+? x == 7 { put 4 }</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2
+4</pre>
+</figure>
+
 <h3>0引数メソッドの括弧省略</h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
