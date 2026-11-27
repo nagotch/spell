@@ -44,6 +44,7 @@
     <li><a href="#s13">入出力</a></li>
     <li><a href="#s14">キーワードと型注釈</a></li>
     <li><a href="#s15">約束事と不定な振る舞い</a></li>
+    <li><a href="#s16">prelude 一覧</a></li>
   </ul>
   <p class="side-h">ドキュメント</p>
   <ul class="side-list">
@@ -993,6 +994,64 @@ false 0</pre>
 <p>
   コンパイル時のエラーは、日本語のメッセージと位置（行・列と該当箇所の下線）つきで報告され、最初の1件で止まります。
   関数やクラスが使われていない場合、そのコードは生成されません（到達可能な関数だけが出力されます）。
+</p>
+
+<h2 id="s16"><span class="no">16</span>prelude 一覧</h2>
+<p>
+  起動時に読み込まれる <code>prelude.sp</code> が定義する型と関数の全一覧です。各項目の詳しい仕様はリンク先の節にあります。
+  <code>print</code> / <code>eprint</code> / <code>exit</code> は prelude の関数ではなく、コンパイラが直接書き換える組み込みです（<a href="#s13">§13</a>）。
+</p>
+
+<h3>型・クラス</h3>
+<table>
+  <tr><th>名前</th><th>概要</th><th>詳細</th></tr>
+  <tr><td><code>int</code></td><td>整数</td><td><a href="#s09">§09</a></td></tr>
+  <tr><td><code>bool</code></td><td>真偽値</td><td><a href="#s09">§09</a></td></tr>
+  <tr><td><code>str</code></td><td>文字列</td><td><a href="#s09">§09</a></td></tr>
+  <tr><td><code>array&lt;T&gt;</code></td><td>配列</td><td><a href="#s09">§09</a></td></tr>
+  <tr><td><code>Range</code></td><td>範囲（<code>a..b</code> / <code>a..=b</code> が作る）</td><td><a href="#s10">§10</a></td></tr>
+  <tr><td><code>RangeIter</code></td><td><code>Range</code> の反復子</td><td><a href="#s10">§10</a></td></tr>
+  <tr><td><code>StrIter</code></td><td><code>str</code> の反復子（1文字ずつの <code>str</code> を返す）</td><td><a href="#s10">§10</a></td></tr>
+  <tr><td><code>ArrayIter&lt;T&gt;</code></td><td>配列の反復子</td><td><a href="#s10">§10</a></td></tr>
+  <tr><td><code>DictIter&lt;K&gt;</code></td><td><code>Dict</code> のキー反復子（挿入順）</td><td><a href="#s10">§10</a></td></tr>
+  <tr><td><code>Dict&lt;K, V&gt;</code></td><td>辞書</td><td><a href="#s11">§11</a></td></tr>
+  <tr><td><code>Vec&lt;T&gt;</code></td><td>可変長配列</td><td><a href="#s11">§11</a></td></tr>
+  <tr><td><code>Deque&lt;T&gt;</code></td><td>両端キュー</td><td><a href="#s11">§11</a></td></tr>
+  <tr><td><code>FileData</code></td><td><code>read_file</code> の結果（<code>ok</code> と <code>text</code>）</td><td><a href="#s11">§11</a></td></tr>
+</table>
+
+<h3>関数</h3>
+<table>
+  <tr><th>名前</th><th>概要</th><th>詳細</th></tr>
+  <tr><td><code>zero_int() -&gt; int</code></td><td>初期値ファクトリ（0 を返す）。<code>Dict</code> / <code>Vec</code> / <code>Deque</code> の構築に渡す</td><td><a href="#s11">§11</a></td></tr>
+  <tr><td><code>zero_bool() -&gt; bool</code></td><td>初期値ファクトリ（偽を返す）</td><td><a href="#s11">§11</a></td></tr>
+  <tr><td><code>zero_str() -&gt; str</code></td><td>初期値ファクトリ（空文字列を返す）</td><td><a href="#s11">§11</a></td></tr>
+  <tr><td><code>args() -&gt; [str]</code></td><td>コマンドライン引数全体</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>read_file(path: str) -&gt; FileData</code></td><td>ファイル全体を読む</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>write_file(path: str, text: str) -&gt; bool</code></td><td>ファイルへ書き出す</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>read_int() -&gt; int</code></td><td>整数を1つ読む（<code>in</code> の実体）</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>read_ints(n: int) -&gt; [int]</code></td><td>整数を n 個読む（<code>in[n]</code> の実体）</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>read_ints2(h: int, w: int) -&gt; [[int]]</code></td><td>整数を h 行 × w 列で読む（<code>in[h][w]</code> の実体）</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>read_ints_dec(n: int) -&gt; [int]</code></td><td>整数を n 個読み、各要素から 1 引く（<code>-</code> 修飾の実体）</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>read_token() -&gt; str</code></td><td>トークンを1つ読む（<code>in_str</code> の実体）</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>read_str() -&gt; str</code></td><td>標準入力の残りを全部読む</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>read_tokens(n: int) -&gt; [str]</code></td><td>トークンを n 個読む（<code>in_str[n]</code> の実体）</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>read_line() -&gt; str</code></td><td>1行読む（<code>in_line</code> の実体）</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>print_yn(b: bool)</code></td><td><code>yn</code> の実体（<code>Yes</code> / <code>No</code> を出す）</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>print_int(n: int)</code></td><td>整数を改行つきで出す（prelude 内部の出力補助）</td><td><a href="#s13">§13</a></td></tr>
+  <tr><td><code>print_str(s: str)</code></td><td>文字列を改行つきで出す（prelude 内部の出力補助）</td><td><a href="#s13">§13</a></td></tr>
+</table>
+
+<h3>内部用（利用側から直接使うものではありません）</h3>
+<table>
+  <tr><th>名前</th><th>役割</th></tr>
+  <tr><td><code>__println(s: str)</code></td><td><code>print</code> の実体</td></tr>
+  <tr><td><code>__eprintln(s: str)</code></td><td><code>eprint</code> の実体</td></tr>
+  <tr><td><code>__count_range(n: int) -&gt; Range</code></td><td><code>@n</code> リピートの実体</td></tr>
+  <tr><td><code>__dict_is_prime</code> / <code>__dict_next_cap</code></td><td><code>Dict</code> の内部用</td></tr>
+</table>
+<p>
+  このほかに、prelude の実装が使う基盤としてコンパイラ組み込みの <code>__spell_*</code> があります（<a href="#s12">§12</a>）。
 </p>
 
 </main>
