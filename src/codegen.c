@@ -899,6 +899,7 @@ static void gen_rax_binop(Node* node) {
 static void gen_rax(Node* node) {
     switch (node->kind) {
         case ND_NUM: gen_rax_num(node); break;
+        case ND_BOOL: gen_rax_num(node); break;
         case ND_LVAR:
         case ND_GVAR:
         case ND_CAPVAR: gen_rax_var(node); break;
@@ -931,6 +932,7 @@ static void gen_discard(Node* node) {
 static void gen(Node* node) {
     switch (node->kind) {
         case ND_NUM:
+        case ND_BOOL:
         case ND_LVAR:
         case ND_GVAR:
         case ND_CAPVAR:

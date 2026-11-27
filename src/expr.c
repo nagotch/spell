@@ -70,6 +70,26 @@ Node* parse_put_args() {
     return head.next;
 }
 
+// 真理値リテラル（step 70）: 式の位置で `true` / `T` を真、`false` / `F`
+// を偽として扱う。該当すれば 1 / 0、しなければ -1 を返す。型の位置
+// （型パラメータ `T` など）やメンバ名は primary を通らないので、
+// この変換の影響を受けない
+static int bool_literal_value(Token* tok) {
+    if (tok->len == 4 && !memcmp(tok->str, "true", 4)) {
+        return 1;
+    }
+    if (tok->len == 5 && !memcmp(tok->str, "false", 5)) {
+        return 0;
+    }
+    if (tok->len == 1 && tok->str[0] == 'T') {
+        return 1;
+    }
+    if (tok->len == 1 && tok->str[0] == 'F') {
+        return 0;
+    }
+    return -1;
+}
+
 static Node* primary() {
     Node* node;
     if (token->kind == TK_KEYWORD && token->keyword == KW_FN) {
@@ -118,6 +138,14 @@ static Node* primary() {
         token = token->next;
         node = array_literal();
         node->tok = bracket;
+    } else if (ident_token && bool_literal_value(ident_token) >= 0) {
+        // 真理値リテラル（step 70）。変数の解決より優先する: この4つの
+        // 綴りは式の位置では変数名として使えない
+        node = create_node(ND_BOOL);
+        node->val = bool_literal_value(ident_token);
+        node->name = ident_token->str;
+        node->len = ident_token->len;
+        node->tok = ident_token;
     } else if (ident_token && token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '(' && ident_is_value_call(ident_token)) {
         // 変数に収まった関数値の呼び出しは、名前呼び出しではなく値経由にする。
         // `(` は後置ループ側で ND_VCALL として消費する

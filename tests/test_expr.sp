@@ -67,6 +67,17 @@ def t066() { a = 0-7; a /= 2; return a; }
 def t067() { a = 0-7; a %= 2; return a; }
 def t068() { (0-6)/(0-2); }
 def t069() { (0-6)%(0-2); }
+def t070() { true; }
+def t071() { false; }
+def t072() { T; }
+def t073() { F; }
+def t074() { !true; }
+def t075() { !F; }
+def t076() { true && false; }
+def t077() { T || F; }
+def t078() { true == T; }
+def t079() { false != T; }
+def t080() { true && (1 < 2); }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -150,6 +161,17 @@ def main() {
     mark(67); fails=fails+check(t067(), 1);
     mark(68); fails=fails+check(t068(), 3);
     mark(69); fails=fails+check(t069(), 0);
+    mark(70); fails=fails+check(t070(), 1);
+    mark(71); fails=fails+check(t071(), 0);
+    mark(72); fails=fails+check(t072(), 1);
+    mark(73); fails=fails+check(t073(), 0);
+    mark(74); fails=fails+check(t074(), 0);
+    mark(75); fails=fails+check(t075(), 1);
+    mark(76); fails=fails+check(t076(), 0);
+    mark(77); fails=fails+check(t077(), 1);
+    mark(78); fails=fails+check(t078(), 1);
+    mark(79); fails=fails+check(t079(), 1);
+    mark(80); fails=fails+check(t080(), 1);
 
     print_str("done"); putchar(10);
     return fails > 0;

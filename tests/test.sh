@@ -148,6 +148,9 @@ def main():
     "def main() { v: Vec<int> = Vec(zero_int); v <- 1; return 0; }|値に演算子\`<-\`は使えません"
     "def main() { q: Deque<int> = Deque(zero_int); a = 1; a <- q <- 2; return 0; }|矢印演算子は連鎖できません"
     "def main() { q: Deque<int> = Deque(zero_int); q <- 1; (1 + 2) <- q; return 0; }|代入先は変数・フィールド・配列の要素でなければなりません"
+    # step 70: 真理値リテラルには代入できない
+    "def main() { true = 1; return 0; }|\`true\`には代入できません"
+    "def main() { T = 0; return 0; }|\`T\`には代入できません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -579,6 +582,18 @@ one_io_test "def main():
     print(s)
     return 0
 " "" "1\n"
+# step 70: 真理値リテラル。4綴りの print、yn、括弧なし条件
+one_io_test "def main() { print(true); print(false); print(T); print(F); yn F; yn T; return 0; }" "" "true\nfalse\ntrue\nfalse\nNo\nYes\n"
+one_io_test "def main():
+    if true: print(1)
+    if F: print(2)
+    else: print(3)
+    while F { print(4); }
+    print(5)
+    return 0
+" "" "1\n3\n5\n"
+# step 70: 配列の要素・Dict の値としての真理値リテラル
+one_io_test "def main() { a = [true, F, T]; print(a[0]); print(a[1]); print(a.len); d: Dict<str, bool> = Dict(zero_bool); d[\"x\"] = true; print(d[\"x\"]); print(d[\"y\"]); return 0; }" "" "true\nfalse\n3\ntrue\nfalse\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
