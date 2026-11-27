@@ -302,6 +302,62 @@ def t087() {
     return r
 }
 
+def t088() {
+    // step 73: 文頭の `?` は if の糖衣（真・偽・else）
+    r = 0
+    ? 1 < 2: r = r + 1
+    ? 1 > 2: r = r + 100
+    else: r = r + 2
+    ? false { r = r + 1000; }
+    return r
+}
+
+def t089() {
+    // step 73: elif / else との併用、括弧つき条件、`{}` 形式ブロック
+    x = 2
+    r = 0
+    ? (x == 1) {
+        r = 10
+    } elif (x == 2) {
+        r = 20
+    } else {
+        r = 30
+    }
+    ? x == 3:
+        r = r + 1000
+    elif x == 2:
+        r = r + 200
+    else:
+        r = r + 3000
+    return r
+}
+
+def t090() {
+    // step 73: ネストした `?` と、while / for との混在
+    s = 0
+    i = 0
+    while i < 5:
+        ? i % 2 == 0:
+            ? i > 0:
+                s = s + i
+        i = i + 1
+    for j in 3:
+        ? j == 2:
+            s = s + 100
+    return s
+}
+
+def t091() {
+    // step 73: if 文と `?` の混在（`?` は if 専用）
+    r = 0
+    if true { r = r + 1; }
+    ? T: r = r + 2
+    if F: r = r + 100
+    ? F: r = r + 1000
+    else: r = r + 4
+    return r
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -402,6 +458,10 @@ def main() {
     mark(85); fails=fails+check(t085(), 53);
     mark(86); fails=fails+check(t086(), 3);
     mark(87); fails=fails+check(t087(), 7);
+    mark(88); fails=fails+check(t088(), 3);
+    mark(89); fails=fails+check(t089(), 220);
+    mark(90); fails=fails+check(t090(), 106);
+    mark(91); fails=fails+check(t091(), 7);
 
     print_str("done"); putchar(10);
     return fails > 0;

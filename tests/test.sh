@@ -153,6 +153,8 @@ def main():
     # step 70: 真理値リテラルには代入できない
     "def main() { true = 1; return 0; }|\`true\`には代入できません"
     "def main() { T = 0; return 0; }|\`T\`には代入できません"
+    # step 73: `?` は文頭の if 糖衣専用で、式の中では使えない
+    "def main() { x = true ? 1 : 2; return 0; }|文の終わりには\`;\`か改行が必要ですが"
 )
 
 cc -c -o funcs.o funcs.c
@@ -596,6 +598,18 @@ one_io_test "def main():
 " "" "1\n3\n5\n"
 # step 70: 配列の要素・Dict の値としての真理値リテラル
 one_io_test "def main() { a = [true, F, T]; print(a[0]); print(a[1]); print(a.len); d: Dict<str, bool> = Dict(zero_bool); d[\"x\"] = true; print(d[\"x\"]); print(d[\"y\"]); return 0; }" "" "true\nfalse\n3\ntrue\nfalse\n"
+# step 73: 文頭 `?` の if 糖衣（elif / else の連鎖、入力との組み合わせ）
+one_io_test "def main():
+    x = in
+    ? x > 10:
+        print(1)
+    elif x > 5:
+        print(2)
+    else:
+        print(3)
+    ? x == 7 { print(4); }
+    return 0
+" "7\n" "2\n4\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
