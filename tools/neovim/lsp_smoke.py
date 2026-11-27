@@ -213,6 +213,49 @@ if len(diags) == 1:
     check("カスケード: 元の代入エラーだけ",
           "が代入されています" in diags[0]["message"], diags[0]["message"])
 
+# 5.9 EOF 位置の診断範囲（step 62）: ファイル末尾を指すエラーは最終行の
+# 最後の1文字を指す。本文が改行で終わっていても、エディタの行モデルに
+# 存在しない「最終行の次の行」へ出してはいけない
+EOF_PAREN_PROGRAM = "def main() {\n    x = (1 + 2"
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 8},
+                 "contentChanges": [{"text": EOF_PAREN_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（EOF・未閉じ括弧）: 診断1件", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 1:
+    r = diags[0]["range"]
+    check("EOF・未閉じ括弧: 範囲は最終行の最後の文字（line=1, char=13-14）",
+          r["start"] == {"line": 1, "character": 13} and r["end"] == {"line": 1, "character": 14},
+          json.dumps(r))
+    check("EOF・未閉じ括弧: メッセージに「が必要ですが」",
+          "が必要ですが" in diags[0]["message"], diags[0]["message"])
+
+EOF_PAREN_NL_PROGRAM = "def main() {\n    x = (1 + 2\n"
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 9},
+                 "contentChanges": [{"text": EOF_PAREN_NL_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（EOF・末尾改行つき）: 診断1件", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 1:
+    r = diags[0]["range"]
+    check("EOF・末尾改行つき: 範囲は改行なしと同じ（line=1, char=13-14）",
+          r["start"] == {"line": 1, "character": 13} and r["end"] == {"line": 1, "character": 14},
+          json.dumps(r))
+
+EOF_LATE_LINE_PROGRAM = "def main() {\n    a = 1;\n    b\n"
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 10},
+                 "contentChanges": [{"text": EOF_LATE_LINE_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（EOF・後ろの行）: 診断1件", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 1:
+    r = diags[0]["range"]
+    check("EOF・後ろの行: 範囲は b の位置（line=2, char=4-5）",
+          r["start"] == {"line": 2, "character": 4} and r["end"] == {"line": 2, "character": 5},
+          json.dumps(r))
+    check("EOF・後ろの行: メッセージに「数値が必要ですが」",
+          "数値が必要ですが" in diags[0]["message"], diags[0]["message"])
+
 # 6. didClose: 空の診断が送られて消える
 send({"jsonrpc": "2.0", "method": "textDocument/didClose",
       "params": {"textDocument": {"uri": URI}}})

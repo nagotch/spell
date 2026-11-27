@@ -502,7 +502,8 @@ put s;</pre>
   標準入力は代入の右辺で <code>in</code> と書きます。<code>in[n]</code> は整数を n 個読んで配列にし、
   <code>in[h][w]</code> は h 行 × w 個の二次元配列にします。文字列は <code>in_str</code>（空白区切りのトークン）、
   <code>in_line</code>（行全体）です。入力が1始まりのときは <code>a- = in[n]</code> と書くと、
-  読みながら各要素から1を引いてくれます。糖衣として <code>&gt;&gt; x;</code> という入力の形もあります。
+  読みながら各要素から1を引いてくれます。糖衣として <code>&gt;&gt; x;</code> という入力の形もあり、
+  <code>&gt;&gt; a, b, c;</code> のように対象を並べると、左から順に1つずつ読みます。
 </p>
 
 <figure class="code">
@@ -523,6 +524,17 @@ put s;</pre>
 <figure class="out">
   <figcaption>出力</figcaption>
 <pre>15</pre>
+</figure>
+
+<figure class="code">
+  <figcaption>例 — 複数の入力</figcaption>
+<pre>>> a, b, c;
+put a + b + c;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>入力が「1 2 3」のときの出力</figcaption>
+<pre>6</pre>
 </figure>
 
 <figure class="code">

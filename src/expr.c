@@ -38,6 +38,17 @@ static Node* parse_args() {
     return result;
 }
 
+// `>>` 文の代入対象を1つ読む。対象の解析中はカンマ区切りの複数代入
+// （a, b = ...）と誤認しないよう suppress_multi を立てる。対象の形は
+// 単独形の `>>` と同じ（識別子・添字・メンバー）で、束縛まで行う
+Node* parse_input_target() {
+    bool saved = suppress_multi;
+    suppress_multi = true;
+    Node* target = bind_target_node(expr());
+    suppress_multi = saved;
+    return target;
+}
+
 // put 文の引数列（括弧なし、カンマ区切り）を読む
 Node* parse_put_args() {
     Node head;
