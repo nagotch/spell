@@ -754,6 +754,13 @@ static Node* suite_body(Token* hdr) {
         if (token_starts_line(token)) {
             int ind = line_indent_of(token);
             if (ind < suite_indent) {
+                // dedent で suite が終わる。頭の行より深い段への
+                // dedent は、どの suite の段にも一致しない中途半端な
+                // 位置なのでエラーにする（外側に同じ段の suite が
+                // ある場合は、頭の行の段以下へ戻る形になる）
+                if (ind > ref) {
+                    error_at(token_start(token), token_end(token), "インデントが揃っていません");
+                }
                 break;
             }
             if (ind > suite_indent) {
@@ -1224,6 +1231,11 @@ static void class_colon_body(Function** cur, Class* klass, int* offset, Token* h
         if (token_starts_line(token)) {
             int ind = line_indent_of(token);
             if (ind < member_indent) {
+                // suite_body と同じく、頭の行より深い段への
+                // dedent はどの段にも一致しないためエラーにする
+                if (ind > ref) {
+                    error_at(token_start(token), token_end(token), "インデントが揃っていません");
+                }
                 break;
             }
             if (ind > member_indent) {

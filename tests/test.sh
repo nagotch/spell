@@ -121,6 +121,14 @@ error_tests=(
       y = 2
     return 0
 |インデントが揃っていません"
+    # step 67: dedent が外側の段にも合わないままトップレベルへ
+    # 吸収される形もエラー（Luna レビュー指摘）
+    "def f():
+    x = 1
+  y = 2
+def main():
+    return 0
+|インデントが揃っていません"
     # step 67: 空の suite はエラー
     "def main():|の後に文がありません"
     # step 67: suite は頭の行より深くインデントしなければならない
