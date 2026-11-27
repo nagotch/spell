@@ -287,6 +287,36 @@ put 3</pre>
 3</pre>
 </figure>
 
+<h3><code>|</code> の else / elif</h3>
+<table>
+  <tr><th>記号形</th><th>正規形</th></tr>
+  <tr><td><code>| 式 ブロック</code></td><td><code>elif 式 ブロック</code></td></tr>
+  <tr><td><code>| ブロック</code></td><td><code>else ブロック</code></td></tr>
+</table>
+<p><code>|</code> の直後がブロック（<code>:</code> か <code>{ }</code>）なら <code>else</code>、式が続けば <code>elif</code> として読みます。キーワード形との混在もできます。for...else の <code>else</code> も <code>|</code> で書けます。</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>x = 2
+if x == 1:
+    put 1
+| x == 2:
+    put 2
+|:
+    put 3
+for i in 3 {
+    if (i == 9) { break }
+} | {
+    put 4
+}</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2
+4</pre>
+</figure>
+
 <h2 id="s04"><span class="no">04</span>式の糖衣</h2>
 
 <h3>連鎖比較</h3>

@@ -328,6 +328,25 @@ if len(diags) == 1:
     check("dedent エラー: メッセージに「インデントが揃っていません」",
           "インデントが揃っていません" in diags[0]["message"], diags[0]["message"])
 
+# 5.13 パイプ else / elif（step 74）: `|` の糖衣を含むプログラムは診断ゼロ
+PIPE_PROGRAM = (
+    "def main():\n"
+    "    x = 2\n"
+    "    r = 0\n"
+    "    if x == 1:\n"
+    "        r = 1\n"
+    "    | x == 2:\n"
+    "        r = 2\n"
+    "    |:\n"
+    "        r = 3\n"
+    "    return r\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 15},
+                 "contentChanges": [{"text": PIPE_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（パイプ else / elif）: 診断ゼロ", diags == [], json.dumps(diags, ensure_ascii=False))
+
 # 6. didClose: 空の診断が送られて消える
 send({"jsonrpc": "2.0", "method": "textDocument/didClose",
       "params": {"textDocument": {"uri": URI}}})

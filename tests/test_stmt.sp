@@ -368,6 +368,108 @@ def check(got, expected) {
     return 0;
 }
 
+def t092() {
+    r = 0
+    a = 1
+    if a == 0:
+        r = 100
+    | a == 1:
+        r = 101
+    | a == 2:
+        r = 102
+    |:
+        r = 199
+    b = 9
+    if b == 0:
+        r = r + 1000
+    | b == 1:
+        r = r + 2000
+    |:
+        r = r + 3000
+    return r
+}
+
+def t093() {
+    r = 0
+    x = 2
+    if x == 1:
+        r = 1
+    elif x == 2:
+        r = 2
+    |:
+        r = 3
+    y = 3
+    if y == 1:
+        r = r + 10
+    | y == 2:
+        r = r + 20
+    else:
+        r = r + 30
+    z = 0
+    if z == 1 {
+        r = r + 100
+    } | z == 0 {
+        r = r + 200
+    } else {
+        r = r + 400
+    }
+    return r
+}
+
+def t094() { a = 2; r = 0; if a == 0 { r = 1; } | a == 1 { r = 2; } | a == 2 { r = 3; } | { r = 4; } return r; }
+
+def t095() {
+    s = 0
+    for i in 0..5:
+        if i == 3:
+            break
+        s = s + 1
+    |:
+        s = 100
+    t = 0
+    for j in 3:
+        t = t + 1
+    |:
+        t = t + 10
+    return s * 100 + t
+}
+
+def t096() {
+    r = 0
+    if 1 == 1:
+        if 2 == 3:
+            r = 1
+        |:
+            r = 2
+    |:
+        r = 3
+    if 1 == 2:
+        r = r + 10
+    |:
+        r = r + 20
+    return r
+}
+
+def t097() {
+    r = 0
+    if 1 == 2: r = 1
+    |: r = 2
+    if 1 == 1: r = r + 10
+    |: r = r + 100
+    return r
+}
+
+def mark(n) {
+    print_int(n); putchar(10); fflush(0);
+    return 0;
+}
+
+def check(got, expected) {
+    if (got != expected) return 1;
+    return 0;
+}
+
+
 def main() {
     fails = 0;
 
@@ -462,6 +564,12 @@ def main() {
     mark(89); fails=fails+check(t089(), 220);
     mark(90); fails=fails+check(t090(), 106);
     mark(91); fails=fails+check(t091(), 7);
+    mark(92); fails=fails+check(t092(), 3101);
+    mark(93); fails=fails+check(t093(), 232);
+    mark(94); fails=fails+check(t094(), 3);
+    mark(95); fails=fails+check(t095(), 313);
+    mark(96); fails=fails+check(t096(), 22);
+    mark(97); fails=fails+check(t097(), 12);
 
     print_str("done"); putchar(10);
     return fails > 0;
