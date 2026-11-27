@@ -112,6 +112,11 @@ error_tests=(
     "def main() { x = __spell_read_file_chars(\"s\"); return 0; }|ですが、\`str\`が指定されています"
     # step 62: >> の末尾カンマは対象が必要というエラーになる
     "def main() { >> a,; return 0; }|数値が必要ですが、\`;\`が見つかりました"
+    # step 65: append の対象はスロットを持つ場所だけ。一時値は書き戻せない
+    "def main() { a = [1, 2]; (a + a).append(1); return 0; }|の対象は変数・フィールド・配列の要素でなければなりません"
+    "def f() -> [int] { return [1]; } def main() { f().append(1); return 0; }|の対象は変数・フィールド・配列の要素でなければなりません"
+    "def main() { a = [1]; a.append(1, 2); return 0; }|\`append\`の引数は1個ですが、2個が指定されています"
+    "def main() { a = [1]; a.append(1 < 2); return 0; }|\`append\`の引数には\`int\`が必要ですが、\`bool\`が指定されています"
 )
 
 cc -c -o funcs.o funcs.c
@@ -330,6 +335,13 @@ one_driver_test "def main() { ok = write_file(\"drv_data.txt\", \"roundtrip 59\\
 one_driver_test "def main() { d = read_file(\"drv_missing.txt\"); print(d.ok); print(d.text.len); return 0; }" "false\n0\n" "" 0
 one_driver_test "def main() { print(\"out\"); eprint(\"err\"); eprint(42); return 0; }" "out\n" "err\n42\n" 0
 one_driver_test "def main() { print(\"before\"); exit(3); print(\"after\"); return 0; }" "before\n" "" 3
+# step 65: append の基本（連結と同じ見た目で、長さが伸びる）
+one_io_test "def main() { a = [1, 2, 3]; a.append(4); a.append(5); print(a); print(a.len); return 0; }" "" "1 2 3 4 5\n5\n"
+# step 65: ランタイムヘルパが作る配列（read_file の文字コード列）にも
+# cap が書かれていて、append で伸ばせること。100回伸ばして中身を確かめる
+one_driver_test "def main() { ok = write_file(\"drv_data.txt\", \"ab\"); d = read_file(\"drv_data.txt\"); i = 0; while (i < 100) { d.text.chars.append(99); i = i + 1; } print(d.text.len); print(d.text[0]); print(d.text[101]); return 0; }" "102\n97\n99\n" "" 0
+# step 65: 読み取り失敗時に返る空配列（ヘルパの失敗経路）への append
+one_driver_test "def main() { d = read_file(\"drv_missing.txt\"); d.text.chars.append(65); print(d.text); print(d.text.len); return 0; }" "A\n1\n" "" 0
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

@@ -40,6 +40,38 @@ def t037() { s = 0; for a in [[1, 2], [3]] { for x in a { s = s + x; } } return 
 def t038() { r = [1, 2, 3].rev; return r[0] * 100 + r[1] * 10 + r[2]; }
 def t039() { s = 0; for i in (1..4).rev { s = s * 10 + i; } if ("abc".rev == "cba") { s = s + 1; } return s; }
 
+// step 65: 配列への append
+def addit(a: [int], v: int) { a.append(v); }
+def addlen(a: [int], v: int) -> int { a.append(v); return a.len; }
+def g100(a: [int]) -> int { a.append(100); return 7; }
+def growrows(rows: [[int]]) -> int { rows.append([9]); return 5; }
+icnt = 0;
+def nexti() -> int { icnt = icnt + 1; return 0; }
+garr = [0; 3];
+def t040() { a = [1, 2, 3]; a.append(4); return a.len * 1000 + a[3] * 100 + a[0] * 10 + a[2]; }
+def t041() { a: [int] = []; a.append(7); a.append(8); return a.len * 100 + a[0] * 10 + a[1]; }
+def t042() { a = [0; 2]; a.append(5); return a.len * 10 + a[2]; }
+def t043() { a: [int] = []; i = 0; while (i < 1000) { a.append(i); i = i + 1; } s = 0; for x in a { s = s + x; } return s + a[999]; }
+def t044() { a = ["a", "b"]; a.append("c"); return a.len * 10 + a[2].len; }
+def t045() { a = [1, 2, 3]; b = a; a.append(4); return b.len * 10 + a.len; }
+def t046() { a = [1, 2, 3]; a.append(4); b = a; a.append(5); return b.len * 10 + b[4]; }
+def t047() { a = [1]; a.append(2); addit(a, 3); return a.len * 10 + a[2]; }
+def t048() { a = [1, 2, 3]; r = addlen(a, 4); return r * 10 + a.len; }
+def t049() { rows = [[1, 2], [3]]; rows[0].append(9); return rows[0].len * 100 + rows[0][2]; }
+def t050() { a = [1]; n = a.append(2); return n * 10 + a.len; }
+def t051() { a = [1, 2, 3]; a.append(g100(a)); return a.len * 1000 + a[3]; }
+def t052() { rows = [[1, 2], [3, 4]]; rows[nexti()].append(9); return icnt * 100 + rows[0].len; }
+def t053() { a = [1, 2, 3]; s = 0; n = 0; for x in a { s = s + x; n = n + 1; a.append(10 + n); } return s * 1000 + n * 100 + a.len; }
+def t054() { b = [1, 2, 3]; b.append(4); s = 0; n = 0; for x in b { s = s + x; n = n + 1; if (n < 4) { b.append(100); } } return s * 10 + n; }
+def t055() { a = [1, 2, 3]; f = fn() -> int { a.append(4); return a.len; }; r = f(); return r * 10 + a.len; }
+def t056() { a: [int] = []; return a.append(10) * 100 + a.append(20) * 10 + a.len; }
+def t057() { a = [0; 1]; i = 0; while (i < 100) { a.append(i * i); i = i + 1; } return a[51] + a.len; }
+def t058() { r = [[1, 2]]; r[0].append(growrows(r)); return r.len * 1000 + r[0].len * 100 + r[0][2]; }
+def t059() { s = "ab"; s.chars.append(99); return s.len * 100 + s[2]; }
+def t060() { garr.append(40); garr.append(50); return garr.len * 100 + garr[3] + garr[4]; }
+def t061() { r = [1, 2, 3].rev; r.append(4); return r.len * 1000 + r[0] * 100 + r[3]; }
+def t062() { s = "abc".rev; s.chars.append(100); return s.len * 1000 + s[3]; }
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -92,6 +124,29 @@ def main() {
     mark(37); fails=fails+check(t037(), 6);
     mark(38); fails=fails+check(t038(), 321);
     mark(39); fails=fails+check(t039(), 322);
+    mark(40); fails=fails+check(t040(), 4413);
+    mark(41); fails=fails+check(t041(), 278);
+    mark(42); fails=fails+check(t042(), 35);
+    mark(43); fails=fails+check(t043(), 500499);
+    mark(44); fails=fails+check(t044(), 31);
+    mark(45); fails=fails+check(t045(), 34);
+    mark(46); fails=fails+check(t046(), 55);
+    mark(47); fails=fails+check(t047(), 33);
+    mark(48); fails=fails+check(t048(), 43);
+    mark(49); fails=fails+check(t049(), 309);
+    mark(50); fails=fails+check(t050(), 22);
+    mark(51); fails=fails+check(t051(), 4007);
+    mark(52); fails=fails+check(t052(), 103);
+    mark(53); fails=fails+check(t053(), 6306);
+    mark(54); fails=fails+check(t054(), 3107);
+    mark(55); fails=fails+check(t055(), 43);
+    mark(56); fails=fails+check(t056(), 122);
+    mark(57); fails=fails+check(t057(), 2601);
+    mark(58); fails=fails+check(t058(), 1305);
+    mark(59); fails=fails+check(t059(), 399);
+    mark(60); fails=fails+check(t060(), 590);
+    mark(61); fails=fails+check(t061(), 4304);
+    mark(62); fails=fails+check(t062(), 4100);
 
     print_str("done"); putchar(10);
     return fails > 0;

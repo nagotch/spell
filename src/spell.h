@@ -161,6 +161,10 @@ typedef enum {
     ND_LAMBDA,
     ND_VCALL,
     ND_CAPVAR,
+    // 配列への append（step 65）。typecheck が配列型レシーバへの
+    // `append` メソッド呼び出しをこの組み込みノードへ書き換える。
+    // left_child = 代入可能な対象（スロット）、args = 追加する値（1個）
+    ND_APPEND,
 } NodeKind;
 typedef struct Node Node;
 struct Node {

@@ -274,8 +274,10 @@ static void register_gvar(Token* tok) {
 
 void register_array(int array_len) {
     register_any();
-    locals->array_len = array_len;
-    note_top_used(locals->offset, array_len);
+    // フレーム上のリテラルは、要素と長さに加えて容量（cap）の置き場所も
+    // 1スロット余分に取る（step 65: ブロックは [cap][len][要素...]）
+    locals->array_len = array_len + 1;
+    note_top_used(locals->offset, array_len + 1);
 }
 
 Node* create_ident_node(Token* tok) {

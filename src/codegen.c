@@ -213,18 +213,23 @@ static void gen_num(Node* node) {
 static void gen_array(Node* node) {
     if (node->array_len == 0) {
         // 空のリテラルはヒープに置く。フレーム上に置くと、関数を抜けた
-        // 後まで保持される場合（フィールドへの代入など）に壊れる
+        // 後まで保持される場合（フィールドへの代入など）に壊れる。
+        // ブロックは [cap][len][要素...]（step 65）。cap は要素0の
+        // 16バイト手前、len は 8バイト手前で、生成時は cap = len
         int label = new_label();
-        printf("  mov rdi, 8\n");
+        printf("  mov rdi, 16\n");
         emit_call(label, NULL, 6, "malloc");
         printf("  mov rcx, 0\n");
         printf("  mov [rax], rcx\n");
-        printf("  add rax, 8\n");
+        printf("  mov [rax+8], rcx\n");
+        printf("  add rax, 16\n");
         printf("  push rax\n");
         return;
     }
+    // 長さと容量（= 長さ）を、要素0から見て -8 と -16 の位置へ書く
     printf("  mov rax, %d\n", node->array_len);
     printf("  mov [rbp-%d], rax\n", node->offset + 8 * node->array_len);
+    printf("  mov [rbp-%d], rax\n", node->offset + 8 * (node->array_len + 1));
     Node* tail = node->body;
     for (int i = 0; tail; i++) {
         gen(tail);
@@ -243,6 +248,75 @@ static void gen_index(Node* node) {
     printf("  push rax\n");
 }
 
+// 配列への append（step 65）。新しい長さを push して戻る。
+// 評価順序は仕様で固定: 対象スロットのアドレスを1回だけ計算 → 値を
+// 評価 → スロットから現在の配列ポインタを読み直す。値を評価する間に
+// 同じスロットへ別の append が走っても、読み直しで新しいポインタと
+// 長さが見える。容量内なら共有ヘッダの長さを増やすだけで、別名からも
+// 伸びが見える。容量超過時は realloc を使わず（動くと別名が宙に浮く）、
+// 新しいブロックへコピーして対象スロットにだけ書き戻す。古いブロック
+// は解放しない（生成コードは全体にそういう方針）
+// レジスタ: rbx = スロットのアドレス、r12 = 追加する値、
+// r13 = 配列ポインタ、r14 = 長さ、r15 = 新しい容量（成長時）。
+// malloc の呼び出しをまたぐので、全部 callee-saved に置く
+static void gen_append(Node* node) {
+    gen_addr(node->left_child);
+    gen(node->args);
+    printf("  pop rdi\n");
+    printf("  pop rax\n");
+    printf("  push rbx\n");
+    printf("  push r12\n");
+    printf("  push r13\n");
+    printf("  push r14\n");
+    printf("  push r15\n");
+    printf("  mov rbx, rax\n");
+    printf("  mov r12, rdi\n");
+    printf("  mov r13, [rbx]\n");
+    printf("  mov r14, [r13-8]\n");
+    int label = new_label();
+    printf("  cmp r14, [r13-16]\n");
+    printf("  jb .Lappend_fast%d\n", label);
+    printf("  mov r15, [r13-16]\n");
+    printf("  add r15, r15\n");
+    printf("  cmp r15, 8\n");
+    printf("  jae .Lappend_cap%d\n", label);
+    printf("  mov r15, 8\n");
+    printf(".Lappend_cap%d:\n", label);
+    printf("  mov rdi, r15\n");
+    printf("  imul rdi, 8\n");
+    printf("  add rdi, 16\n");
+    emit_call(new_label(), NULL, 6, "malloc");
+    printf("  mov [rax], r15\n");
+    printf("  mov [rax+8], r14\n");
+    printf("  xor rcx, rcx\n");
+    printf(".Lappend_copy%d:\n", label);
+    printf("  cmp rcx, r14\n");
+    printf("  jae .Lappend_copied%d\n", label);
+    printf("  mov rdx, [r13+rcx*8]\n");
+    printf("  mov [rax+rcx*8+16], rdx\n");
+    printf("  inc rcx\n");
+    printf("  jmp .Lappend_copy%d\n", label);
+    printf(".Lappend_copied%d:\n", label);
+    printf("  mov [rax+r14*8+16], r12\n");
+    printf("  inc r14\n");
+    printf("  mov [rax+8], r14\n");
+    printf("  add rax, 16\n");
+    printf("  mov [rbx], rax\n");
+    printf("  jmp .Lappend_done%d\n", label);
+    printf(".Lappend_fast%d:\n", label);
+    printf("  mov [r13+r14*8], r12\n");
+    printf("  inc r14\n");
+    printf("  mov [r13-8], r14\n");
+    printf(".Lappend_done%d:\n", label);
+    printf("  mov rax, r14\n");
+    printf("  pop r15\n");
+    printf("  pop r14\n");
+    printf("  pop r13\n");
+    printf("  pop r12\n");
+    printf("  pop rbx\n");
+    printf("  push rax\n");
+}
+
 static void gen_len(Node* node) {
     gen(node->left_child);
     printf("  pop rax\n");
@@ -256,15 +330,17 @@ static void gen_newarray(Node* node) {
     gen(node->right_child);
     printf("  pop rax\n");
     printf("  push rax\n");
-    printf("  add rax, 1\n");
+    printf("  add rax, 2\n");
     printf("  imul rax, 8\n");
     printf("  mov rdi, rax\n");
     printf("  mov rdi, rax\n");
     emit_call(label, NULL, 6, "malloc");
     printf("  pop rcx\n");
+    // ブロックは [cap][len][要素...]（step 65）。生成時は cap = len
     printf("  mov [rax], rcx\n");
+    printf("  mov [rax+8], rcx\n");
     printf("  pop rsi\n");
-    printf("  add rax, 8\n");
+    printf("  add rax, 16\n");
     printf("  push rax\n");
     label = new_label();
     printf("  mov rdx, rax\n");
@@ -885,6 +961,7 @@ static void gen_push(Node* node) {
         case ND_LAMBDA: gen_lambda(node); break;
         case ND_VCALL: gen_vcall(node); break;
         case ND_ARRAY: gen_array(node); break;
+        case ND_APPEND: gen_append(node); break;
         case ND_INDEX: gen_index(node); break;
         case ND_LEN: gen_len(node); break;
         case ND_NEWARRAY: gen_newarray(node); break;
@@ -913,7 +990,8 @@ static void gen_push(Node* node) {
 //
 // 組み込みプリミティブの実体。到達可能なコードが使うプリミティブに
 // 対応するものだけを出す（step 63）。配列のレイアウトは
-// コンパイラが作るものと同一（要素の8バイト手前に長さ）で、[int] の
+// コンパイラが作るものと同一（要素の16バイト手前に容量、8バイト手前に
+// 長さ。生成時は cap = len）で、[int] の
 // 文字コード配列と int だけを相手にする。libc のデータシンボルには
 // 触らない（stderr へは fd 2 への write で出す）。一時バッファは
 // 解放しない（生成コードは全体にそういう方針）
@@ -980,26 +1058,28 @@ static void emit_rt_argv_chars() {
     printf(".Lrt_argv_alloc:\n");
     printf("  mov rdi, r12\n");
     printf("  imul rdi, 8\n");
-    printf("  add rdi, 8\n");
+    printf("  add rdi, 16\n");
     printf("  call malloc\n");
     printf("  mov r13, rax\n");
     printf("  mov [r13], r12\n");
+    printf("  mov [r13+8], r12\n");
     printf("  xor r14, r14\n");
     printf(".Lrt_argv_fill:\n");
     printf("  cmp r14, r12\n");
     printf("  jae .Lrt_argv_ret\n");
     printf("  movzx rcx, byte ptr [rbx+r14]\n");
-    printf("  mov [r13+r14*8+8], rcx\n");
+    printf("  mov [r13+r14*8+16], rcx\n");
     printf("  inc r14\n");
     printf("  jmp .Lrt_argv_fill\n");
     printf(".Lrt_argv_ret:\n");
-    printf("  lea rax, [r13+8]\n");
+    printf("  lea rax, [r13+16]\n");
     printf("  jmp .Lrt_argv_epilogue\n");
     printf(".Lrt_argv_empty:\n");
-    printf("  mov rdi, 8\n");
+    printf("  mov rdi, 16\n");
     printf("  call malloc\n");
     printf("  mov qword ptr [rax], 0\n");
-    printf("  add rax, 8\n");
+    printf("  mov qword ptr [rax+8], 0\n");
+    printf("  add rax, 16\n");
     printf(".Lrt_argv_epilogue:\n");
     printf("  pop r14\n");
     printf("  pop r13\n");
@@ -1070,29 +1150,31 @@ static void emit_rt_read_file_chars() {
     printf("  mov qword ptr [rip + __spell_io_status], 1\n");
     printf("  mov rdi, r12\n");
     printf("  imul rdi, 8\n");
-    printf("  add rdi, 8\n");
+    printf("  add rdi, 16\n");
     printf("  call malloc\n");
     printf("  mov [rax], r12\n");
+    printf("  mov [rax+8], r12\n");
     printf("  xor rcx, rcx\n");
     printf(".Lrt_read_fill:\n");
     printf("  cmp rcx, r12\n");
     printf("  jae .Lrt_read_ret\n");
     printf("  movzx rdx, byte ptr [rbx+rcx]\n");
-    printf("  mov [rax+rcx*8+8], rdx\n");
+    printf("  mov [rax+rcx*8+16], rdx\n");
     printf("  inc rcx\n");
     printf("  jmp .Lrt_read_fill\n");
     printf(".Lrt_read_ret:\n");
-    printf("  add rax, 8\n");
+    printf("  add rax, 16\n");
     printf("  jmp .Lrt_read_epilogue\n");
     printf(".Lrt_read_oom:\n");
     printf("  mov rdi, [rsp]\n");
     printf("  call fclose\n");
     printf(".Lrt_read_fail:\n");
     printf("  mov qword ptr [rip + __spell_io_status], 0\n");
-    printf("  mov rdi, 8\n");
+    printf("  mov rdi, 16\n");
     printf("  call malloc\n");
     printf("  mov qword ptr [rax], 0\n");
-    printf("  add rax, 8\n");
+    printf("  mov qword ptr [rax+8], 0\n");
+    printf("  add rax, 16\n");
     printf(".Lrt_read_epilogue:\n");
     printf("  add rsp, 24\n");
     printf("  pop r13\n");

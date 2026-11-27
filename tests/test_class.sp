@@ -693,6 +693,62 @@ def t057() {
     return dist[3 * 4 + 2];
 }
 
+// step 65: フィールドへの append、評価順序、ユーザークラスの append
+class AppBox {
+    a: [int];
+    def __init__(self) { self.a = [1; 1]; }
+}
+def t058() {
+    p = AppBox();
+    p.a.append(2);
+    p.a.append(3);
+    return p.a.len * 100 + p.a[1] * 10 + p.a[2];
+}
+
+class AppH {
+    a: [int];
+    def __init__(self) {
+        self.a = [0; 3];
+        self.a[0] = 1;
+        self.a[1] = 2;
+        self.a[2] = 3;
+    }
+    def g(self) -> int { self.a.append(100); return 7; }
+}
+def t059() {
+    h = AppH();
+    h.a.append(h.g());
+    return h.a.len * 10000 + h.a[3] * 10 + h.a[4];
+}
+
+class AppBag {
+    n: int;
+    def __init__(self) { self.n = 0; }
+    def append(self, v: int) -> int { self.n = self.n + v; return self.n; }
+}
+def t060() {
+    bag = AppBag();
+    r1 = bag.append(5);
+    r2 = bag.append(3);
+    return r1 * 100 + r2 * 10 + bag.n;
+}
+
+// ジェネリックなクラスの中でも、[T] フィールドへ append できる
+// （実体化したクローン側で要素型つきに検査される）
+class GBag<T> {
+    a: [T];
+    def __init__(self) { self.a = []; }
+    def add(self, v: T) { self.a.append(v); }
+    def get(self, i: int) -> T { return self.a[i]; }
+    def n(self) -> int { return self.a.len; }
+}
+def t061() {
+    b: GBag<int> = GBag();
+    b.add(5);
+    b.add(6);
+    return b.n() * 100 + b.get(0) * 10 + b.get(1);
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -757,6 +813,10 @@ def main() {
     mark(55); fails=fails+check(t055(), 1003);
     mark(56); fails=fails+check(t056(), 3621);
     mark(57); fails=fails+check(t057(), 5);
+    mark(58); fails=fails+check(t058(), 323);
+    mark(59); fails=fails+check(t059(), 51007);
+    mark(60); fails=fails+check(t060(), 588);
+    mark(61); fails=fails+check(t061(), 256);
 
     print_str("done"); putchar(10);
     return fails > 0;

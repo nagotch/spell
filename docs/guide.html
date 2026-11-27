@@ -309,6 +309,38 @@ put [7] * 3;</pre>
 </figure>
 
 <p>
+  配列は <code>append</code> で末尾へ要素を足して伸ばせます（Python の <code>list</code> と同じ感覚です）。
+  容量は倍々に広がるので、追加は均し定数時間です。戻り値は伸びた後の長さです。
+</p>
+
+<figure class="code">
+  <figcaption>例 — append</figcaption>
+<pre>a = [3, 1, 4];
+a.append(1);
+a.append(5);
+put a;
+put a.len;
+n = a.append(9);
+put n;
+put a;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3 1 4 1 5
+5
+6
+3 1 4 1 5 9</pre>
+</figure>
+
+<p class="note">
+  伸ばし方には1つ癖があります。容量に空きがある間は同じ置き場所が伸びるので、別名（<code>b = a</code>）や
+  関数の引数経由でも伸びが見えますが、容量がいっぱいで置き場所が付け替わったときは、付け替えた変数にだけ
+  伸びが伝わり、別名や呼び出し側は元の長さのままになります。要素の読み書きは常に従来どおり高速です。
+  対象は変数・フィールド・配列の要素だけで、<code>(a + b).append(x)</code> のような一時値へは使えません。
+</p>
+
+<p>
   文字列 <code>str</code> も同じ作りで、<code>+</code> で連結、<code>==</code> で比較、<code>.len</code> と <code>.rev</code> を持ちます。
   添字で取り出すと文字コード（<code>int</code>）が返ります。
 </p>
@@ -471,8 +503,8 @@ false</pre>
 
 <h3>Vec（伸びる配列）</h3>
 <p>
-  <code>Vec&lt;T&gt;</code> は末尾へ追加していける配列です。通常の配列は長さが作った時点で決まりますが、
-  <code>Vec</code> は <code>append</code> で伸びます（容量は倍々に広がるので、追加は均し定数時間です）。
+  <code>Vec&lt;T&gt;</code> は末尾へ追加していける配列です。通常の配列も <code>append</code> で伸ばせますが、
+  <code>Vec</code> は容量と論理長を分けて持つため、別名や引数経由でも伸びが常に見えます。
   生成には <code>Dict</code> と同じく既定値ファクトリを渡します。<code>len</code> と反復が見るのは論理長（容量ではありません）で、
   反復は開始時点のスナップショットをたどります。配列として取り出すには <code>to_array()</code> を使います。
 </p>
