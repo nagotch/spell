@@ -497,6 +497,40 @@ put s;</pre>
 8</pre>
 </figure>
 
+<h3>Deque（両端キュー）</h3>
+<p>
+  <code>Deque&lt;T&gt;</code> は両端から出し入れできるキューです。<code>push_back</code> と <code>pop_front</code> を使えば Queue、
+  <code>push_back</code> と <code>pop_back</code> を使えば Stack として使えます（幅優先探索のキューは前者です）。
+  中身は円環バッファで、両端の出し入れは容量の倍増を除いて定数時間です。
+  生成には <code>Vec</code> と同じく既定値ファクトリを渡します。添字は論理位置で、<code>q[0]</code> が先頭です。
+  <code>front()</code> と <code>back()</code> は取り出さずに両端を覗きます。反復は先頭から末尾へ、開始時点のスナップショットをたどります。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>q: Deque&lt;int&gt; = Deque(zero_int);
+q.push_back(1);
+q.push_back(2);
+q.push_front(0);
+put q.len;
+put q.pop_front();
+put q.pop_back();
+put q.front();</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3
+0
+2
+1</pre>
+</figure>
+
+<p class="note">
+  空のときに <code>pop_front</code>、<code>pop_back</code>、<code>front</code>、<code>back</code> を呼ぶのは誤りで、結果は不定です
+  （配列の範囲外アクセスと同じく、検査はしません）。
+</p>
+
 <h2 id="s11"><span class="no">11</span>入力</h2>
 <p>
   標準入力は代入の右辺で <code>in</code> と書きます。<code>in[n]</code> は整数を n 個読んで配列にし、
