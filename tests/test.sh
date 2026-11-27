@@ -117,6 +117,11 @@ error_tests=(
     "def f() -> [int] { return [1]; } def main() { f().append(1); return 0; }|の対象は変数・フィールド・配列の要素でなければなりません"
     "def main() { a = [1]; a.append(1, 2); return 0; }|\`append\`の引数は1個ですが、2個が指定されています"
     "def main() { a = [1]; a.append(1 < 2); return 0; }|\`append\`の引数には\`int\`が必要ですが、\`bool\`が指定されています"
+    # step 66: 矢印は dunder プロトコルへの書き換え。持たない型には使えない
+    "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { p = P(1); p <- 1; return 0; }|値に演算子\`<-\`は使えません"
+    "def main() { v: Vec<int> = Vec(zero_int); v <- 1; return 0; }|値に演算子\`<-\`は使えません"
+    "def main() { q: Deque<int> = Deque(zero_int); a = 1; a <- q <- 2; return 0; }|矢印演算子は連鎖できません"
+    "def main() { q: Deque<int> = Deque(zero_int); q <- 1; (1 + 2) <- q; return 0; }|代入先は変数・フィールド・配列の要素でなければなりません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -342,6 +347,49 @@ one_io_test "def main() { a = [1, 2, 3]; a.append(4); a.append(5); print(a); pri
 one_driver_test "def main() { ok = write_file(\"drv_data.txt\", \"ab\"); d = read_file(\"drv_data.txt\"); i = 0; while (i < 100) { d.text.chars.append(99); i = i + 1; } print(d.text.len); print(d.text[0]); print(d.text[101]); return 0; }" "102\n97\n99\n" "" 0
 # step 65: 読み取り失敗時に返る空配列（ヘルパの失敗経路）への append
 one_driver_test "def main() { d = read_file(\"drv_missing.txt\"); d.text.chars.append(65); print(d.text); print(d.text.len); return 0; }" "A\n1\n" "" 0
+# step 66: 矢印で書く BFS と、メソッド形との等価性
+one_io_test "def main() {
+    rows = [\"S..#\", \"##..\", \"...#\", \"..G.\"];
+    dist = [0 - 1; 16];
+    q: Deque<int> = Deque(zero_int);
+    dist[0] = 0;
+    q <- 0;
+    dr = [0 - 1, 1, 0, 0];
+    dc = [0, 0, 0 - 1, 1];
+    while (q.len > 0) {
+        cur <- q;
+        r = cur / 4;
+        c = cur % 4;
+        k = 0;
+        while (k < 4) {
+            nr = r + dr[k];
+            nc = c + dc[k];
+            if (0 <= nr && nr < 4 && 0 <= nc && nc < 4) {
+                if (rows[nr][nc] != 35 && dist[nr * 4 + nc] == 0 - 1) {
+                    dist[nr * 4 + nc] = dist[cur] + 1;
+                    q <- nr * 4 + nc;
+                }
+            }
+            k = k + 1;
+        }
+    }
+    print(dist[14]);
+    return 0;
+}" "" "5\n"
+one_io_test "def main() {
+    a: Deque<int> = Deque(zero_int);
+    b: Deque<int> = Deque(zero_int);
+    i = 0;
+    while (i < 10) { a <- i; b.push_back(i); i = i + 1; }
+    100 -> a; b.push_front(100);
+    a -> u; t = b.pop_back();
+    s = 0;
+    while (a.len > 0) { x <- a; y = b.pop_front(); s = s + x - y; }
+    print(s);
+    print(u + t);
+    print(a.len + b.len);
+    return 0;
+}" "" "0\n18\n0\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

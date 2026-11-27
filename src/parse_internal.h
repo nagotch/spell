@@ -26,3 +26,4 @@ extern int expr_depth;
 Node* parse_lambda(bool arrow, Token* kw);
 bool lambda_arrow_ahead();
 bool ident_is_value_call(Token* tok);
+bool ident_is_bound(Token* tok);

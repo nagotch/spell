@@ -558,6 +558,36 @@ put q.front();</pre>
 1</pre>
 </figure>
 
+<p>
+  矢印演算子でも出し入れできます。<code>q &lt;- x</code> は後ろへ入れる（<code>push_back</code>）、
+  <code>x &lt;- q</code> は前から取り出して代入する（<code>pop_front</code>）、
+  <code>x -&gt; q</code> は前へ入れる（<code>push_front</code>）、
+  <code>q -&gt; x</code> は後ろから取り出して代入する（<code>pop_back</code>）の形です。
+  実体は通常メソッドではなく、<code>__push_back__</code> などのダンダーメソッドへの書き換えで、
+  自作クラスがダンダーを定義すればそのクラスでも矢印が使えます。
+  なお両辺が <code>int</code> のときの <code>&lt;-</code> / <code>-&gt;</code> は矢印ではなく比較で、
+  <code>a &lt;- b</code> は <code>a &lt; -b</code>、<code>a -&gt; b</code> は <code>a &gt; -b</code> と同じ意味になります。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>q: Deque&lt;int&gt; = Deque(zero_int);
+q &lt;- 1;
+q &lt;- 2;
+0 -&gt; q;
+put q.pop_front();
+q -&gt; x;
+put x;
+put q.front();</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>0
+2
+1</pre>
+</figure>
+
 <p class="note">
   空のときに <code>pop_front</code>、<code>pop_back</code>、<code>front</code>、<code>back</code> を呼ぶのは誤りで、結果は不定です
   （配列の範囲外アクセスと同じく、検査はしません）。

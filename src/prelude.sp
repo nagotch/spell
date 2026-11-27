@@ -675,31 +675,53 @@ class Deque<T> {
         self.head = 0;
     }
 
-    def push_back(self, v: T) {
+    // 矢印演算子 `<-` / `->` の実体は、この dunder 群（step 66）。
+    // 演算子は通常メソッドを呼ばず dunder へ書き換えられる、という
+    // 言語の統一規則に従う。push 系は self を返す
+    def __push_back__(self, v: T) -> Deque<T> {
         if (self.n == self.buf.len) { self.grow(); }
         self.buf[(self.head + self.n) % self.buf.len] = v;
         self.n = self.n + 1;
+        return self;
     }
 
-    def push_front(self, v: T) {
+    def __push_front__(self, v: T) -> Deque<T> {
         if (self.n == self.buf.len) { self.grow(); }
         self.head = self.head - 1;
         if (self.head < 0) { self.head = self.buf.len - 1; }
         self.buf[self.head] = v;
         self.n = self.n + 1;
+        return self;
     }
 
-    def pop_back(self) -> T {
+    def __pop_back__(self) -> T {
         self.n = self.n - 1;
         return self.buf[(self.head + self.n) % self.buf.len];
     }
 
-    def pop_front(self) -> T {
+    def __pop_front__(self) -> T {
         v = self.buf[self.head];
         self.head = self.head + 1;
         if (self.head == self.buf.len) { self.head = 0; }
         self.n = self.n - 1;
         return v;
+    }
+
+    // 公開メソッドは dunder の薄いラッパー
+    def push_back(self, v: T) {
+        self.__push_back__(v);
+    }
+
+    def push_front(self, v: T) {
+        self.__push_front__(v);
+    }
+
+    def pop_back(self) -> T {
+        return self.__pop_back__();
+    }
+
+    def pop_front(self) -> T {
+        return self.__pop_front__();
     }
 
     def front(self) -> T {

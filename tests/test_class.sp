@@ -749,6 +749,160 @@ def t061() {
     return b.n() * 100 + b.get(0) * 10 + b.get(1);
 }
 
+// step 66: 矢印演算子は dunder プロトコルへの書き換え。
+// `q <- x` = __push_back__、`x <- q` = __pop_front__、
+// `x -> q` = __push_front__、`q -> x` = __pop_back__
+def t062() {
+    q: Deque<int> = Deque(zero_int);
+    q <- 1;
+    q <- 2;
+    0 -> q;
+    q <- 3;
+    a <- q;
+    q -> b;
+    return a * 1000 + b * 100 + q[0] * 10 + q.len;
+}
+
+def t063() {
+    // 矢印で書く幅優先探索（t057 と同じ迷路・同じ答え）
+    rows = ["S..#", "##..", "...#", "..G."];
+    dist = [0 - 1; 16];
+    q: Deque<int> = Deque(zero_int);
+    dist[0] = 0;
+    q <- 0;
+    dr = [0 - 1, 1, 0, 0];
+    dc = [0, 0, 0 - 1, 1];
+    while (q.len > 0) {
+        cur <- q;
+        r = cur / 4;
+        c = cur % 4;
+        k = 0;
+        while (k < 4) {
+            nr = r + dr[k];
+            nc = c + dc[k];
+            if (0 <= nr && nr < 4 && 0 <= nc && nc < 4) {
+                if (rows[nr][nc] != 35 && dist[nr * 4 + nc] == 0 - 1) {
+                    dist[nr * 4 + nc] = dist[cur] + 1;
+                    q <- nr * 4 + nc;
+                }
+            }
+            k = k + 1;
+        }
+    }
+    return dist[3 * 4 + 2];
+}
+
+def t064() {
+    // push 系の矢印の値はコンテナ自身（dunder が self を返す）
+    q: Deque<int> = Deque(zero_int);
+    r = (q <- 7);
+    s = (8 -> q);
+    ok = 0;
+    if (r == q && s == q) { ok = 1; }
+    return ok * 1000 + q[0] * 10 + q[1];
+}
+
+// dunder を自分で定義したクラスでも矢印が使える（プロトコルであって
+// Deque 専用の決め打ちではない）
+class ArrowSt {
+    a: [int];
+    n: int;
+    def __init__(self) { self.a = [0; 16]; self.n = 0; }
+    def __push_back__(self, v: int) -> ArrowSt {
+        self.a[self.n] = v;
+        self.n = self.n + 1;
+        return self;
+    }
+    def __pop_back__(self) -> int {
+        self.n = self.n - 1;
+        return self.a[self.n];
+    }
+    def __push_front__(self, v: int) -> ArrowSt {
+        i = self.n;
+        while (i > 0) { self.a[i] = self.a[i - 1]; i = i - 1; }
+        self.a[0] = v;
+        self.n = self.n + 1;
+        return self;
+    }
+    def __pop_front__(self) -> int {
+        v = self.a[0];
+        i = 0;
+        while (i + 1 < self.n) { self.a[i] = self.a[i + 1]; i = i + 1; }
+        self.n = self.n - 1;
+        return v;
+    }
+}
+def t065() {
+    s = ArrowSt();
+    s <- 1;
+    s <- 2;
+    0 -> s;
+    a <- s;
+    s -> b;
+    return a * 100 + b * 10 + s.n;
+}
+
+// pop の代入先: 配列の要素・フィールド・__setitem__ を持つクラスへの添字
+class ArrowArr {
+    a: [int];
+    def __init__(self) { self.a = [0; 3]; }
+    def __getitem__(self, i: int) -> int { return self.a[i]; }
+    def __setitem__(self, i: int, v: int) { self.a[i] = v; }
+}
+class ArrowHolder {
+    v: int;
+    def __init__(self) { self.v = 0; }
+}
+def t066() {
+    q: Deque<int> = Deque(zero_int);
+    q <- 10;
+    q <- 20;
+    q <- 30;
+    arr = [0, 0];
+    arr[1] <- q;
+    h = ArrowHolder();
+    h.v <- q;
+    aa = ArrowArr();
+    aa[2] <- q;
+    return arr[1] * 100 + h.v * 10 + aa[2];
+}
+
+def t067() {
+    // str の Deque でも矢印が使える
+    q: Deque<str> = Deque(zero_str);
+    q <- "b";
+    "a" -> q;
+    q <- "c";
+    x <- q;
+    q -> y;
+    s = x + q[0] + y;
+    if (s == "abc") { return 100 + q.len; }
+    return 0;
+}
+
+def t068() {
+    // コンテナが添字の先にある形（左辺が識別子でない矢印）
+    qa: Deque<int> = Deque(zero_int);
+    qb: Deque<int> = Deque(zero_int);
+    qs = [qa, qb];
+    qs[0] <- 11;
+    22 -> qs[1];
+    qs[0] -> w;
+    v <- qs[1];
+    return w * 100 + v;
+}
+
+def t069() {
+    // 矢印で両端から 100 個入れ（倍増と巻き戻しをまたぐ）、前から drain
+    q: Deque<int> = Deque(zero_int);
+    i = 0;
+    while (i < 50) { q <- i; i -> q; i = i + 1; }
+    first <- q;
+    s = 0;
+    while (q.len > 0) { v <- q; s = s + v; }
+    return first * 10000 + s;
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -817,6 +971,14 @@ def main() {
     mark(59); fails=fails+check(t059(), 51007);
     mark(60); fails=fails+check(t060(), 588);
     mark(61); fails=fails+check(t061(), 256);
+    mark(62); fails=fails+check(t062(), 312);
+    mark(63); fails=fails+check(t063(), 5);
+    mark(64); fails=fails+check(t064(), 1087);
+    mark(65); fails=fails+check(t065(), 21);
+    mark(66); fails=fails+check(t066(), 1230);
+    mark(67); fails=fails+check(t067(), 101);
+    mark(68); fails=fails+check(t068(), 1122);
+    mark(69); fails=fails+check(t069(), 492401);
 
     print_str("done"); putchar(10);
     return fails > 0;
