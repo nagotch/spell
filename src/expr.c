@@ -6,6 +6,11 @@ static Node* array_literal();
 // 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数なしなら NULL
 static bool suppress_multi = false;
 
+// for の頭の式（反復対象・回数）を読んでいる間は真。その位置では
+// 式の直後の `:` が suite の区切りと競合するため、型注釈の `:` は
+// 「型 = 」と続く場合だけ注釈として扱う（annotation_ahead）
+bool suppress_anno = false;
+
 int expr_depth = 0;
 
 // 深さ0で、次のトークンが前のトークンより後の行にあれば、式はそこで
@@ -429,6 +434,120 @@ static Node* range() {
     return call;
 }
 
+static bool sym_is(Token* t, const char* symbol) {
+    int len = (int)strlen(symbol);
+    return t && t->kind == TK_SYMBOL && t->len == len && !memcmp(symbol, t->str, t->len);
+}
+
+// 型の名前としてあり得るか（注釈かどうかの見分け専用。意味の検証は
+// 注釈として確定してから parse_type が行う）
+static bool type_name_known(Token* t) {
+    if (t->len == 3 && !memcmp(t->str, "int", 3)) {
+        return true;
+    }
+    if (find_class(t->str, t->len)) {
+        return true;
+    }
+    if (parsing_klass) {
+        for (int i = 0; i < parsing_klass->tparam_count; i++) {
+            if (parsing_klass->tparam_lens[i] == t->len && !memcmp(t->str, parsing_klass->tparams[i], t->len)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// トークン列だけを見て型を1つ読み飛ばし、直後のトークンを返す。
+// 型の形でなければ NULL。parse_type は破壊的（`>>` の書き換えや
+// エラーでの終了）なので、試し読みには使えない。型引数の中身は
+// 括弧の対応だけを見て読み飛ばす
+static Token* scan_type(Token* t) {
+    if (!t || t->kind == TK_EOF) {
+        return NULL;
+    }
+    if (t->kind == TK_KEYWORD && t->keyword == KW_FN) {
+        t = t->next;
+        if (!sym_is(t, "(")) {
+            return NULL;
+        }
+        t = t->next;
+        if (!sym_is(t, ")")) {
+            while (true) {
+                t = scan_type(t);
+                if (!t) {
+                    return NULL;
+                }
+                if (sym_is(t, ",")) {
+                    t = t->next;
+                    continue;
+                }
+                break;
+            }
+        }
+        if (!sym_is(t, ")")) {
+            return NULL;
+        }
+        t = t->next;
+        if (!sym_is(t, "->")) {
+            return NULL;
+        }
+        return scan_type(t->next);
+    }
+    if (sym_is(t, "[")) {
+        t = scan_type(t->next);
+        if (!t || !sym_is(t, "]")) {
+            return NULL;
+        }
+        return t->next;
+    }
+    if (t->kind != TK_IDENT || !type_name_known(t)) {
+        return NULL;
+    }
+    t = t->next;
+    if (sym_is(t, "<")) {
+        int depth = 0;
+        while (t && t->kind != TK_EOF) {
+            if (sym_is(t, "<")) {
+                depth++;
+                t = t->next;
+            } else if (sym_is(t, ">")) {
+                depth--;
+                t = t->next;
+                if (depth == 0) {
+                    return t;
+                }
+            } else if (sym_is(t, ">>")) {
+                depth -= 2;
+                t = t->next;
+                if (depth == 0) {
+                    return t;
+                }
+                if (depth < 0) {
+                    return NULL;
+                }
+            } else {
+                t = t->next;
+            }
+        }
+        return NULL;
+    }
+    return t;
+}
+
+// 現在のトークンの `:` が型注釈のものか。suite の `:` と競合する
+// 位置（suppress_anno）でのみ使う。`:` の後ろに「型 = 」が続く
+// 場合だけ注釈とみなす。型の名前が実在することも条件にするため、
+// suite の最初の文が `名前 = ...` という代入でも、その名前が
+// 型でなければ注釈と誤認しない
+static bool annotation_ahead() {
+    if (!sym_is(token, ":")) {
+        return false;
+    }
+    Token* after = scan_type(token->next);
+    return after && sym_is(after, "=");
+}
+
 static Node* assign() {
     if (lambda_arrow_ahead()) {
         return parse_lambda(true, token);
@@ -495,7 +614,7 @@ static Node* assign() {
         }
         return multi;
     }
-    if (consume(":")) {
+    if (suppress_anno ? annotation_ahead() && consume(":") : consume(":")) {
         Node* assign_node = create_node(ND_ASSIGN);
         node = bind_target_node(node);
         if (node->kind != ND_LVAR && node->kind != ND_GVAR) {

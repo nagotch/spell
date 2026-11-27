@@ -256,6 +256,42 @@ if len(diags) == 1:
     check("EOF・後ろの行: メッセージに「数値が必要ですが」",
           "数値が必要ですが" in diags[0]["message"], diags[0]["message"])
 
+# 5.10 colon 形式（step 67）: インデント形式のプログラムは診断ゼロ
+COLON_PROGRAM = (
+    "def main():\n"
+    "    x = 0\n"
+    "    if (x == 0):\n"
+    "        x = 42\n"
+    "    return x\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 11},
+                 "contentChanges": [{"text": COLON_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（colon 形式）: 診断ゼロ", diags == [], json.dumps(diags, ensure_ascii=False))
+
+# 5.11 dedent エラー（step 67）: どの段にも合わないインデントは、
+# そのトークンの位置に診断が出る
+DEDENT_PROGRAM = (
+    "def main():\n"
+    "    if (1 < 2):\n"
+    "        x = 1\n"
+    "      y = 2\n"
+    "    return 0\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 12},
+                 "contentChanges": [{"text": DEDENT_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（dedent エラー）: 診断1件", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 1:
+    r = diags[0]["range"]
+    check("dedent エラー: 範囲は y の位置（line=3, char=6-7）",
+          r["start"] == {"line": 3, "character": 6} and r["end"] == {"line": 3, "character": 7},
+          json.dumps(r))
+    check("dedent エラー: メッセージに「インデントが揃っていません」",
+          "インデントが揃っていません" in diags[0]["message"], diags[0]["message"])
+
 # 6. didClose: 空の診断が送られて消える
 send({"jsonrpc": "2.0", "method": "textDocument/didClose",
       "params": {"textDocument": {"uri": URI}}})

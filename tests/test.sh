@@ -114,6 +114,24 @@ error_tests=(
     "def main() { >> a,; return 0; }|数値が必要ですが、\`;\`が見つかりました"
     # step 65: append の対象はスロットを持つ場所だけ。一時値は書き戻せない
     "def main() { a = [1, 2]; (a + a).append(1); return 0; }|の対象は変数・フィールド・配列の要素でなければなりません"
+    # step 67: dedent がどの段にも合わない場合はエラー
+    "def main():
+    if (1 < 2):
+        x = 1
+      y = 2
+    return 0
+|インデントが揃っていません"
+    # step 67: 空の suite はエラー
+    "def main():|の後に文がありません"
+    # step 67: suite は頭の行より深くインデントしなければならない
+    "def main():
+return 0
+|インデントされたブロックが必要です"
+    # step 67: 空のクラス suite はエラー
+    "class P:
+def main():
+    return 0
+|インデントされたブロックが必要です"
     "def f() -> [int] { return [1]; } def main() { f().append(1); return 0; }|の対象は変数・フィールド・配列の要素でなければなりません"
     "def main() { a = [1]; a.append(1, 2); return 0; }|\`append\`の引数は1個ですが、2個が指定されています"
     "def main() { a = [1]; a.append(1 < 2); return 0; }|\`append\`の引数には\`int\`が必要ですが、\`bool\`が指定されています"
@@ -342,6 +360,169 @@ one_io_test "def main() { a = [1, 2, 3]; a.append(4); a.append(5); print(a); pri
 one_driver_test "def main() { ok = write_file(\"drv_data.txt\", \"ab\"); d = read_file(\"drv_data.txt\"); i = 0; while (i < 100) { d.text.chars.append(99); i = i + 1; } print(d.text.len); print(d.text[0]); print(d.text[101]); return 0; }" "102\n97\n99\n" "" 0
 # step 65: 読み取り失敗時に返る空配列（ヘルパの失敗経路）への append
 one_driver_test "def main() { d = read_file(\"drv_missing.txt\"); d.text.chars.append(65); print(d.text); print(d.text.len); return 0; }" "A\n1\n" "" 0
+# step 67: `:` ＋インデント形式（suite）。def / if-elif-else / while /
+# for / for...else を colon 形式で書いたプログラム
+one_io_test "def fib(n: int) -> int:
+    if (n < 2):
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+def main():
+    print(fib(10))
+    x = 0
+    while (x < 3):
+        print(x)
+        x = x + 1
+    for i in 3:
+        print(i * 10)
+    else:
+        print(999)
+    if (fib(5) == 5):
+        print(1)
+    elif (fib(5) == 6):
+        print(2)
+    else:
+        print(3)
+    return 0
+" "" "55\n0\n1\n2\n0\n10\n20\n999\n1\n"
+# step 67: class の colon 形式（フィールド＋メソッド、ジェネリクス）
+one_io_test "class Pt:
+    x: int
+    y: int
+    def __init__(self, x: int, y: int):
+        self.x = x
+        self.y = y
+    def sum(self) -> int:
+        return self.x + self.y
+
+class Box<T>:
+    v: T
+    def __init__(self, v: T):
+        self.v = v
+    def get(self) -> T:
+        return self.v
+
+def main():
+    p = Pt(3, 4)
+    print(p.sum())
+    b: Box<int> = Box(42)
+    print(b.get())
+    return 0
+" "" "7\n42\n"
+# step 67: 1行形 suite（def と if、class も）
+one_io_test "def one(): return 7
+
+class P: v: int; def get(self) -> int { return self.v; }
+
+def main():
+    print(one())
+    if (one() == 7): print(100)
+    if (one() == 9): print(200)
+    else: print(300)
+    p = P()
+    print(p.get())
+    return 0
+" "" "7\n100\n300\n0\n"
+# step 67: 混在（colon の中に {}、{} の中に colon、3段）
+one_io_test "def main() {
+    a = 0
+    if (a == 0):
+        b = 0
+        while (b < 3) {
+            if (b == 1):
+                a = a + 10
+            else {
+                a = a + 1
+            }
+            b = b + 1
+        }
+        a = a + 100
+    print(a)
+    return 0
+}" "" "112\n"
+# step 67: @ 系の colon 形式（i@n:、@:、@n:）
+one_io_test "def main():
+    s = 0
+    i@4:
+        s = s + i
+    print(s)
+    c = 0
+    @:
+        c = c + 1
+        if (c >= 3): !;
+    print(c)
+    t = 0
+    @3:
+        t = t + 2
+    print(t)
+    return 0
+" "" "6\n3\n6\n"
+# step 67: コメント行・空行を挟んだ suite と、式の継続行
+one_io_test "def main():
+    x = 0
+    if (x == 0):
+
+        // コメントだけの行
+        x = 5
+
+    print(x)
+    y = 1 +
+        2
+    print(y)
+    return 0
+" "" "5\n3\n"
+# step 67: 同一プログラムの {} 形と : 形で出力が一致すること（2本）
+one_io_test "def main() { s = 0; for i in 5 { if (i == 2) { s = s + 10; } else { s = s + i; } } print(s); return 0; }" "" "18\n"
+one_io_test "def main():
+    s = 0
+    for i in 5:
+        if (i == 2):
+            s = s + 10
+        else:
+            s = s + i
+    print(s)
+    return 0
+" "" "18\n"
+one_io_test "class Acc { n: int; def __init__(self) { self.n = 0; } def add(self, v: int) { self.n = self.n + v; } } def main() { a = Acc(); a.add(5); a.add(37); print(a.n); return 0; }" "" "42\n"
+one_io_test "class Acc:
+    n: int
+    def __init__(self):
+        self.n = 0
+    def add(self, v: int):
+        self.n = self.n + v
+
+def main():
+    a = Acc()
+    a.add(5)
+    a.add(37)
+    print(a.n)
+    return 0
+" "" "42\n"
+# step 67: トップレベルの colon 文と、注釈つき反復対象（colon 形でも
+# 注釈として読める。suite の最初の文が代入でも誤認しない）
+one_io_test "n = in
+s = 0
+for i in n:
+    s = s + i
+print(s)
+for i in x: [int] = [7, 8]:
+    print(i)
+for i in [1]:
+    z = 50
+    print(z)
+" "3\n" "3\n7\n8\n50\n"
+# step 67: for...else の colon 形式（break したら else は動かない）
+one_io_test "def main():
+    s = 0
+    for i in 5:
+        if (i == 2):
+            !;
+        s = s + i
+    else:
+        s = 999
+    print(s)
+    return 0
+" "" "1\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
