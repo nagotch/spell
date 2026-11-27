@@ -318,7 +318,7 @@ put z;</pre>
 <table>
   <tr><th>文</th><th>形</th><th>備考</th></tr>
   <tr><td>条件分岐</td><td><code>if 式 ブロック</code>、<code>elif</code>、<code>else</code></td><td>条件の括弧は任意（<code>if (式)</code> とも書ける）。<code>elif</code> は <code>else</code> の中の <code>if</code> と同じ</td></tr>
-  <tr><td>繰り返し</td><td><code>while (式) ブロック</code></td><td><code>while</code> に <code>else</code> は無い</td></tr>
+  <tr><td>繰り返し</td><td><code>while 式 ブロック</code></td><td>条件の括弧は任意。<code>while</code> に <code>else</code> は無い</td></tr>
   <tr><td>反復</td><td><code>for 変数 in 式 ブロック</code>、<code>for 式 ブロック</code>（回数）</td><td>反復プロトコルは <a href="#s10">§10</a>。<code>else</code> を付けると、<code>break</code> しなかったときだけ <code>else</code> 側が実行される（for...else）</td></tr>
   <tr><td>脱出</td><td><code>break;</code>、<code>continue;</code></td><td>糖衣として <code>!;</code>（break）と <code>^;</code>（continue）もある（<a href="sugar.html">糖衣集</a>）</td></tr>
   <tr><td>復帰</td><td><code>return 式;</code></td><td>式は必須（<code>return;</code> はエラー）</td></tr>
