@@ -745,6 +745,34 @@ static Type* check_member(Node* node) {
     return &ty_unknown;
 }
 
+// 配列への append（step 65）。prelude のメソッドではなく、型検査で
+// 組み込みノード ND_APPEND へ書き換える（メソッドでは呼び出し元の
+// 変数を付け替えられないため、exit の書き換えと同じ方式）。対象は
+// スロットを持つ場所（変数・捕捉変数・フィールド・配列の要素）だけに
+// 限る。計算された一時値への append は、書き戻す先が無いのでエラー。
+// 戻り値は新しい長さ（int）
+static Type* check_append(Node* node, Type* obj) {
+    Node* recv = node->left_child;
+    bool lvalue = recv->kind == ND_LVAR || recv->kind == ND_GVAR
+        || recv->kind == ND_CAPVAR || recv->kind == ND_INDEX
+        || (recv->kind == ND_MEMBER && !recv->func);
+    if (!lvalue) {
+        error_node(node, "`append`の対象は変数・フィールド・配列の要素でなければなりません");
+    }
+    Type* expected_list[6] = {};
+    expected_list[0] = obj->elem;
+    Type* arg_types[6];
+    int nargs = check_args_expected(node->args, arg_types, expected_list);
+    if (nargs != 1) {
+        error_node(node, "`append`の引数は1個ですが、%d個が指定されています", nargs);
+    } else if (arg_types[0]->kind != TY_UNKNOWN && obj->elem->kind != TY_UNKNOWN
+            && !type_equals(obj->elem, arg_types[0])) {
+        error_node(node, "`append`の引数には`%s`が必要ですが、`%s`が指定されています", type_text(obj->elem), type_text(arg_types[0]));
+    }
+    node->kind = ND_APPEND;
+    return &ty_int;
+}
+
 static Type* check_mcall(Node* node) {
     Type* obj = check_node(node->left_child);
     if (node->len == 3 && !memcmp(node->name, "len", 3) && (obj->kind == TY_ARRAY || obj->kind == TY_UNKNOWN)) {
@@ -760,6 +788,9 @@ static Type* check_mcall(Node* node) {
         Type* arg_types[6];
         check_args(node->args, arg_types);
         return &ty_unknown;
+    }
+    if (obj->kind == TY_ARRAY && node->len == 6 && !memcmp(node->name, "append", 6)) {
+        return check_append(node, obj);
     }
     Class* klass = class_of(obj);
     if (!klass) {
@@ -1436,6 +1467,13 @@ static Type* check_node(Node* node) {
             break;
         case ND_MEMBER:
             result = check_member(node);
+            break;
+        case ND_APPEND:
+            // 通常は check_mcall の書き換えで生まれ、ここへは来ない。
+            // 再検査の経路でも壊れないよう、子だけ検査して int とする
+            check_node(node->left_child);
+            check_node(node->args);
+            result = &ty_int;
             break;
         case ND_MCALL:
             result = check_mcall(node);
