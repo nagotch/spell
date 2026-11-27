@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>リファレンス — spell</title>
-<meta name="description" content="spell の演算子、糖衣構文、組み込み型とメソッド、入出力の形の一覧です。">
+<meta name="description" content="spell の値と型、演算子、文、組み込み型とメソッド、ダンダープロトコル、入出力の全機能リファレンスです。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -19,6 +19,7 @@
     <a href="index.html">概要</a>
     <a href="guide.html">言語ツアー</a>
     <a href="reference.html" class="here">リファレンス</a>
+    <a href="sugar.html">糖衣集</a>
     <a href="editor.html">エディタ連携</a>
     <a href="https://github.com/nagotch/spell">GitHub</a>
   </nav>
@@ -28,18 +29,28 @@
 <aside class="side">
   <p class="side-h">このページ</p>
   <ul class="side-list">
-    <li><a href="#s01">演算子</a></li>
-    <li><a href="#s02">糖衣構文と正規形</a></li>
-    <li><a href="#s03">組み込み型とメソッド</a></li>
-    <li><a href="#s04">入出力の形</a></li>
-    <li><a href="#s05">キーワード</a></li>
-    <li><a href="#s06">型注釈を書ける場所</a></li>
+    <li><a href="#s01">値とリテラル</a></li>
+    <li><a href="#s02">演算子と優先順位</a></li>
+    <li><a href="#s03">変数・代入・スコープ</a></li>
+    <li><a href="#s04">文とブロック</a></li>
+    <li><a href="#s05">関数</a></li>
+    <li><a href="#s06">関数値とラムダ</a></li>
+    <li><a href="#s07">クラス</a></li>
+    <li><a href="#s08">ジェネリクス</a></li>
+    <li><a href="#s09">組み込み型（基本）</a></li>
+    <li><a href="#s10">範囲と反復プロトコル</a></li>
+    <li><a href="#s11">コレクション</a></li>
+    <li><a href="#s12">ダンダープロトコル一覧</a></li>
+    <li><a href="#s13">入出力</a></li>
+    <li><a href="#s14">キーワードと型注釈</a></li>
+    <li><a href="#s15">約束事と不定な振る舞い</a></li>
   </ul>
   <p class="side-h">ドキュメント</p>
   <ul class="side-list">
     <li><a href="index.html">概要</a></li>
     <li><a href="guide.html">言語ツアー</a></li>
     <li><a href="reference.html" class="here">リファレンス</a></li>
+    <li><a href="sugar.html">糖衣集</a></li>
     <li><a href="editor.html">エディタ連携</a></li>
     <li><a href="https://github.com/nagotch/spell/blob/main/docs/language-design.md">設計メモ</a></li>
   </ul>
@@ -48,118 +59,920 @@
 
 <h1 class="page">リファレンス</h1>
 <p class="lede">
-  演算子と糖衣構文、prelude が用意する型とメソッド、入出力の形の一覧です。
+  spell の全機能の一覧です。値と型、演算子、文、prelude が用意する型とメソッド、
+  ダンダープロトコル、入出力の形を、実装に即してまとめます。
   振る舞いの大半は prelude のクラス定義で決まります。迷ったら
   <a href="https://github.com/nagotch/spell/blob/main/src/prelude.sp">prelude.sp</a> が正本です。
+  記号糖衣だけを集めた一覧は<a href="sugar.html">糖衣集</a>にあります（各節でも、その機能に属する糖衣はあわせて紹介します）。
 </p>
 
-<h2 id="s01"><span class="no">01</span>演算子</h2>
+<h2 id="s01"><span class="no">01</span>値とリテラル</h2>
+
+<h3>組み込みの型</h3>
+<table>
+  <tr><th>型</th><th>内容</th><th>備考</th></tr>
+  <tr><td><code>int</code></td><td>64ビット符号つき整数</td><td>オーバーフローは2の補数で巻き戻る</td></tr>
+  <tr><td><code>bool</code></td><td>真偽値</td><td>リテラルは無い。比較や論理演算が作る（後述）</td></tr>
+  <tr><td><code>str</code></td><td>文字列</td><td>中身は文字コード（<code>int</code>）の配列</td></tr>
+  <tr><td><code>[T]</code></td><td>配列</td><td>要素はすべて同じ型 <code>T</code></td></tr>
+  <tr><td><code>Range</code></td><td>範囲 <code>a..b</code> の値</td><td>反復専用に近い。文字列化はできない</td></tr>
+  <tr><td><code>fn(A) -&gt; B</code></td><td>関数値</td><td>関数名そのもの、またはラムダ</td></tr>
+  <tr><td>ユーザークラス</td><td><code>class</code> で定義した型</td><td>ジェネリクス（型パラメータ最大4つ）対応</td></tr>
+</table>
+
+<h3>整数リテラル</h3>
+<p>
+  10進数だけです（<code>0x10</code> のような16進表記はありません）。
+  そのまま書けるのは、絶対値が <code>2147483647</code> 以下のリテラルです。
+  それより大きな値は、リテラル同士の演算で組み立ててください（値は64ビットなので、演算結果は大きくできます）。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>put 2147483647;
+x = 1000000 * 1000000;
+put x;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2147483647
+1000000000000</pre>
+</figure>
+
+<h3>bool 値</h3>
+<p>
+  <code>true</code> / <code>false</code> というリテラルはありません。<code>bool</code> 値は比較や論理演算の結果として得ます
+  （確実に真が欲しいときは <code>1 == 1</code>、偽は <code>1 == 0</code> と書きます）。
+  表示すると <code>true</code> / <code>false</code> になります。
+  条件式は <code>bool</code> で書くのが基本ですが、判定は「0でないか」で行われるため、
+  <code>int</code>（0が偽、それ以外が真）や参照型の値もそのまま条件に使えます。
+</p>
+
+<h3>文字列リテラル</h3>
+<p>
+  <code>"..."</code> で囲みます。エスケープは <code>\n</code>（改行）、<code>\t</code>（タブ）、<code>\\</code>、<code>\"</code>、<code>\0</code> だけが特別で、
+  それ以外の <code>\x</code> は <code>x</code> そのものになります（たとえば <code>\r</code> は復帰コードではなく文字 <code>r</code> です）。
+  文字列は改行をまたげません。1文字だけの文字リテラルはありません（文字は <code>str</code> の添字が返す <code>int</code> の文字コードで扱います）。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>s = "a\tb\nc";
+put s;
+put "q\"q";
+put "a\rb";</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>a	b
+c
+q"q
+arb</pre>
+</figure>
+
+<h3>配列リテラル</h3>
+<table>
+  <tr><th>形</th><th>意味</th></tr>
+  <tr><td><code>[1, 2, 3]</code></td><td>要素を並べた配列。要素の型はすべて同じでなければならない（混ぜるとエラー）</td></tr>
+  <tr><td><code>[値; 長さ]</code></td><td>同じ値で埋めた、実行時に決まる長さの配列</td></tr>
+  <tr><td><code>[]</code></td><td>空配列。要素の型は注釈や代入先から決まる</td></tr>
+  <tr><td><code>[[1, 2], [3]]</code></td><td>配列の配列（<code>[[int]]</code>）</td></tr>
+</table>
+
+<h2 id="s02"><span class="no">02</span>演算子と優先順位</h2>
 
 <table>
   <tr><th>分類</th><th>演算子</th><th>備考</th></tr>
-  <tr><td>算術</td><td><code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code></td><td><code>/</code> と <code>%</code> は床除算（Python 式）。型ごとの意味はダンダーメソッドで定義される</td></tr>
-  <tr><td>比較</td><td><code>==</code> <code>!=</code> <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>連鎖できる（<code>0 &lt; x &lt; 10</code>）。配列に <code>&lt;</code> 系はない</td></tr>
-  <tr><td>論理</td><td><code>&amp;&amp;</code> <code>||</code> <code>!</code></td><td>短絡評価</td></tr>
-  <tr><td>代入</td><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code></td><td>複数代入 <code>a, b = b, a</code> も可。右辺を先に全部評価する</td></tr>
-  <tr><td>増減</td><td><code>++</code> <code>--</code></td><td>後置のみ</td></tr>
-  <tr><td>範囲</td><td><code>..</code> <code>..=</code></td><td><code>a..b</code> は半開、<code>a..=b</code> は終端を含む。降順も可</td></tr>
+  <tr><td>算術</td><td><code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code></td><td><code>/</code> は床除算、<code>%</code> は除数と同じ符号の剰余（Python 式）。型ごとの意味はダンダーメソッドで定義される</td></tr>
+  <tr><td>比較</td><td><code>==</code> <code>!=</code> <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>連鎖できる（<code>0 &lt; x &lt; 10</code>）。中間の値は1回だけ評価される。配列と <code>str</code> に <code>&lt;</code> 系はない</td></tr>
+  <tr><td>論理</td><td><code>&amp;&amp;</code> <code>||</code> <code>!</code></td><td><code>&amp;&amp;</code> と <code>||</code> は短絡評価。<code>!</code> は否定</td></tr>
+  <tr><td>代入</td><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code></td><td>代入は式で、値は代入した値。<code>a = b = 3</code> とつなげられる。複数代入 <code>a, b = b, a</code> も可</td></tr>
+  <tr><td>増減</td><td><code>++</code> <code>--</code></td><td>後置のみ。<code>x++</code> は <code>x += 1</code> と同じで、式の値は代入後の値</td></tr>
+  <tr><td>範囲</td><td><code>..</code> <code>..=</code></td><td><code>a..b</code> は半開、<code>a..=b</code> は終端を含む。降順も可（<a href="#s10">§10</a>）</td></tr>
   <tr><td>添字・メンバ</td><td><code>a[i]</code> <code>a.x</code> <code>a.m()</code></td><td>添字は <code>__getitem__</code> / <code>__setitem__</code> へ展開。0引数メソッドは括弧を省略できる</td></tr>
-  <tr><td>関数値</td><td><code>x -&gt; 式</code>、<code>fn(...) { }</code></td><td>矢印形は式1つの無名関数。<code>fn</code> 形は本体がブロック</td></tr>
-  <tr><td>矢印</td><td><code>&lt;-</code> <code>-&gt;</code></td><td>型で解決される。<code>q &lt;- x</code> は <code>q.__push_back__(x)</code>、<code>x &lt;- q</code> は <code>x = q.__pop_front__()</code>、<code>x -&gt; q</code> は <code>q.__push_front__(x)</code>、<code>q -&gt; x</code> は <code>x = q.__pop_back__()</code>。両辺が <code>int</code> なら比較（<code>a &lt;- b</code> は <code>a &lt; -b</code>、<code>a -&gt; b</code> は <code>a &gt; -b</code>）。連鎖はエラー</td></tr>
+  <tr><td>矢印</td><td><code>&lt;-</code> <code>-&gt;</code></td><td>型で解決される（下記）。連鎖はエラー</td></tr>
+  <tr><td>関数値</td><td><code>x -&gt; 式</code>、<code>fn(...) { }</code></td><td>矢印形は式1つの無名関数。<code>fn</code> 形は本体がブロック（<a href="#s06">§06</a>）</td></tr>
 </table>
 
-<h2 id="s02"><span class="no">02</span>糖衣構文と正規形</h2>
+<figure class="code">
+  <figcaption>例 — 除算・剰余と比較の連鎖</figcaption>
+<pre>put 7 / 2, -7 / 2, 7 / -2, -7 % 2, 7 % -2;
+x = 5;
+put 0 &lt; x &lt; 10, 0 &lt; x &lt; 5, 10 &gt; x &gt; 0;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3 -4 -4 1 -1
+true false true</pre>
+</figure>
+
+<h3>矢印演算子 <code>&lt;-</code> / <code>-&gt;</code></h3>
 <p>
-  記号形はすべて、通常の構文への書き換えとして定義されています。
+  オペランドの型で意味が決まります。解決順は次のとおりです。
+</p>
+<table>
+  <tr><th>形</th><th>1.</th><th>2.</th><th>3.</th></tr>
+  <tr><td><code>A &lt;- B</code></td><td><code>A.__push_back__(B)</code></td><td><code>A = B.__pop_front__()</code></td><td rowspan="2">両辺が <code>int</code> なら比較</td></tr>
+  <tr><td><code>A -&gt; B</code></td><td><code>B.__push_front__(A)</code></td><td><code>B = A.__pop_back__()</code></td></tr>
+</table>
+<p>
+  比較として解決される場合、<code>a &lt;- b</code> は <code>a &lt; -b</code>、<code>a -&gt; b</code> は <code>a &gt; -b</code> と同じです
+  （符号反転される側は1回だけ評価されます）。pop 側の代入先は、通常の代入先と同じ形（変数・添字・フィールド）が使え、新しい変数への束縛もできます。
+  演算子は通常メソッドを直接呼ばず、ダンダーへだけ展開されます（<a href="#s12">§12</a>）。
+  <code>-&gt;</code> はラムダの矢印と字面が重なりますが、左辺の名前が束縛済みなら矢印演算子、未束縛ならラムダの引数名として解決されます（<a href="#s06">§06</a>）。
 </p>
 
+<figure class="code">
+  <figcaption>例 — int 同士の矢印は比較</figcaption>
+<pre>a = 3;
+b = 5;
+put a &lt;- b, a -&gt; b, a &lt; -b, a &gt; -b;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>false true false true</pre>
+</figure>
+
+<h3>優先順位</h3>
+<p>高い順に並べます。</p>
 <table>
-  <tr><th>記号形</th><th>正規形・意味</th></tr>
-  <tr><td><code>&lt;&lt; x;</code>、文頭の <code>&lt; x;</code></td><td><code>x</code> を文字列化して1行で出す</td></tr>
-  <tr><td><code>&gt;&gt; x;</code>、<code>&gt;&gt; x, y, z;</code></td><td><code>x = in;</code>（整数を読んで代入。複数並べると左から順に1つずつ読む。添字やフィールドも対象にできる）</td></tr>
-  <tr><td><code>i@n { }</code></td><td><code>for i in n { }</code>（0 から n−1）</td></tr>
-  <tr><td><code>i@a..b { }</code></td><td><code>for i in a..b { }</code></td></tr>
-  <tr><td><code>x@a { }</code></td><td><code>for x in a { }</code>（要素の走査）</td></tr>
-  <tr><td><code>@n { }</code></td><td>変数なしで n 回繰り返す</td></tr>
-  <tr><td><code>@ { }</code></td><td><code>while true { }</code>（無限ループ。<code>!;</code> で抜ける）</td></tr>
-  <tr><td><code>!;</code></td><td><code>break;</code></td></tr>
-  <tr><td><code>^;</code></td><td><code>continue;</code></td></tr>
-  <tr><td><code>a- = in[n];</code></td><td>整数を n 個読み、各要素から1引いた配列を代入する</td></tr>
-  <tr><td><code>x.rev</code></td><td>範囲・配列・文字列の逆順（コピーを返す）</td></tr>
+  <tr><th>順位</th><th>演算子</th></tr>
+  <tr><td>1</td><td>後置: 呼び出し <code>()</code>、添字 <code>[]</code>、メンバ <code>.</code>、<code>++</code> <code>--</code></td></tr>
+  <tr><td>2</td><td>単項: <code>-</code> <code>+</code> <code>!</code></td></tr>
+  <tr><td>3</td><td><code>*</code> <code>/</code> <code>%</code></td></tr>
+  <tr><td>4</td><td><code>+</code> <code>-</code></td></tr>
+  <tr><td>5</td><td>関係: <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code>（連鎖可）</td></tr>
+  <tr><td>6</td><td>等値: <code>==</code> <code>!=</code>（連鎖可）</td></tr>
+  <tr><td>7</td><td><code>&amp;&amp;</code></td></tr>
+  <tr><td>8</td><td><code>||</code></td></tr>
+  <tr><td>9</td><td>範囲: <code>..</code> <code>..=</code></td></tr>
+  <tr><td>10</td><td>代入・複合代入・複数代入・矢印・型注釈つき代入（右結合）</td></tr>
 </table>
 
-<h2 id="s03"><span class="no">03</span>組み込み型とメソッド</h2>
+<h2 id="s03"><span class="no">03</span>変数・代入・スコープ</h2>
 <p>
-  起動時に読み込まれる prelude が定義する型です。メソッドのうち引数を取らないものは、
-  呼び出しの括弧を省略できます（例: <code>a.len</code>）。
+  変数は代入で生まれます。型は代入した値から推論され、<code>x: int = 5</code> のように注釈で縛ることもできます。
+  一度決まった型と違う型の値を代入するとエラーになります。
+  スコープは関数単位でフラットです（ブロックで区切られません）。
+  トップレベルでの代入はグローバル変数を作り、関数の中から読み書きできます。
+  関数の中の代入は、同名のグローバルがあればそのグローバルへ、なければ新しいローカル変数へ行われます。
 </p>
-
-<table>
-  <tr><th>型</th><th>持つ操作</th><th>備考</th></tr>
-  <tr><td><code>int</code></td><td>四則演算、比較、<code>__hash__</code>、反復（<code>for i in n</code>）</td><td>64ビット整数</td></tr>
-  <tr><td><code>bool</code></td><td><code>__hash__</code>、文字列化（<code>true</code> / <code>false</code>）</td><td>条件式の型</td></tr>
-  <tr><td><code>str</code></td><td><code>+</code> 連結、<code>==</code> / <code>!=</code>、<code>len</code>、<code>rev</code>、添字（文字コードを返す）、反復、<code>__hash__</code></td><td>中身は文字コードの配列</td></tr>
-  <tr><td><code>[T]</code>（array）</td><td><code>+</code> 連結、<code>*</code> 繰り返し、<code>==</code> / <code>!=</code>（中身の比較）、<code>len</code>、<code>rev</code>、添字、反復、<code>__hash__</code></td><td><code>[値; 長さ]</code> で埋めて作れる</td></tr>
-  <tr><td><code>Range</code></td><td>反復、<code>rev</code></td><td><code>a..b</code> / <code>a..=b</code> の値</td></tr>
-  <tr><td><code>Dict&lt;K, V&gt;</code></td><td><code>d[k]</code> 読み（無ければ既定値を生やす）、<code>d[k] = v</code> 書き、<code>has(k)</code>、<code>len</code>、<code>keys()</code>、キー列挙の反復</td><td>構築時に既定値ファクトリを渡す。キーには <code>__hash__</code> が要る</td></tr>
-  <tr><td><code>Vec&lt;T&gt;</code></td><td><code>append(v)</code>、<code>len</code>、添字の読み書き、反復、<code>to_array()</code></td><td>伸びる配列。構築時に既定値ファクトリを渡す。反復はスナップショット</td></tr>
-  <tr><td><code>Deque&lt;T&gt;</code></td><td><code>push_back(v)</code>、<code>push_front(v)</code>、<code>pop_back()</code>、<code>pop_front()</code>、<code>front()</code>、<code>back()</code>、<code>len</code>、添字（0 が先頭）、反復</td><td>両端キュー。構築時に既定値ファクトリを渡す。空への <code>pop</code> は結果不定。反復はスナップショット。出し入れの実体は <code>__push_back__</code> 等のダンダーで、公開メソッドはそのラッパー。矢印演算子 <code>&lt;-</code> / <code>-&gt;</code> でも出し入れできる</td></tr>
-  <tr><td><code>FileData</code></td><td>フィールド <code>ok</code>（bool）、<code>text</code>（str）</td><td><code>read_file</code> の戻り値。読めなかったときは <code>ok</code> が偽になる</td></tr>
-  <tr><td><code>fn(A) -&gt; B</code></td><td>呼び出し</td><td>関数値の型。外側の変数は値で捕捉する</td></tr>
-</table>
-
+<p>
+  代入は式であり、値は代入した値です。複数代入 <code>a, b = 値1, 値2</code> は、値を全部評価してから代入するので、交換がそのまま書けます。
+  複合代入 <code>x += e</code> は <code>x = x + e</code> と同じですが、代入先が添字の場合は添字式が2回評価されます（副作用のある添字式には注意してください）。
+</p>
 <p class="note">
-  既定値ファクトリとして <code>zero_int</code>、<code>zero_bool</code>、<code>zero_str</code> が用意されています。
-  自作クラスが <code>__hash__</code> と <code>__eq__</code> を持てば、辞書のキーにも使えます。
+  未束縛の名前を読むとエラーにはならず、未初期化の変数として扱われます（値は不定）。
+  名前の書き間違いが実行時まで残ることがあるので、束縛は代入で明示するのが安全です。
 </p>
 
-<h2 id="s04"><span class="no">04</span>入出力の形</h2>
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>p, q = 1, 2;
+p, q = q, p;
+put p, q;
+a = b = 3;
+put a, b;
+x: int = 5;
+s: str = "hi";
+arr: [int] = [1, 2];
+put x, s, arr;</pre>
+</figure>
 
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2 1
+3 3
+5 hi 1 2</pre>
+</figure>
+
+<h2 id="s04"><span class="no">04</span>文とブロック</h2>
+
+<h3>ブロックの2形式</h3>
+<p>
+  ブロックは <code>{ }</code> 形式と、<code>:</code> ＋インデント形式のどちらでも書け、ブロックごとに独立に選べます（同じファイル・同じ入れ子で混ぜても構いません）。
+  <code>:</code> 形式では、インデントが戻ったところでブロックが終わります。<code>:</code> の同じ行に文を1つ書く1行形も使えます。
+  空の <code>:</code> ブロック（文が1つもないもの）はエラーです（<code>{ }</code> の空ブロックは可）。
+  インデントは空白1つが1列、タブは次の8の倍数の列まで進めて数えます。空行とコメントだけの行は判定に使われません。
+  どの段にも合わない位置への dedent はエラーになります。
+  対象は <code>def</code> / <code>class</code> / <code>if</code> / <code>elif</code> / <code>else</code> / <code>while</code> / <code>for</code> と <code>@</code> 系の糖衣で、ラムダ <code>fn</code> の本体だけは <code>{ }</code> のみです。
+</p>
+
+<figure class="code">
+  <figcaption>例 — <code>:</code> 形式</figcaption>
+<pre>def fact(n: int) -&gt; int:
+    if (n == 0):
+        return 1
+    return n * fact(n - 1)
+put fact(5)
+i = 0
+while (i &lt; 3):
+    i = i + 1
+put i
+if (1 &lt; 2): put 5</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>120
+3
+5</pre>
+</figure>
+
+<h3>文の終わりと改行</h3>
+<p>
+  文は <code>;</code> で終えますが、<code>;</code> は省略できます。その場合、文の終わりは改行でなければなりません
+  （同じ行に文を続けるには <code>;</code> が要ります）。ブロック <code>{ }</code> の直後はどちらも要りません。余分な <code>;</code>（空文）は読み飛ばされます。
+  式の途中での改行は、括弧・角括弧の中では自由です。演算子の直後なら被演算子を次の行に置けますが、行末で式が完結していると、次の行は新しい文として読まれます。
+  コメントは <code>//</code>（行末まで）と <code>/* */</code>（複数行可、入れ子不可）が使えます。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>// 行コメント
+/* 複数行
+   コメント */
+a = 1; b = 2; put a + b;
+x = 1 +
+    2;
+put x;
+z = [
+    1,
+    2
+];
+put z;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3
+3
+1 2</pre>
+</figure>
+
+<h3>分岐とループ</h3>
+<table>
+  <tr><th>文</th><th>形</th><th>備考</th></tr>
+  <tr><td>条件分岐</td><td><code>if (式) ブロック</code>、<code>elif</code>、<code>else</code></td><td>条件の括弧は必須。<code>elif</code> は <code>else</code> の中の <code>if</code> と同じ</td></tr>
+  <tr><td>繰り返し</td><td><code>while (式) ブロック</code></td><td><code>while</code> に <code>else</code> は無い</td></tr>
+  <tr><td>反復</td><td><code>for 変数 in 式 ブロック</code>、<code>for 式 ブロック</code>（回数）</td><td>反復プロトコルは <a href="#s10">§10</a>。<code>else</code> を付けると、<code>break</code> しなかったときだけ <code>else</code> 側が実行される（for...else）</td></tr>
+  <tr><td>脱出</td><td><code>break;</code>、<code>continue;</code></td><td>糖衣として <code>!;</code>（break）と <code>^;</code>（continue）もある（<a href="sugar.html">糖衣集</a>）</td></tr>
+  <tr><td>復帰</td><td><code>return 式;</code></td><td>式は必須（<code>return;</code> はエラー）</td></tr>
+</table>
+
+<figure class="code">
+  <figcaption>例 — for...else</figcaption>
+<pre>for i in 0 {
+    put 999;
+} else {
+    put 7;
+}
+for i in 3 {
+    if (i == 1) { break; }
+} else {
+    put 8;
+}
+put 10;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>7
+10</pre>
+</figure>
+
+<h2 id="s05"><span class="no">05</span>関数</h2>
+<p>
+  <code>def 名前(引数, ...) -&gt; 戻り値の型 ブロック</code> で定義します。引数は最大6つです。
+  引数と戻り値の型注釈は省略でき、戻り値の型は <code>return</code> 文から推論されます。
+  ただし、推論が済む前の位置（トップレベルの文など）から呼ぶと、戻り値は型不明の値として扱われ、
+  <code>put</code> のような型の要る操作には直接渡せません。使い回す関数には戻り値の注釈を付けるのが確実です。
+  再帰も使えます。本体の末尾まで落ちた関数の戻り値は不定です（文として呼ぶだけの関数では問題になりません）。
+</p>
+<p>
+  プログラムはトップレベルに文を並べるだけで書けます。文は上から順に実行されます。
+  <code>def main()</code> がある場合は、トップレベルの文が先に実行されてから <code>main</code> が呼ばれ、
+  <code>main</code> の戻り値がプロセスの終了コードになります（末尾まで落ちた場合は 0）。
+  <code>main</code> が無ければ、トップレベルの文そのものがプログラムで、終了コードは 0 です。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>def fib(n: int) -&gt; int {
+    if (n &lt; 2) { return n; }
+    return fib(n - 1) + fib(n - 2);
+}
+put fib(10);
+g = 10;
+def getg() -&gt; int { return g; }
+def setg(v: int) { g = v; }
+put getg();
+setg(33);
+put getg();
+def main() -&gt; int {
+    put 100;
+    return 7;
+}</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力（終了コードは 7）</figcaption>
+<pre>55
+10
+33
+100</pre>
+</figure>
+
+<h2 id="s06"><span class="no">06</span>関数値とラムダ</h2>
+<p>
+  関数は値として扱えます。関数名をそのまま書くと関数値になり、型は <code>fn(引数の型) -&gt; 戻り値の型</code> です。
+  関数値の呼び出しは通常の呼び出しと同じ字面です。メソッドを値として取り出すことはできません（必要な場合はラムダで包みます）。
+  関数名と同じ名前への代入は、関数ではなく新しい変数の束縛として扱われます。
+</p>
 <table>
   <tr><th>形</th><th>意味</th></tr>
-  <tr><td><code>x = in;</code></td><td>整数を1つ読む</td></tr>
-  <tr><td><code>a, b = in;</code></td><td>整数を複数読む</td></tr>
-  <tr><td><code>a = in[n];</code></td><td>整数を n 個読んで配列にする</td></tr>
-  <tr><td><code>a = in[h][w];</code></td><td>h 行 × w 個の二次元配列として読む</td></tr>
-  <tr><td><code>s = in_str;</code>、<code>ws = in_str[n];</code></td><td>空白区切りのトークンを1つ / n 個読む</td></tr>
-  <tr><td><code>s = in_line;</code></td><td>行全体を1つ読む（空白を含む）</td></tr>
-  <tr><td><code>a- = in[n];</code></td><td>読みながら各要素から1引く（1始まり入力用）</td></tr>
-  <tr><td><code>put x;</code>、<code>put x, y;</code></td><td>値を空白区切りで1行に出す。配列は要素を並べて出し、二次元配列も平らに1行になる</td></tr>
-  <tr><td><code>yn 条件;</code></td><td>真なら <code>Yes</code>、偽なら <code>No</code> を出す</td></tr>
-  <tr><td><code>eprint(x);</code></td><td><code>print</code> と同じ文字列化で、標準エラーに出す</td></tr>
-  <tr><td><code>args()</code></td><td>コマンドライン引数を <code>[str]</code> で返す（先頭はプログラム名）</td></tr>
-  <tr><td><code>read_file(path)</code></td><td>ファイル全体を <code>FileData</code> で返す</td></tr>
-  <tr><td><code>write_file(path, text)</code></td><td>文字列をファイルに書く。成功で <code>true</code></td></tr>
-  <tr><td><code>exit(code);</code></td><td>出力をフラッシュして、そのコードで終了する</td></tr>
+  <tr><td><code>fn(x: int) -&gt; int { ... }</code></td><td>完全形。引数の型注釈とブロック本体を持ち、戻り値の型も書ける</td></tr>
+  <tr><td><code>x -&gt; 式</code></td><td>引数1つの糖衣。本体は式1つで、その値が戻り値</td></tr>
+  <tr><td><code>(x, y) -&gt; 式</code></td><td>引数が複数の糖衣</td></tr>
 </table>
-
-<h2 id="s05"><span class="no">05</span>キーワード</h2>
 <p>
-  <code>def</code>、<code>class</code>、<code>return</code>、<code>if</code>、<code>elif</code>、<code>else</code>、
-  <code>while</code>、<code>for</code>、<code>in</code>、<code>break</code>、<code>continue</code>、<code>fn</code>、
-  <code>put</code>、<code>yn</code>、そして入力の <code>in</code> / <code>in_str</code> / <code>in_line</code> です。
-  コメントは <code>//</code> と <code>/* */</code> が使えます。
+  ラムダが外側のローカル変数を使うと、その変数は<strong>ラムダ式を評価した時点の値でコピー</strong>されて捕捉されます。
+  コピーはラムダ専用の環境に置かれ、ラムダの中での代入はそのコピーに対して行われて呼び出しをまたいで残りますが、外側の変数とは連動しません。
+  グローバル変数は捕捉されず、そのまま読み書きされます。
+  引数の型は、注釈か、代入先・引数位置などの期待型から決まります。どちらからも決まらない場合はエラーになります。
+  自分自身を代入した変数経由で再帰するクロージャは書けません。
+  <code>-&gt;</code> の振り分けは §02 の矢印演算子と同じ規則で、左辺の名前が束縛済みなら矢印演算子、未束縛ならラムダの引数名になります。
+  そのため、束縛済みの変数と同名の引数を持つ裸のラムダ（<code>x -&gt; ...</code>）は書けません（<code>fn</code> 形を使ってください）。
 </p>
 
-<h2 id="s06"><span class="no">06</span>型注釈を書ける場所</h2>
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>def apply(f: fn(int) -&gt; int, v: int) -&gt; int { return f(v); }
+put apply(x -&gt; x * 2, 21);
+sq: fn(int) -&gt; int = x -&gt; x * x;
+put sq(9);
+def make() -&gt; fn(int) -&gt; int {
+    base = 100;
+    h = fn(v: int) -&gt; int { return v + base; };
+    base = 200;
+    return h;
+}
+f = make();
+put f(1);
+def counter() -&gt; fn() -&gt; int {
+    n = 0;
+    return fn() -&gt; int { n = n + 1; return n; };
+}
+c = counter();
+put c(), c(), c();</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>42
+81
+101
+1 2 3</pre>
+</figure>
+
+<h2 id="s07"><span class="no">07</span>クラス</h2>
+<p>
+  <code>class 名前:</code> または <code>class 名前 { }</code> の本体に、フィールド宣言とメソッド定義を並べます。継承はありません。
+</p>
 <ul>
-  <li>ローカル変数の初回束縛: <code>x: int = 式</code></li>
-  <li>関数の引数と戻り値: <code>def f(x: int) -&gt; int { }</code></li>
-  <li>クラスのフィールド: <code>data: [int]</code>（こちらは必須）</li>
-  <li>関数値の型: <code>f: fn(int) -&gt; int</code></li>
+  <li>フィールドは <code>名前: 型</code> で宣言し、<strong>型が必須</strong>です。同じ名前のフィールドは二重に宣言できません。フィールドの初期値は書けず、<code>__init__</code> での代入に集約します</li>
+  <li>メソッドはクラスの中でも <code>def</code> で書き、最初の引数 <code>self</code> が必須です（<code>self</code> の型は所属クラスから決まります）。フィールドへは <code>self.名前</code> でアクセスします</li>
+  <li>構築は <code>クラス名(引数, ...)</code> で、<code>__init__</code> が呼ばれます。<code>__init__</code> があるクラスでは、正常に終わる全経路で全フィールドが初期化されることが検査され、漏れるとエラーになります</li>
+  <li><code>__init__</code> が無いクラスは引数なしで構築でき、フィールドはゼロ値（数値なら 0、参照型なら null 相当）で初期化されます</li>
+  <li>フィールドとメソッドが同名の場合、<code>obj.x</code> はフィールドを読み、<code>obj.x()</code> はメソッドを呼びます。メソッド名への代入はエラーです</li>
+  <li>関数型のフィールドは <code>obj.m()</code> で、その関数値を呼び出す形になります</li>
+  <li>演算子や添字はダンダーメソッドで定義します（<a href="#s12">§12</a>）。<code>__eq__</code> が無いクラスの <code>==</code> は同一性（同じオブジェクトか）で判定されます</li>
+  <li><code>__init__</code> は通常のメソッドとしても呼べます（<code>p.__init__(5)</code> のように再初期化できます）</li>
 </ul>
-<p class="note">
-  型パラメータはクラス定義側で明示し（最大4つ）、生成側では推論されます。
-  どちらからも決まらない場合は、注釈を求めるエラーになります。
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>class Pt {
+    x: int
+    y: int
+    def __init__(self, x: int, y: int) {
+        self.x = x
+        self.y = y
+    }
+    def __add__(self, o: Pt) -&gt; Pt {
+        return Pt(self.x + o.x, self.y + o.y)
+    }
+    def __eq__(self, o: Pt) -&gt; bool {
+        return self.x == o.x &amp;&amp; self.y == o.y
+    }
+    def __str__(self) -&gt; str {
+        return "(" + self.x.__str__() + "," + self.y.__str__() + ")"
+    }
+}
+a = Pt(1, 2)
+b = Pt(3, 4)
+put a + b
+put a == Pt(1, 2), a == b
+class Empty {
+    n: int
+}
+e = Empty()
+put e.n</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>(4,6)
+true false
+0</pre>
+</figure>
+
+<h2 id="s08"><span class="no">08</span>ジェネリクス</h2>
+<p>
+  クラス定義に <code>class Pair&lt;A, B&gt;</code> のように型パラメータを付けられます（最大4つ）。
+  実装は単相化で、使われた型引数の組み合わせごとに専用のコードが生成されます。
+  型パラメータは、フィールド・引数・戻り値の型の位置に書けます。
+</p>
+<p>
+  構築時の型引数は、<code>__init__</code> の引数の値と、代入先の注釈・関数の引数位置・戻り値といった期待型の両方から推論されます。
+  どちらからも決まらない場合は「型引数を推論できません」というエラーになります。
+  とくに <code>Dict</code> / <code>Vec</code> / <code>Deque</code> は、ファクトリの引数だけでは型引数が決まらないため、注釈などの期待型が必須です。
+  型引数は注釈の中に <code>Pair&lt;int, str&gt;</code> と書けます（入れ子も可）。構築式そのものに型引数を書く形はありません。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>class Pair&lt;A, B&gt; {
+    fst: A
+    snd: B
+    def __init__(self, fst: A, snd: B) {
+        self.fst = fst
+        self.snd = snd
+    }
+}
+p: Pair&lt;int, str&gt; = Pair(42, "x")
+put p.fst, p.snd
+q = Pair("a", 7)
+put q.fst, q.snd</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>42 x
+a 7</pre>
+</figure>
+
+<h2 id="s09"><span class="no">09</span>組み込み型（基本）</h2>
+<p>
+  起動時に読み込まれる prelude が定義する型です。メソッドのうち引数を取らないものは、呼び出しの括弧を省略できます（例: <code>a.len</code>）。
+</p>
+
+<h3>int</h3>
+<table>
+  <tr><th>操作</th><th>内容</th></tr>
+  <tr><td><code>__add__</code> <code>__sub__</code> <code>__mul__</code> <code>__div__</code> <code>__mod__</code></td><td>四則演算と剰余。除算・剰余は床方式（§01）</td></tr>
+  <tr><td><code>__eq__</code> <code>__ne__</code> <code>__lt__</code> <code>__le__</code></td><td>比較。<code>&gt;</code> <code>&gt;=</code> は左右を入れ替えて解決される</td></tr>
+  <tr><td><code>__hash__</code></td><td>値そのもの</td></tr>
+  <tr><td><code>__iter__</code></td><td><code>for i in n</code> で 0 から n−1 を反復（n が 0 以下なら0回）</td></tr>
+  <tr><td><code>__str__</code></td><td>10進表記</td></tr>
+</table>
+
+<h3>bool</h3>
+<table>
+  <tr><th>操作</th><th>内容</th></tr>
+  <tr><td><code>__hash__</code></td><td>真は 1、偽は 0</td></tr>
+  <tr><td><code>__str__</code></td><td><code>true</code> / <code>false</code></td></tr>
+</table>
+
+<h3>str</h3>
+<table>
+  <tr><th>操作</th><th>内容</th></tr>
+  <tr><td><code>len</code></td><td>文字数（バイト数ではなく文字コードの個数）</td></tr>
+  <tr><td><code>s[i]</code>（<code>__getitem__</code>）</td><td>i 番目の文字コード（<code>int</code>）を返す。添字への代入はできない（<code>__setitem__</code> は無い）</td></tr>
+  <tr><td><code>__add__</code></td><td>連結</td></tr>
+  <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較。<code>&lt;</code> 系の順序比較はない</td></tr>
+  <tr><td><code>__hash__</code></td><td>文字コード列からのハッシュ</td></tr>
+  <tr><td><code>__iter__</code></td><td>1文字ずつの <code>str</code> を返す（<code>StrIter</code>）。ループ変数への代入は元の文字列へ書き戻される</td></tr>
+  <tr><td><code>rev</code></td><td>逆順にした新しい文字列</td></tr>
+  <tr><td><code>__str__</code></td><td>自分自身</td></tr>
+  <tr><td><code>chars</code> フィールド</td><td>中身の文字コード配列 <code>[int]</code></td></tr>
+</table>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>s = "hello";
+put s.len, s[0], s[4];
+put s + " " + "world";
+put s == "hello", s != "bye";
+t = "ABCA";
+for c in t { if (c != "A") { c = "."; } }
+put t;
+put "abc".rev;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>5 104 111
+hello world
+true true
+A..A
+cba</pre>
+</figure>
+
+<h3>配列 <code>[T]</code></h3>
+<table>
+  <tr><th>操作</th><th>内容</th></tr>
+  <tr><td><code>len</code></td><td>要素数</td></tr>
+  <tr><td><code>a[i]</code></td><td>要素の読み書き。範囲外（負数を含む）は検査されず、結果は不定</td></tr>
+  <tr><td><code>__add__</code></td><td>連結した新しい配列</td></tr>
+  <tr><td><code>__mul__</code></td><td><code>a * n</code> で n 回繰り返した新しい配列</td></tr>
+  <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較。<code>&lt;</code> 系の順序比較はない（エラーになる）</td></tr>
+  <tr><td><code>__hash__</code></td><td>要素のハッシュの合成。配列は書き換え可能なので、辞書のキーにした後で中身を変えると、そのエントリは引けなくなる</td></tr>
+  <tr><td><code>__iter__</code></td><td>要素の走査（<code>ArrayIter</code>）。配列そのものへの反復で、ループ変数への代入は要素へ書き戻される</td></tr>
+  <tr><td><code>rev</code></td><td>逆順にした新しい配列（元の配列は変わらない）</td></tr>
+  <tr><td><code>__str__</code></td><td>要素を空白区切りで並べた文字列。入れ子の配列も平らに並ぶ</td></tr>
+  <tr><td><code>append(v)</code></td><td>末尾に要素を足す（下記）。戻り値は新しい要素数</td></tr>
+</table>
+<p>
+  <code>append</code> は prelude のメソッドではなく、コンパイラが処理する組み込み操作です（メソッドでは呼び出し元の変数を付け替えられないため）。
+  対象にできるのは、変数・フィールド・配列の要素など、スロットを持つ場所だけです（<code>(a + b).append(x)</code> のような一時値への append はエラー）。
+  配列は容量を持ち、容量に空きがある間は同じブロックが伸びて別名からも見えますが、
+  容量を超える append では新しいブロックへコピーして対象の変数だけが付け替わります（別名や、引数として渡した先の呼び出し元には伝わりません）。
+  作りたての配列は容量＝要素数なので、最初の append は必ず付け替えになります。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>a = [1, 2, 3];
+r = a.append(4);
+put a, r;
+b = a;
+a.append(5);
+put a.len, b.len;
+e: [int] = [];
+for i in 20 { e.append(i); }
+put e.len;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1 2 3 4 4
+5 5
+20</pre>
+</figure>
+
+<h2 id="s10"><span class="no">10</span>範囲と反復プロトコル</h2>
+
+<h3>Range</h3>
+<p>
+  <code>a..b</code> は終端を含まない範囲、<code>a..=b</code> は終端を含む範囲です。値は <code>Range</code> 型で、変数に保持できます。
+  <code>a &gt; b</code> のときは降順になります（並びの集合は昇順の場合と同じで、順序だけが逆です。たとえば <code>5..0</code> は 4, 3, 2, 1, 0）。
+  <code>rev</code> は向きを反転した範囲を返します。フィールド <code>lo</code> / <code>hi</code> / <code>incl</code>（終端を含むなら 1）も読めます。
+  <code>Range</code> に <code>__str__</code> は無いので、そのまま出力はできません。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>for i in 5..0 { put i; }
+put 99;
+r = 1..4;
+for i in r.rev { put i; }</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>4
+3
+2
+1
+0
+99
+3
+2
+1</pre>
+</figure>
+
+<h3>反復プロトコル</h3>
+<p>
+  <code>for x in 式</code> は、式の値の <code>__iter__()</code> が返すイテレータに対して、
+  <code>__has_next__()</code>（<code>bool</code> を返す）が真の間 <code>__next__()</code> で値を取り出す形に展開されます。
+  反復対象の式は最初に1回だけ評価されます。ループ変数は最後に反復した値を保持し、反復が0回なら代入自体が起きません。
+  イテレータが任意メソッド <code>__set_current__(v)</code> を持つ場合、本体でのループ変数への代入は各反復の終わり（と、このループ宛の <code>break</code> / <code>continue</code> の直前）に現在の要素へ書き戻されます。
+  持たない反復でのループ変数への代入は、書き戻されずに消える事故を防ぐため、コンパイルエラーになります。<code>return</code> で抜ける場合は書き戻されません。
+</p>
+<table>
+  <tr><th>イテレータ</th><th>対象</th><th>備考</th></tr>
+  <tr><td><code>RangeIter</code></td><td><code>int</code>、<code>Range</code></td><td><code>__set_current__</code> は無い（ループ変数への代入はエラー）</td></tr>
+  <tr><td><code>ArrayIter&lt;T&gt;</code></td><td>配列、<code>Vec</code>、<code>Deque</code></td><td>配列への反復は配列そのものを見て書き戻しも効く。<code>Vec</code> / <code>Deque</code> は開始時点のスナップショット（<code>to_array()</code>）への反復で、書き戻しもスナップショット側</td></tr>
+  <tr><td><code>StrIter</code></td><td><code>str</code></td><td>1文字ずつの <code>str</code> を返す。書き戻しは、代入された文字列の先頭の文字で置き換える（空文字列なら何もしない）</td></tr>
+  <tr><td><code>DictIter&lt;K&gt;</code></td><td><code>Dict</code></td><td>開始時点のキー並びのスナップショット。<code>__set_current__</code> は無い</td></tr>
+</table>
+<p>
+  自作クラスも <code>__iter__</code> / <code>__has_next__</code> / <code>__next__</code> を実装すれば <code>for</code> で回せます。
+  配列への反復中に <code>append</code> した場合、容量内の append は反復にも伸びが見え、
+  容量を超えて付け替えられた後は、イテレータは元のブロックの範囲をたどります。
+</p>
+
+<figure class="code">
+  <figcaption>例 — 自作イテレータ</figcaption>
+<pre>class Count {
+    n: int
+    def __init__(self, n: int) { self.n = n; }
+    def __iter__(self) -&gt; CountIter { return CountIter(self.n); }
+}
+class CountIter {
+    left: int
+    def __init__(self, n: int) { self.left = n; }
+    def __has_next__(self) -&gt; bool { return self.left &gt; 0; }
+    def __next__(self) -&gt; int { self.left = self.left - 1; return self.left; }
+}
+for v in Count(3) { put v; }</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2
+1
+0</pre>
+</figure>
+
+<h2 id="s11"><span class="no">11</span>コレクション</h2>
+
+<h3>Dict&lt;K, V&gt; — 辞書</h3>
+<p>
+  構築には既定値ファクトリが必須で、<code>d: Dict&lt;str, int&gt; = Dict(zero_int)</code> のように書きます
+  （ファクトリは「無かったキー」を生やすための既定値を作る関数で、キーごとに呼ばれます）。
+  読み取り <code>d[k]</code> は、キーが無ければファクトリで作った既定値を登録してから返します（defaultdict 式）。
+  キーに使えるのは <code>__hash__</code> と <code>__eq__</code> を持つ型で、等しいキーは等しいハッシュを返す必要があります。
+  既定のファクトリとして <code>zero_int</code>（0）、<code>zero_bool</code>（偽）、<code>zero_str</code>（空文字列）があり、
+  それ以外の既定値はラムダで渡します。
+  <code>Dict</code> 自身に <code>__str__</code> と <code>__hash__</code> は無いので、出力したりキーにしたりはできません。
+</p>
+<table>
+  <tr><th>操作</th><th>内容</th></tr>
+  <tr><td><code>d[k]</code>（<code>__getitem__</code>）</td><td>読み取り。無ければ既定値を生やして返す</td></tr>
+  <tr><td><code>d[k] = v</code>（<code>__setitem__</code>）</td><td>書き込み。上書きしてもキーの挿入位置は変わらない</td></tr>
+  <tr><td><code>has(k)</code></td><td>キーの有無。<code>d[k]</code> の読み取りで生えたキーも「有り」になる</td></tr>
+  <tr><td><code>len</code></td><td>エントリ数</td></tr>
+  <tr><td><code>keys()</code></td><td>挿入順のキー配列のコピー</td></tr>
+  <tr><td><code>__iter__</code></td><td>キーの列挙（開始時点のスナップショット）</td></tr>
+</table>
+
+<figure class="code">
+  <figcaption>例 — 数え上げ</figcaption>
+<pre>cnt: Dict&lt;int, int&gt; = Dict(zero_int)
+a = [1, 2, 2, 3, 3, 3]
+for v in a { cnt[v] = cnt[v] + 1; }
+put cnt[1], cnt[2], cnt[3], cnt[9], cnt.len
+d: Dict&lt;str, int&gt; = Dict(zero_int)
+d["a"] = 5
+put d.has("a"), d.has("zzz")
+put d.keys()</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1 2 3 0 4
+true false
+a</pre>
+</figure>
+
+<h3>Vec&lt;T&gt; — 伸びる配列</h3>
+<p>
+  構築は <code>v: Vec&lt;int&gt; = Vec(zero_int)</code> のように、既定値ファクトリと注釈（などの期待型）が必須です。
+  末尾への追加は容量の倍増で均し定数時間です。
+</p>
+<table>
+  <tr><th>操作</th><th>内容</th></tr>
+  <tr><td><code>append(v)</code></td><td>末尾へ追加</td></tr>
+  <tr><td><code>len</code></td><td>論理要素数</td></tr>
+  <tr><td><code>v[i]</code>（<code>__getitem__</code> / <code>__setitem__</code>）</td><td>内部バッファへの直接の読み書き。論理要素数以上の添字も検査されず、容量の範囲では埋め草（ファクトリの値）が見える</td></tr>
+  <tr><td><code>to_array()</code></td><td>論理要素数分の通常配列のコピー</td></tr>
+  <tr><td><code>__iter__</code></td><td>開始時点のスナップショット（<code>to_array()</code>）への反復</td></tr>
+</table>
+
+<h3>Deque&lt;T&gt; — 両端キュー</h3>
+<p>
+  Queue としても Stack としても使える両端キューです。構築は <code>q: Deque&lt;int&gt; = Deque(zero_int)</code> のように、ファクトリと注釈が必須です。
+  出し入れの実体はダンダー <code>__push_back__</code> / <code>__push_front__</code> / <code>__pop_back__</code> / <code>__pop_front__</code> で、
+  公開メソッドはその薄いラッパーです。矢印演算子（§02）でも出し入れできます。
+  空のときに <code>pop_front</code> / <code>pop_back</code> / <code>front</code> / <code>back</code> を呼ぶのは誤りで、結果は不定です（検査はしません）。
+</p>
+<table>
+  <tr><th>操作</th><th>内容</th></tr>
+  <tr><td><code>push_back(v)</code> / <code>push_front(v)</code></td><td>末尾 / 先頭へ追加（戻り値なし）</td></tr>
+  <tr><td><code>pop_back()</code> / <code>pop_front()</code></td><td>末尾 / 先頭を取り出して返す</td></tr>
+  <tr><td><code>front()</code> / <code>back()</code></td><td>先頭 / 末尾を覗く</td></tr>
+  <tr><td><code>len</code></td><td>要素数</td></tr>
+  <tr><td><code>q[i]</code>（<code>__getitem__</code>）</td><td>論理位置の読み取り（0 が先頭）。書き込み用の <code>__setitem__</code> は無い</td></tr>
+  <tr><td><code>to_array()</code></td><td>先頭から末尾の順の通常配列のコピー</td></tr>
+  <tr><td><code>__iter__</code></td><td>開始時点のスナップショットへの反復（先頭から末尾）</td></tr>
+</table>
+
+<figure class="code">
+  <figcaption>例 — キューとして使う</figcaption>
+<pre>q: Deque&lt;int&gt; = Deque(zero_int)
+q &lt;- 1
+q &lt;- 2
+q.push_front(0)
+put q.len, q.front(), q.back()
+x &lt;- q
+put x
+30 -&gt; q
+q -&gt; y
+put y, q.to_array()</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3 0 2
+0
+2 30 1</pre>
+</figure>
+
+<h3>FileData — read_file の結果</h3>
+<table>
+  <tr><th>フィールド</th><th>内容</th></tr>
+  <tr><td><code>ok: bool</code></td><td>開けて最後まで読めたときだけ真。空のファイルは真で <code>text</code> は空</td></tr>
+  <tr><td><code>text: str</code></td><td>ファイル全体の内容。読めなかったときは空</td></tr>
+</table>
+
+<h2 id="s12"><span class="no">12</span>ダンダープロトコル一覧</h2>
+<p>
+  演算子や構文は、すべてダンダーメソッドへの書き換えで処理されます。自作クラスが実装できるのは次のとおりです。
+  シグネチャは、組み込み型が実装する形を基準に示します。
+</p>
+<table>
+  <tr><th>ダンダー</th><th>使われる場所</th><th>備考</th></tr>
+  <tr><td><code>__init__(self, ...)</code></td><td>構築 <code>Cls(...)</code></td><td>戻り値の型注釈は書かない。全フィールド初期化の検査対象</td></tr>
+  <tr><td><code>__add__</code> <code>__sub__</code> <code>__mul__</code> <code>__div__</code> <code>__mod__</code></td><td><code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code>、複合代入、<code>++</code> / <code>--</code></td><td><code>a += b</code> は <code>a = a.__add__(b)</code>。<code>++</code> は <code>__add__(1)</code></td></tr>
+  <tr><td><code>__eq__</code> <code>__ne__</code></td><td><code>==</code> <code>!=</code>、<code>Dict</code> のキー照合</td><td><code>__eq__</code> が無いクラスの <code>==</code> は同一性</td></tr>
+  <tr><td><code>__lt__</code> <code>__le__</code></td><td><code>&lt;</code> <code>&lt;=</code> と連鎖比較</td><td><code>&gt;</code> <code>&gt;=</code> は左右を入れ替えて <code>__lt__</code> / <code>__le__</code> に帰着。<code>&gt;=</code> の右辺が複合式だと左結合の意味に化ける既知の制限がある</td></tr>
+  <tr><td><code>__hash__() -&gt; int</code></td><td><code>Dict</code> のキー</td><td><code>__eq__</code> と対で実装する。<code>Dict</code> は <code>__hash__</code> の無い型をキーにできない</td></tr>
+  <tr><td><code>__str__() -&gt; str</code></td><td><code>print</code> / <code>put</code>、文字列連結での自動変換</td><td>無ければ出力時にエラー（<code>Range</code> や <code>Dict</code> はこちら）</td></tr>
+  <tr><td><code>__getitem__(i)</code> / <code>__setitem__(i, v)</code></td><td><code>a[i]</code> の読み書き、複合代入の対象</td><td>添字の型は任意（辞書のキーは任意の型）</td></tr>
+  <tr><td><code>__iter__() -&gt; イテレータ</code></td><td><code>for x in obj</code></td><td>イテレータ側は <code>__has_next__() -&gt; bool</code> と <code>__next__()</code> を実装。任意で <code>__set_current__(v)</code>（ループ変数の書き戻し）</td></tr>
+  <tr><td><code>__push_back__(v)</code> / <code>__push_front__(v)</code></td><td>矢印 <code>q &lt;- v</code> / <code>v -&gt; q</code></td><td>どちらか片方だけでもよい（使う側だけ解決される）</td></tr>
+  <tr><td><code>__pop_back__()</code> / <code>__pop_front__()</code></td><td>矢印 <code>q -&gt; x</code> / <code>x &lt;- q</code></td><td>取り出した値を返す形</td></tr>
+</table>
+<p>
+  これ以外に、prelude のクラスが内部で使う <code>__spell_*</code> 始まりの基盤関数がありますが、利用側のコードから直接使うものではありません。
+  型変換は自動的には行われません（<code>int</code> と <code>str</code> の <code>+</code> はエラーで、<code>x.__str__()</code> と明示します）。
+  例外として <code>print</code> / <code>put</code> だけは、引数を自動で文字列化します。
+</p>
+
+<h2 id="s13"><span class="no">13</span>入出力</h2>
+
+<h3>出力</h3>
+<table>
+  <tr><th>形</th><th>内容</th></tr>
+  <tr><td><code>print(x)</code></td><td>値を文字列化して改行つきで出す。文字列化の規則: 文字列はそのまま、数値は10進、<code>bool</code> は <code>true</code> / <code>false</code>、配列は要素を空白区切り（入れ子も平らに）、クラスは <code>__str__</code> の結果。<code>__str__</code> の無い型（<code>Range</code>、<code>Dict</code> など）はエラー</td></tr>
+  <tr><td><code>put x, y, ...;</code></td><td><code>print</code> の文形。複数の引数を空白区切りで並べて改行まで出す。引数は1つ以上</td></tr>
+  <tr><td><code>&lt;&lt; x;</code> / 文頭の <code>&lt; x;</code></td><td><code>print(x)</code> の糖衣（<a href="sugar.html">糖衣集</a>）</td></tr>
+  <tr><td><code>eprint(x)</code></td><td><code>print</code> と同じ文字列化で、標準エラー出力へ改行つきで出す</td></tr>
+</table>
+
+<h3>入力</h3>
+<p>
+  <code>in</code> は代入の右辺だけでなく、式の途中でも使えます。
+</p>
+<table>
+  <tr><th>形</th><th>内容</th></tr>
+  <tr><td><code>in</code></td><td>整数を1つ読む。負数も読める</td></tr>
+  <tr><td><code>in[n]</code></td><td>整数を n 個読んで <code>[int]</code> にする</td></tr>
+  <tr><td><code>in[h][w]</code></td><td>整数を h 行 × w 列読んで <code>[[int]]</code> にする（出力すると平らに並ぶ）</td></tr>
+  <tr><td><code>a- = in[n];</code></td><td><code>in[n]</code> の読み取りに <code>-</code> 修飾を付けた形。読んだ各値から 1 を引いて代入する</td></tr>
+  <tr><td><code>in_str</code></td><td>空白区切りのトークンを1つ読む</td></tr>
+  <tr><td><code>in_str[n]</code></td><td>トークンを n 個読んで <code>[str]</code> にする</td></tr>
+  <tr><td><code>in_line</code></td><td>1行をそのまま読む（行末の改行は含まない）</td></tr>
+  <tr><td><code>&gt;&gt; a, b, c;</code></td><td><code>a = in; b = in; c = in;</code> の糖衣。左から順に読む。対象は複数代入の左辺と同じ形が使える</td></tr>
+  <tr><td><code>yn 式;</code></td><td>式が真なら <code>Yes</code>、偽なら <code>No</code> を1行出す糖衣</td></tr>
+</table>
+<p>
+  整数の読み取りは、先行する空白を読み飛ばしません。読み取りのたびに区切り文字が1つ消費されるため、
+  空白1つ（または改行）で区切られた通常の入力では続けて読めますが、先頭に空白がある入力や空白の重なりでは 0 になります。
+  <code>in_str</code> は先行する空白を読み飛ばし、<code>in_line</code> は行末までをそのまま取ります。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>n = in;
+a, b = in;
+grid = in[2][3];
+s = in_str;
+toks = in_str[2];
+line = in_line;
+put n, a + b;
+put grid;
+put s, toks, line;
+z = in + 5;
+put z;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>入力</figcaption>
+<pre>42
+10 20
+1 2 3
+4 5 6
+tok
+foo bar
+hello world foo
+10</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>42 30
+1 2 3 4 5 6
+tok foo bar hello world foo
+15</pre>
+</figure>
+
+<h3>コマンドライン引数とファイル</h3>
+<table>
+  <tr><th>関数</th><th>内容</th></tr>
+  <tr><td><code>args() -&gt; [str]</code></td><td>コマンドライン引数全体。<code>[0]</code> はプログラム名（起動されたときの文字列そのまま）</td></tr>
+  <tr><td><code>read_file(path: str) -&gt; FileData</code></td><td>ファイル全体を読む。結果の意味は §11</td></tr>
+  <tr><td><code>write_file(path: str, text: str) -&gt; bool</code></td><td>ファイル全体を書き出す（既存は置き換え）。成功したら真</td></tr>
+  <tr><td><code>exit(code: int)</code></td><td>その場で終了する（以降の文は実行されない）。戻らない関数のため、戻り値の型は無い</td></tr>
+</table>
+
+<figure class="code">
+  <figcaption>例 — 引数を1つ受け取って実行した場合</figcaption>
+<pre>a = args();
+put a.len, a[1];
+ok = write_file("memo.txt", "abc");
+f = read_file("memo.txt");
+put ok, f.ok, f.text;
+g = read_file("nope.txt");
+put g.ok, g.text.len;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2 xyz
+true true abc
+false 0</pre>
+</figure>
+
+<h2 id="s14"><span class="no">14</span>キーワードと型注釈</h2>
+
+<h3>キーワード</h3>
+<p>
+  <code>def</code> <code>class</code> <code>if</code> <code>elif</code> <code>else</code> <code>while</code> <code>for</code> <code>break</code> <code>continue</code> <code>return</code> <code>in</code> <code>in_str</code> <code>in_line</code> <code>put</code> <code>yn</code> <code>fn</code>
+  の16語です。これらは識別子として使えません（変数名・関数名・フィールド名・メソッド名のどれにも使えません）。
+  <code>in</code> は <code>for x in ...</code> のキーワードと、入力を読む式の両方に使われます。
+</p>
+
+<h3>型注釈を書ける場所</h3>
+<table>
+  <tr><th>場所</th><th>形</th><th>必須かどうか</th></tr>
+  <tr><td>変数の束縛</td><td><code>x: int = 5</code></td><td>任意。再代入の型も縛る</td></tr>
+  <tr><td>関数の引数</td><td><code>def f(a: int)</code></td><td>任意</td></tr>
+  <tr><td>関数の戻り値</td><td><code>def f() -&gt; int</code></td><td>任意（§05 の推論の注意あり）</td></tr>
+  <tr><td>クラスのフィールド</td><td><code>x: int</code></td><td><strong>必須</strong></td></tr>
+  <tr><td>ラムダの引数と戻り値</td><td><code>fn(x: int) -&gt; int { ... }</code></td><td>任意（期待型からも決まる）</td></tr>
+  <tr><td><code>for</code> の反復対象</td><td><code>for x in 式: [int] = ...</code></td><td>まれなケース用の任意注釈</td></tr>
+</table>
+<p>
+  型名の綴り: <code>int</code>、<code>bool</code>、<code>str</code>、<code>[T]</code>、<code>fn(A) -&gt; B</code>、クラス名（型引数つきは <code>Dict&lt;str, int&gt;</code>）。
+  注釈は代入のときだけ書けます（再代入に注釈は付けられません）。
+</p>
+
+<h2 id="s15"><span class="no">15</span>約束事と不定な振る舞い</h2>
+<p>
+  spell は高速さを優先し、実行時の検査を最小限にしています。次は「言語の約束事」として決まっている挙動です。
+  うっかり踏むと、エラーではなく不定の結果になります。
+</p>
+<table>
+  <tr><th>事柄</th><th>約束事</th></tr>
+  <tr><td>範囲外アクセス</td><td>配列・文字列・<code>Vec</code> の添字は検査されません。負数や長さ以上の添字の読み書きは不定（多くの場合クラッシュ）</td></tr>
+  <tr><td>空の <code>Deque</code></td><td><code>pop_front</code> / <code>pop_back</code> / <code>front</code> / <code>back</code> は不定。呼ぶ前に <code>len</code> を確認すること</td></tr>
+  <tr><td>ゼロ除算</td><td>未定義（多くの場合クラッシュ）</td></tr>
+  <tr><td>未束縛の名前の読み取り</td><td>エラーにならず、未初期化の値（不定）が返る</td></tr>
+  <tr><td>関数の戻り値</td><td><code>return</code> せずに末尾まで落ちた関数の戻り値は不定</td></tr>
+  <tr><td>整数オーバーフロー</td><td>2の補数で巻き戻る（エラーにはならない）</td></tr>
+  <tr><td>引数の上限</td><td>関数は引数6つまで。超えるとエラー</td></tr>
+  <tr><td>型引数の上限</td><td>ジェネリクスの型パラメータは4つまで</td></tr>
+  <tr><td>入力の形式</td><td><code>in</code> は空白を読み飛ばさない（§13）。入力が尽きた後の読み取りは不定</td></tr>
+  <tr><td>フレーム配列の寿命</td><td>関数の中で作った配列リテラルをフィールドへ直接代入すると、関数の終了後に宙に浮く。共有したい配列はヒープ側の構築（<code>[fill; n]</code> など）か、引数経由で渡す</td></tr>
+</table>
+<p>
+  コンパイル時のエラーは、日本語のメッセージと位置（行・列と該当箇所の下線）つきで報告され、最初の1件で止まります。
+  関数やクラスが使われていない場合、そのコードは生成されません（到達可能な関数だけが出力されます）。
 </p>
 
 </main>
 </div>
 
 <footer>
-  <span class="fname">spell.</span><br>
-  個人プロジェクトとして開発中です。このドキュメントのコード例は、すべて現在のコンパイラでコンパイルと実行を確認しています。<br>
-  <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a>
+  <span>spell — <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a></span>
+  <span>ドキュメントは <a href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC BY 4.0</a> で公開しています</span>
 </footer>
 
 </div>
