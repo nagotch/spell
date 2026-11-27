@@ -911,8 +911,8 @@ static void gen_push(Node* node) {
 
 // ---- ランタイムヘルパ（step 59） ----
 //
-// 組み込みプリミティブの実体。prelude のラッパ関数が常に出力される以上、
-// ヘルパも常に出す（prelude 本体と同じ扱い）。配列のレイアウトは
+// 組み込みプリミティブの実体。到達可能なコードが使うプリミティブに
+// 対応するものだけを出す（step 63）。配列のレイアウトは
 // コンパイラが作るものと同一（要素の8バイト手前に長さ）で、[int] の
 // 文字コード配列と int だけを相手にする。libc のデータシンボルには
 // 触らない（stderr へは fd 2 への write で出す）。一時バッファは
@@ -1217,20 +1217,141 @@ static void emit_rt_exit() {
     printf("  call _exit\n");
 }
 
-static void emit_runtime_helpers() {
-    emit_rt_chars_to_bytes();
-    emit_rt_argc();
-    emit_rt_argv_chars();
-    emit_rt_read_file_chars();
-    emit_rt_io_ok();
-    emit_rt_write_file_chars();
-    emit_rt_stderr_chars();
-    emit_rt_exit();
+// used は SpellBuiltin を添字とする使用ビット（到達可能性の走査で集める）。
+// chars_to_bytes は3つのヘルパから呼ばれる部品で、それ自体は
+// プリミティブではないため、呼び手の使用ビットから出すかどうかを決める
+static void emit_runtime_helpers(int used) {
+    if (used & ((1 << BUILTIN_READ_FILE_CHARS) | (1 << BUILTIN_WRITE_FILE_CHARS) | (1 << BUILTIN_STDERR_CHARS))) {
+        emit_rt_chars_to_bytes();
+    }
+    if (used & (1 << BUILTIN_ARGC)) {
+        emit_rt_argc();
+    }
+    if (used & (1 << BUILTIN_ARGV_CHARS)) {
+        emit_rt_argv_chars();
+    }
+    if (used & (1 << BUILTIN_READ_FILE_CHARS)) {
+        emit_rt_read_file_chars();
+    }
+    if (used & (1 << BUILTIN_IO_OK)) {
+        emit_rt_io_ok();
+    }
+    if (used & (1 << BUILTIN_WRITE_FILE_CHARS)) {
+        emit_rt_write_file_chars();
+    }
+    if (used & (1 << BUILTIN_STDERR_CHARS)) {
+        emit_rt_stderr_chars();
+    }
+    if (used & (1 << BUILTIN_EXIT)) {
+        emit_rt_exit();
+    }
+}
+
+// ---- 到達可能性（step 63） ----
+//
+// 出力する関数を、入口（main と __spell_init）から実際に辿れるものだけに
+// 絞る。prelude の全関数を常に出していると、簡単なプログラムでも
+// アセンブリが数千行になり、提出コードが膨らんでしまうため。
+// 辿り方は codegen が出す呼び出しと正確に対応させる:
+//   ND_FUNCALL … 組み込みなら使用ビットを立てる。__init__ が解決されて
+//     いれば（構築を含む）node->func への辺。素の呼び出しは codegen も
+//     名前で出すので、関数一覧から名前で引く（getchar のような libc 側
+//     の名前は一覧に無いので辺にならない）
+//   ND_MCALL / ND_MEMBER（func 付き）… node->func への辺
+//   ND_FUNCREF … 関数値として使われるので、指す関数への辺
+//   ND_LAMBDA … node->func（ラムダ本体）への辺。値はどこからでも
+//     呼ばれうるが、辺はラムダ式のある場所からだけ張る
+// 子ノードは Node の全ポインタフィールドを辿る（desugar と同じ集合）。
+// 関数には辿る前に印を付けるので、再帰・相互再帰でも止まる
+
+static Function* cg_functions;
+static int cg_used_builtins;
+
+static Function* find_plain_function(char* name, int len) {
+    for (Function* fn = cg_functions; fn; fn = fn->next) {
+        if (!fn->klass && fn->len == len && !memcmp(fn->name, name, len)) {
+            return fn;
+        }
+    }
+    return NULL;
+}
+
+static void mark_function(Function* fn);
+
+static void walk_reachable(Node* node) {
+    for (Node* n = node; n; n = n->next) {
+        if (n->kind == ND_FUNCALL) {
+            if (n->builtin) {
+                cg_used_builtins |= 1 << n->builtin;
+            } else if (n->func) {
+                mark_function(n->func);
+            } else if (!n->klass) {
+                mark_function(find_plain_function(n->name, n->len));
+            }
+        } else if (n->kind == ND_MCALL) {
+            mark_function(n->func);
+        } else if (n->kind == ND_MEMBER) {
+            if (n->func) {
+                mark_function(n->func);
+            }
+        } else if (n->kind == ND_FUNCREF) {
+            if (n->func) {
+                mark_function(n->func);
+            } else {
+                mark_function(find_plain_function(n->name, n->len));
+            }
+        } else if (n->kind == ND_LAMBDA) {
+            if (n->func) {
+                mark_function(n->func);
+            } else {
+                // ジェネリクスのクローンでは func がリセットされることが
+                // ある（typecheck の check_lambda と同じ引き直し）
+                for (Function* f = cg_functions; f; f = f->next) {
+                    if (f->is_lambda && f->len == n->len && !memcmp(f->name, n->name, n->len)) {
+                        mark_function(f);
+                        break;
+                    }
+                }
+            }
+        }
+        walk_reachable(n->left_child);
+        walk_reachable(n->right_child);
+        walk_reachable(n->cond);
+        walk_reachable(n->then);
+        walk_reachable(n->els);
+        walk_reachable(n->init);
+        walk_reachable(n->inc);
+        walk_reachable(n->body);
+        walk_reachable(n->args);
+    }
+}
+
+static void mark_function(Function* fn) {
+    if (!fn || fn->reachable) {
+        return;
+    }
+    fn->reachable = true;
+    walk_reachable(fn->body);
+}
+
+static void mark_reachable(Function* prog) {
+    cg_functions = prog;
+    cg_used_builtins = 0;
+    for (Function* fn = prog; fn; fn = fn->next) {
+        if (fn->klass) {
+            continue;
+        }
+        if ((fn->len == 4 && !memcmp(fn->name, "main", 4))
+                || (fn->len == 12 && !memcmp(fn->name, "__spell_init", 12))) {
+            mark_function(fn);
+        }
+    }
 }
 
 // ---- 関数ごとの出力 ----
 
 void codegen(Function* prog) {
+    mark_reachable(prog);
     bool has_init = false;
     for (Function* fn = prog; fn; fn = fn->next) {
         if (fn->len == 12 && !memcmp(fn->name, "__spell_init", 12)) {
@@ -1253,6 +1374,10 @@ void codegen(Function* prog) {
     printf(".text\n");
     while (prog) {
         if (prog->klass && prog->klass->tparam_count > 0) {
+            prog = prog->next;
+            continue;
+        }
+        if (!prog->reachable) {
             prog = prog->next;
             continue;
         }
@@ -1302,5 +1427,5 @@ void codegen(Function* prog) {
         printf("  ret\n");
         prog = prog->next;
     }
-    emit_runtime_helpers();
+    emit_runtime_helpers(cg_used_builtins);
 }

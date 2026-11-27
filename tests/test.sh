@@ -300,6 +300,31 @@ one_driver_test() {
     rm -f drv.sp drv drv.s drv.out drv.err drv.expout drv.experr drv_data.txt
 }
 
+# 到達可能性（step 63）: 生成された asm に、入口から辿れる関数と使う
+# ヘルパだけが含まれることを見る。$1=ソース $2=含まれるラベル断片
+# $3=含まれてはいけないラベル断片
+one_reach_test() {
+    printf '%s' "$1" > reach.sp
+    "$SPELL" -S -o reach reach.sp
+    if ! grep -q "$2" reach.s || grep -q "$3" reach.s; then
+        echo "reach test failed: $1 (want: $2, reject: $3)"
+        fail_count=$((fail_count+1))
+    fi
+    n=$((n+1))
+    rm -f reach.sp reach.s
+}
+
+# (a) hello 相当では Dict のメソッドも read_file のヘルパも出ない
+one_reach_test "def main() { print(42); return 0; }" "__println" "Dict"
+one_reach_test "def main() { print(42); return 0; }" "__println" "__rt_spell_read_file_chars"
+# (b) read_file を使うと対応するヘルパが出る。Vec は使わないので出ない
+one_reach_test "def main() { d = read_file(\"x\"); print(d.ok); return 0; }" "__rt_spell_read_file_chars" "Vec"
+# (c) 呼ばれない自作関数は出ず、呼ばれるものは出る
+one_reach_test "def alpha() -> int { return 1; } def omega() -> int { return 2; } def main() { return alpha(); }" "alpha" "omega"
+# (d) 関数値を保持して後から呼ぶ・クロージャ・Dict のファクトリ関数名渡し
+one_io_test "def main() { base = 40; f = fn(v: int) -> int { return v + base; }; print(f(2)); return 0; }" "" "42\n"
+one_io_test "def main() { d: Dict<str, int> = Dict(zero_int); d[\"a\"] = 40; d[\"b\"] = 2; s = 0; for k in d.keys() { s = s + d[k]; } print(s); return 0; }" "" "42\n"
+
 one_driver_test "def main() { a = args(); print(a[1]); print(a[2]); return 0; }" "hello\nworld\n" "" 0 hello world
 one_driver_test "def main() { ok = write_file(\"drv_data.txt\", \"roundtrip 59\\n\"); d = read_file(\"drv_data.txt\"); print(ok); print(d.ok); print(d.text); return 0; }" "true\ntrue\nroundtrip 59\n\n" "" 0
 one_driver_test "def main() { d = read_file(\"drv_missing.txt\"); print(d.ok); print(d.text.len); return 0; }" "false\n0\n" "" 0
