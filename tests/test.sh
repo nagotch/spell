@@ -619,6 +619,74 @@ one_io_test "def main() { >> n; >>> s[n]; print(s); return 0; }" "3 apple banana
 one_io_test "def main() { a = [0] * 5; >> a[2]; print(a); return 0; }" "7\n" "0 0 7 0 0\n"
 one_io_test "def main() { >> n, a[n]; print(a.len); return 0; }" "0\n" "0\n"
 one_io_test "def main() { >> n, m, a[n], b[m]; print(a); print(b); return 0; }" "2 1 2 3 4 5 6\n" "2 3\n4\n"
+# step 75: 個数形の n 次元化（未束縛の基底名なら角括弧の並びは全て個数）
+one_io_test "def main():
+    >> h, w, a[h][w]
+    print(a.len)
+    print(a[0])
+    print(a[1])
+    print(a[1][2])
+    return 0
+" "2 3\n1 2 3 4 5 6\n" "2\n1 2 3\n4 5 6\n6\n"
+one_io_test "def main():
+    >> n, a[n][n]
+    print(a[0][0])
+    print(a[2][2])
+    print(a[0])
+    print(a[2])
+    return 0
+" "3\n1 2 3 4 5 6 7 8 9\n" "1\n9\n1 2 3\n7 8 9\n"
+one_io_test "def main():
+    >> a[2][3][4]
+    print(a.len)
+    print(a[0].len)
+    print(a[0][0].len)
+    s = 0
+    for x in a:
+        for y in x:
+            for z in y:
+                s = s + z
+    print(s)
+    print(a[1][2][3])
+    return 0
+" "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24\n" "2\n3\n4\n300\n24\n"
+# step 75: 小配列は枠ごとに作られる（行同士で共有しない）
+one_io_test "def main():
+    >> a[2][2]
+    a[0][0] = 99
+    print(a[0])
+    print(a[1])
+    return 0
+" "1 2 3 4\n" "99 2\n3 4\n"
+# step 75: >>> の二次元（文字列）
+one_io_test "def main():
+    >> h, w
+    >>> s[h][w]
+    print(s[0])
+    print(s[1][1])
+    return 0
+" "2 2\naa bb cc dd\n" "aa bb\ndd\n"
+# step 75: 束縛済みの二次元配列への >> a[1][2] は従来どおり1要素読み
+one_io_test "def main() { a = [[0, 0, 0], [0, 0, 0]]; >> a[1][2]; print(a[1][2]); print(a[0]); print(a[1]); return 0; }" "7\n" "7\n0 0 0\n0 0 7\n"
+# step 75: 次元 0（何も読まず、空の方向ができるだけ）
+one_io_test "def main():
+    >> a[0][3]
+    print(a.len)
+    >> b[3][0]
+    print(b.len)
+    print(b[0].len)
+    print(b[2].len)
+    return 0
+" "" "0\n3\n0\n0\n"
+# step 75: 個数式はそれぞれ1回だけ評価される（副作用つき関数で数える）
+one_io_test "def nxt() -> int { print(777); return 2; }
+def main() {
+    >> a[nxt()][nxt()];
+    print(a.len);
+    print(a[1][1]);
+    return 0;
+}
+" "1 2 3 4\n" "777\n777\n2\n4\n"
 # step 72: 対象は空白区切りでも並べられる（カンマとの混在も可）
 one_io_test "def main() { >> x y; print(x + y); return 0; }" "1 2\n" "3\n"
 one_io_test "def main() { >>> s t; print(s); print(t); return 0; }" "foo bar\n" "foo\nbar\n"
