@@ -638,6 +638,98 @@ class Vec<T> {
     }
 }
 
+// 両端キュー（Queue としても Stack としても使える）。円環バッファで、
+// 先頭位置 head と要素数 n だけを動かすので、両端の出し入れは容量の
+// 倍増を除いて定数時間。生成は Vec / Dict と同じく既定値ファクトリを
+// 受け取る（広げた領域の埋め草に使う）。添字は論理位置（0 が先頭）。
+// 空のときに pop_front / pop_back / front / back を呼ぶのは誤りで、
+// 結果は不定（配列の範囲外アクセスと同じで、検査はしない）。
+// 反復と to_array は開始時点のスナップショットに対するもの
+class Deque<T> {
+    factory: fn() -> T;
+    buf: [T];
+    head: int;
+    n: int;
+
+    def __init__(self, factory: fn() -> T) {
+        self.factory = factory;
+        self.buf = [];
+        self.head = 0;
+        self.n = 0;
+    }
+
+    def len(self) -> int {
+        return self.n;
+    }
+
+    def grow(self) {
+        cap = self.buf.len * 2;
+        if (cap == 0) { cap = 8; }
+        nb = [self.factory(); cap];
+        i = 0;
+        while (i < self.n) {
+            nb[i] = self.buf[(self.head + i) % self.buf.len];
+            i = i + 1;
+        }
+        self.buf = nb;
+        self.head = 0;
+    }
+
+    def push_back(self, v: T) {
+        if (self.n == self.buf.len) { self.grow(); }
+        self.buf[(self.head + self.n) % self.buf.len] = v;
+        self.n = self.n + 1;
+    }
+
+    def push_front(self, v: T) {
+        if (self.n == self.buf.len) { self.grow(); }
+        self.head = self.head - 1;
+        if (self.head < 0) { self.head = self.buf.len - 1; }
+        self.buf[self.head] = v;
+        self.n = self.n + 1;
+    }
+
+    def pop_back(self) -> T {
+        self.n = self.n - 1;
+        return self.buf[(self.head + self.n) % self.buf.len];
+    }
+
+    def pop_front(self) -> T {
+        v = self.buf[self.head];
+        self.head = self.head + 1;
+        if (self.head == self.buf.len) { self.head = 0; }
+        self.n = self.n - 1;
+        return v;
+    }
+
+    def front(self) -> T {
+        return self.buf[self.head];
+    }
+
+    def back(self) -> T {
+        return self.buf[(self.head + self.n - 1) % self.buf.len];
+    }
+
+    def __getitem__(self, i: int) -> T {
+        return self.buf[(self.head + i) % self.buf.len];
+    }
+
+    def __iter__(self) -> ArrayIter<T> {
+        return ArrayIter(self.to_array());
+    }
+
+    def to_array(self) -> [T] {
+        if (self.n == 0) { return []; }
+        r = [self.buf[self.head]; self.n];
+        i = 0;
+        while (i < self.n) {
+            r[i] = self.buf[(self.head + i) % self.buf.len];
+            i = i + 1;
+        }
+        return r;
+    }
+}
+
 def read_ints(n: int) -> [int] {
     a = [0; n];
     for i in n { a[i] = read_int(); }

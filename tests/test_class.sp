@@ -530,6 +530,169 @@ def t047() {
     return v[0].x * 100 + v[1].y * 10 + v.len;
 }
 
+def t048() {
+    // Deque: FIFO と push_front の混在。両端からの取り出し順
+    q: Deque<int> = Deque(zero_int);
+    q.push_back(1);
+    q.push_back(2);
+    q.push_back(3);
+    q.push_front(0);
+    a = q.pop_front();
+    b = q.pop_back();
+    c = q.pop_front();
+    d = q.pop_back();
+    return a * 10000 + b * 1000 + c * 100 + d * 10 + q.len;
+}
+
+def t049() {
+    // Deque: LIFO（後ろで出し入れする Stack、先頭で出し入れする Stack）
+    q: Deque<int> = Deque(zero_int);
+    q.push_back(1);
+    q.push_back(2);
+    q.push_back(3);
+    x = q.pop_back() * 100 + q.pop_back() * 10 + q.pop_back();
+    q.push_front(4);
+    q.push_front(5);
+    q.push_front(6);
+    y = q.pop_front() * 100 + q.pop_front() * 10 + q.pop_front();
+    return x * 1000 + y;
+}
+
+def t050() {
+    // Deque: 巻き戻し。容量 8 を満たし、先頭を 5 つ抜いてから物理末尾を
+    // 越えて push_back し、全順序を drain で確認する
+    q: Deque<int> = Deque(zero_int);
+    i = 0;
+    while (i < 8) { q.push_back(i); i = i + 1; }
+    i = 0;
+    while (i < 5) { x = q.pop_front(); i = i + 1; }
+    i = 8;
+    while (i < 13) { q.push_back(i); i = i + 1; }
+    n = q.len;
+    s = 0;
+    j = 0;
+    while (q.len > 0) { s = s + q.pop_front() * (j + 1); j = j + 1; }
+    return s + n;
+}
+
+def t051() {
+    // Deque: 両端を交互に 100 個入れ、倍増をまたいでも全順序が保たれる
+    q: Deque<int> = Deque(zero_int);
+    i = 0;
+    while (i < 100) {
+        if (i % 2 == 0) { q.push_back(i); } else { q.push_front(i); }
+        i = i + 1;
+    }
+    s = 0;
+    j = 0;
+    while (j < 100) { s = s + q[j] * (j + 1); j = j + 1; }
+    return s;
+}
+
+def t052() {
+    // Deque: push_front 側から倍増させる（100 個入れて逆順に drain）
+    q: Deque<int> = Deque(zero_int);
+    i = 0;
+    while (i < 100) { q.push_front(i); i = i + 1; }
+    s = 0;
+    j = 0;
+    while (q.len > 0) { s = s + q.pop_front() * (j + 1); j = j + 1; }
+    return s;
+}
+
+def t053() {
+    // Deque: 巻き戻した状態での添字・front・back と、物理的に巻き戻った
+    // 位置からの pop_back
+    q: Deque<int> = Deque(zero_int);
+    i = 0;
+    while (i < 8) { q.push_back(i); i = i + 1; }
+    i = 0;
+    while (i < 3) { x = q.pop_front(); i = i + 1; }
+    q.push_back(8);
+    q.push_back(9);
+    r = q[0] * 10000 + q[3] * 1000 + q[q.len - 1] * 100 + q.front() * 10 + q.back();
+    a = q.pop_back();
+    b = q.pop_back();
+    return r * 100 + a * 10 + b;
+}
+
+def t054() {
+    // Deque: 巻き戻した状態での反復（先頭から末尾の順）
+    q: Deque<int> = Deque(zero_int);
+    i = 0;
+    while (i < 8) { q.push_back(i); i = i + 1; }
+    i = 0;
+    while (i < 5) { x = q.pop_front(); i = i + 1; }
+    i = 8;
+    while (i < 13) { q.push_back(i); i = i + 1; }
+    s = 0;
+    j = 0;
+    for v in q { s = s + v * (j + 1); j = j + 1; }
+    // to_array も同じ並びを返し、反復はスナップショットなので反復中の
+    // push_back は周回回数に影響しない
+    a = q.to_array();
+    cnt = 0;
+    sum2 = 0;
+    for v in q { q.push_back(99); sum2 = sum2 + v; cnt = cnt + 1; }
+    r = s * 10 + cnt;
+    r = r * 100 + sum2;
+    return r * 100 + a[0] * 10 + a[a.len - 1];
+}
+
+def t055() {
+    // Deque: str の Deque
+    d: Deque<str> = Deque(zero_str);
+    d.push_back("b");
+    d.push_front("a");
+    d.push_back("c");
+    d.push_front("z");
+    x = d.pop_back();
+    s = d.pop_front() + d.pop_front() + d.pop_front();
+    r = 0;
+    if (s == "zab" && x == "c") { r = 1; }
+    return r * 1000 + s.len;
+}
+
+def t056() {
+    // Deque: クラスの Deque（ファクトリで Pt を生やす）
+    q: Deque<Pt> = Deque(make_pt);
+    q.push_back(Pt(1, 2));
+    q.push_front(Pt(3, 4));
+    q.push_back(Pt(5, 6));
+    a = q.pop_front();
+    b = q.pop_back();
+    return a.x * 1000 + b.y * 100 + q.front().y * 10 + q.len;
+}
+
+def t057() {
+    // Deque をキューにした幅優先探索（4x4 グリッドの最短路）
+    rows = ["S..#", "##..", "...#", "..G."];
+    dist = [0 - 1; 16];
+    q: Deque<int> = Deque(zero_int);
+    dist[0] = 0;
+    q.push_back(0);
+    dr = [0 - 1, 1, 0, 0];
+    dc = [0, 0, 0 - 1, 1];
+    while (q.len > 0) {
+        cur = q.pop_front();
+        r = cur / 4;
+        c = cur % 4;
+        k = 0;
+        while (k < 4) {
+            nr = r + dr[k];
+            nc = c + dc[k];
+            if (0 <= nr && nr < 4 && 0 <= nc && nc < 4) {
+                if (rows[nr][nc] != 35 && dist[nr * 4 + nc] == 0 - 1) {
+                    dist[nr * 4 + nc] = dist[cur] + 1;
+                    q.push_back(nr * 4 + nc);
+                }
+            }
+            k = k + 1;
+        }
+    }
+    return dist[3 * 4 + 2];
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -584,6 +747,16 @@ def main() {
     mark(45); fails=fails+check(t045(), 2020);
     mark(46); fails=fails+check(t046(), 63);
     mark(47); fails=fails+check(t047(), 1042);
+    mark(48); fails=fails+check(t048(), 3120);
+    mark(49); fails=fails+check(t049(), 321654);
+    mark(50); fails=fails+check(t050(), 356);
+    mark(51); fails=fails+check(t051(), 248725);
+    mark(52); fails=fails+check(t052(), 166650);
+    mark(53); fails=fails+check(t053(), 3693998);
+    mark(54); fails=fails+check(t054(), 34886862);
+    mark(55); fails=fails+check(t055(), 1003);
+    mark(56); fails=fails+check(t056(), 3621);
+    mark(57); fails=fails+check(t057(), 5);
 
     print_str("done"); putchar(10);
     return fails > 0;
