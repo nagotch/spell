@@ -270,6 +270,19 @@ def pairn(n: int) -> int:
 
 def t084() { return pairp(10) * 1000 + pairn(10); }
 
+def t085() {
+    a = 1
+    b = 2
+    r = 0
+    if a == 1 &&
+        b == 2
+        r = 5
+    i = 0
+    while i < 3 &&
+        r == 5 { i = i + 1; }
+    return r * 10 + i
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -367,6 +380,7 @@ def main() {
     mark(82); fails=fails+check(t082(), 11);
     mark(83); fails=fails+check(t083(), 14);
     mark(84); fails=fails+check(t084(), 20020);
+    mark(85); fails=fails+check(t085(), 53);
 
     print_str("done"); putchar(10);
     return fails > 0;

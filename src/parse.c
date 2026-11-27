@@ -794,6 +794,7 @@ static Node* suite_body(Token* hdr) {
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
         int saved_depth = expr_depth;
+        bool saved_anno = suppress_anno;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             Node* s = stmt();
@@ -806,6 +807,7 @@ static Node* suite_body(Token* hdr) {
             globals = saved_globals;
             lambda_stack = saved_lambda;
             expr_depth = saved_depth;
+            suppress_anno = saved_anno;
             if (token->kind == TK_EOF) {
                 break;
             }
@@ -836,6 +838,7 @@ static Node* parse_stmt_list() {
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
         int saved_depth = expr_depth;
+        bool saved_anno = suppress_anno;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             Node* s = stmt();
@@ -848,6 +851,7 @@ static Node* parse_stmt_list() {
             globals = saved_globals;
             lambda_stack = saved_lambda;
             expr_depth = saved_depth;
+            suppress_anno = saved_anno;
             if (at_eof()) {
                 break;
             }
@@ -1273,6 +1277,7 @@ static void class_colon_body(Function** cur, Class* klass, int* offset, Token* h
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
         int saved_depth = expr_depth;
+        bool saved_anno = suppress_anno;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             class_member(cur, klass, offset);
@@ -1283,6 +1288,7 @@ static void class_colon_body(Function** cur, Class* klass, int* offset, Token* h
             globals = saved_globals;
             lambda_stack = saved_lambda;
             expr_depth = saved_depth;
+            suppress_anno = saved_anno;
             if (token->kind == TK_EOF) {
                 break;
             }
@@ -1345,6 +1351,7 @@ static void class_decl(Function** cur) {
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
         int saved_depth = expr_depth;
+        bool saved_anno = suppress_anno;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             class_member(cur, klass, &offset);
@@ -1355,6 +1362,7 @@ static void class_decl(Function** cur) {
             globals = saved_globals;
             lambda_stack = saved_lambda;
             expr_depth = saved_depth;
+            suppress_anno = saved_anno;
             if (at_eof()) {
                 break;
             }
@@ -1527,6 +1535,7 @@ Function* program() {
         LVar* saved_globals = globals;
         LambdaParse* saved_lambda = lambda_stack;
         int saved_depth = expr_depth;
+        bool saved_anno = suppress_anno;
         jmp_buf* saved_recover = error_capture_set_recover(&jb);
         if (setjmp(jb) == 0) {
             parse_top_item(&cur, &stmt_cur);
@@ -1537,6 +1546,7 @@ Function* program() {
             globals = saved_globals;
             lambda_stack = saved_lambda;
             expr_depth = saved_depth;
+            suppress_anno = saved_anno;
             is_top_level = false;
             if (at_eof()) {
                 break;
