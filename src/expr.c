@@ -69,20 +69,31 @@ bool input_target_is_count_form() {
     return !ident_is_bound(token);
 }
 
-// 個数形の対象 `名前[個数式]` を読み、基底名トークンと個数式を返す。
-// 呼び出し前に input_target_is_count_form() で判定すること。個数式の
-// 解析条件は parse_input_target と同じ（suppress_multi を立てる）
+// 個数形の対象 `名前[個数式][個数式]...` を読み、基底名トークンと、
+// 個数式の並び（next で連結）を返す（step 75: n 次元への一般化。
+// 角括弧の並びは全て個数として読む）。角括弧の継続は、空白区切りの
+// 対象継続と同じく同じ行の中だけとする（次の行の先頭の `[` を飲み
+// 込まない）。呼び出し前に input_target_is_count_form() で判定する
+// こと。個数式の解析条件は parse_input_target と同じ
+// （suppress_multi を立てる）
 Node* parse_input_count(Token** name_out) {
     *name_out = consume_ident();
-    consume("[");
-    bool saved = suppress_multi;
-    suppress_multi = true;
-    expr_depth++;
-    Node* count = expr();
-    expr_depth--;
-    suppress_multi = saved;
-    expect("]");
-    return count;
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    do {
+        consume("[");
+        bool saved = suppress_multi;
+        suppress_multi = true;
+        expr_depth++;
+        cur->next = expr();
+        expr_depth--;
+        suppress_multi = saved;
+        cur = cur->next;
+        expect("]");
+    } while (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '['
+             && token->prev && token->line == token->prev->line);
+    return head.next;
 }
 
 // put 文の引数列（括弧なし、カンマ区切り）を読む

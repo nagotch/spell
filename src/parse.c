@@ -420,112 +420,179 @@ static void expect_stmt_end(const char* subject) {
     }
 }
 
-// 個数形の対象 `a[n]` 1つ分の展開を文の並びの末尾に足す（step 72）:
-//   tmp = 個数式; a = [fill] * tmp; @tmp { a[i] = 入力 }
-// 個数式は一時スロットへ1回だけ評価する。fill は整数形（>>）が 0、
-// 文字列形（>>>）が ""。ループは make_for_count と同じ形の ND_FOR
-// （__count_range 経由）で、本体は合成した代入文にする。負数や0の
-// 振る舞いは、展開先の `[fill] * n` と回数ループの振る舞いそのまま
-static void append_count_input(Node** cur, Token* start, int mode) {
-    Token* name = NULL;
-    Node* count = parse_input_count(&name);
-    // 一時スロット（個数式の評価は1回だけ）
-    register_any();
-    int tmp_offset = locals->offset;
-    Node* tmp_var = create_node(ND_LVAR);
-    tmp_var->offset = tmp_offset;
-    tmp_var->tok = name;
-    Node* s1 = create_node(ND_ASSIGN);
-    s1->left_child = tmp_var;
-    s1->right_child = count;
-    s1->tok = name;
-    // a = [fill] * tmp で束縛する
+// 個数形の葉の値（整数形（>>）は 0、文字列形（>>>）は ""）を
+// 毎回新しいノードで作る
+static Node* make_input_fill(Token* name, int mode) {
+    if (mode == 0) {
+        Node* zero = create_number_node(0);
+        zero->tok = name;
+        return zero;
+    }
+    // "" の文字配列を str へ変換する（文字列リテラルと同じ形）
+    Token* fake = calloc(1, sizeof(Token));
+    fake->kind = TK_STR;
+    fake->str = "";
+    fake->len = 0;
+    fake->line = name->line;
+    fake->next = token;
+    token = fake;
+    Node* chars = char_array();
+    Node* str_node = create_node(ND_FUNCALL);
+    str_node->name = "str";
+    str_node->len = 3;
+    str_node->tok = name;
+    str_node->args = chars;
+    return str_node;
+}
+
+// 個数形の「下ごしらえ」リテラル: 深さ depth の入れ子配列リテラル
+// （要素は全て1つだけで、最深部が葉の値）。`[このリテラル] * 個数`
+// の形で使うと、目的の次元の型を持つ長さ1の雛形になる。雛形の
+// 小配列は、読み取りループの中で枠ごとに新しい配列へ置き換えられ
+// てから使われるので、共有されても書き換えられることはない
+static Node* make_input_placeholder(Token* name, int mode, int depth) {
+    if (depth == 0) {
+        return make_input_fill(name, mode);
+    }
+    Node* inner = make_input_placeholder(name, mode, depth - 1);
     Node* lit = create_node(ND_ARRAY);
     register_array(1);
     lit->array_len = 1;
     lit->offset = locals->offset;
     lit->tok = name;
-    if (mode == 0) {
-        Node* zero = create_number_node(0);
-        zero->tok = name;
-        lit->body = zero;
-    } else {
-        // "" の文字配列を str へ変換する（文字列リテラルと同じ形）
-        Token* fake = calloc(1, sizeof(Token));
-        fake->kind = TK_STR;
-        fake->str = "";
-        fake->len = 0;
-        fake->line = name->line;
-        fake->next = token;
-        token = fake;
-        Node* chars = char_array();
-        Node* str_node = create_node(ND_FUNCALL);
-        str_node->name = "str";
-        str_node->len = 3;
-        str_node->tok = name;
-        str_node->args = chars;
-        lit->body = str_node;
+    lit->body = inner;
+    return lit;
+}
+
+static Node* make_lvar_ref(int offset, Token* tok) {
+    Node* node = create_node(ND_LVAR);
+    node->offset = offset;
+    node->tok = tok;
+    return node;
+}
+
+// 添字列のパス `名前[i0][i1]...`（depth 個の添字）を新しいノードで作る
+static Node* make_index_path(Token* name, int* var_offsets, int depth) {
+    Node* node = create_ident_node(name);
+    for (int d = 0; d < depth; d++) {
+        Node* idx = create_node(ND_INDEX);
+        idx->tok = name;
+        idx->left_child = node;
+        idx->right_child = make_lvar_ref(var_offsets[d], name);
+        node = idx;
     }
-    Node* tmp_ref = create_node(ND_LVAR);
-    tmp_ref->offset = tmp_offset;
-    tmp_ref->tok = name;
-    Node* mul = create_binary_operation_node(OP_MUL, lit, tmp_ref);
+    return node;
+}
+
+// 個数形の対象 `a[d1][d2]...[dk]` 1つ分の展開を文の並びの末尾に
+// 足し、足した文の数を返す（step 72、step 75 で n 次元化）:
+//   tmp1 = d1; ...; tmpk = dk
+//   a = [雛形] * tmp1
+//   @tmp1 { a[i1] = [雛形] * tmp2; @tmp2 { ... @tmpk { a[i1]...[ik] = 入力 } } }
+// 個数式は一時スロットへ左から順に1回だけ評価する。葉の fill は
+// 整数形（>>）が 0、文字列形（>>>）が ""。小配列は、ループの中で
+// 枠ごとに `[雛形] * 個数` で新しい配列を作って割り当ててから中身を
+// 読むため、行同士が同じ配列を共有することはない（prelude の
+// read_ints2 と同じ作り方）。ループは make_for_count と同じ形の
+// ND_FOR（__count_range 経由）。負数や0の振る舞いは、展開先の
+// `[fill] * n` と回数ループの振る舞いそのまま
+static int append_count_input(Node** cur, Token* start, int mode) {
+    Token* name = NULL;
+    Node* counts = parse_input_count(&name);
+    int k = 0;
+    for (Node* c = counts; c; c = c->next) {
+        k++;
+    }
+    int* tmp_offsets = malloc(sizeof(int) * k);
+    int* loop_offsets = malloc(sizeof(int) * k);
+    int* var_offsets = malloc(sizeof(int) * k);
+    int nstmts = 0;
+    // tmp_j = 個数式（左から順に、評価は1回だけ）
+    int j = 0;
+    for (Node* c = counts; c; c = c->next, j++) {
+        register_any();
+        tmp_offsets[j] = locals->offset;
+        Node* s = create_node(ND_ASSIGN);
+        s->left_child = make_lvar_ref(tmp_offsets[j], name);
+        s->right_child = c;
+        s->tok = name;
+        (*cur)->next = s;
+        *cur = s;
+        nstmts++;
+    }
+    // ループ変数と反復子のスロットを先に確保する
+    for (j = 0; j < k; j++) {
+        register_any();
+        loop_offsets[j] = locals->offset;
+        register_any();
+        var_offsets[j] = locals->offset;
+    }
+    // a = [雛形] * tmp1 で束縛する
+    Node* mul = create_binary_operation_node(
+        OP_MUL, make_input_placeholder(name, mode, k),
+        make_lvar_ref(tmp_offsets[0], name));
     mul->tok = name;
     Node* s2 = create_node(ND_ASSIGN);
     s2->left_child = bind_target_node(create_ident_node(name));
     s2->right_child = mul;
     s2->tok = name;
-    // @tmp { a[i] = 入力 }
-    Node* loop = create_node(ND_FOR);
-    loop->tok = start;
-    Node* range_call = create_node(ND_FUNCALL);
-    range_call->name = "__count_range";
-    range_call->len = 13;
-    range_call->tok = name;
-    Node* tmp_ref2 = create_node(ND_LVAR);
-    tmp_ref2->offset = tmp_offset;
-    tmp_ref2->tok = name;
-    range_call->args = tmp_ref2;
-    loop->init = range_call;
-    register_any();
-    loop->offset = locals->offset;
-    register_any();
-    Node* loop_var = create_node(ND_LVAR);
-    loop_var->offset = locals->offset;
-    loop_var->tok = name;
-    loop->left_child = loop_var;
-    Node* idx = create_node(ND_INDEX);
-    idx->tok = name;
-    idx->left_child = create_ident_node(name);
-    Node* var_ref = create_node(ND_LVAR);
-    var_ref->offset = loop_var->offset;
-    var_ref->tok = name;
-    idx->right_child = var_ref;
+    (*cur)->next = s2;
+    *cur = s2;
+    nstmts++;
+    // 入れ子のループを内側から組み立てる。最深部は要素への読み取り、
+    // それより外の各段では、まずその枠へ新しい小配列を割り当てる
     Node* input = create_node(ND_INPUT);
     input->val = mode;
     input->tok = start;
-    Node* assign = create_node(ND_ASSIGN);
-    assign->left_child = idx;
-    assign->right_child = input;
-    assign->tok = name;
-    Node* body = create_node(ND_BLOCK);
-    body->body = assign;
-    body->tok = name;
-    loop->then = body;
-    (*cur)->next = s1;
-    *cur = s1;
-    (*cur)->next = s2;
-    *cur = s2;
-    (*cur)->next = loop;
-    *cur = loop;
+    Node* inner = create_node(ND_ASSIGN);
+    inner->left_child = make_index_path(name, var_offsets, k);
+    inner->right_child = input;
+    inner->tok = name;
+    for (j = k - 1; j >= 0; j--) {
+        Node* body_head = inner;
+        if (j < k - 1) {
+            Node* cmul = create_binary_operation_node(
+                OP_MUL, make_input_placeholder(name, mode, k - j - 1),
+                make_lvar_ref(tmp_offsets[j + 1], name));
+            cmul->tok = name;
+            Node* ca = create_node(ND_ASSIGN);
+            ca->left_child = make_index_path(name, var_offsets, j + 1);
+            ca->right_child = cmul;
+            ca->tok = name;
+            ca->next = inner;
+            body_head = ca;
+        }
+        Node* block = create_node(ND_BLOCK);
+        block->body = body_head;
+        block->tok = name;
+        Node* loop = create_node(ND_FOR);
+        loop->tok = start;
+        Node* range_call = create_node(ND_FUNCALL);
+        range_call->name = "__count_range";
+        range_call->len = 13;
+        range_call->tok = name;
+        range_call->args = make_lvar_ref(tmp_offsets[j], name);
+        loop->init = range_call;
+        loop->offset = loop_offsets[j];
+        loop->left_child = make_lvar_ref(var_offsets[j], name);
+        loop->then = block;
+        inner = loop;
+    }
+    (*cur)->next = inner;
+    *cur = inner;
+    nstmts++;
+    free(tmp_offsets);
+    free(loop_offsets);
+    free(var_offsets);
+    return nstmts;
 }
 
 // 入力文 `>> 対象...` / `>>> 対象...`（step 72）。mode は ND_INPUT の
 // val（0 = 整数 in、1 = 文字列トークン in_str）。対象はカンマ区切り・
 // 空白区切りのどちらでも並べられ、混在もできる。空白区切りの継続は
 // 同じ行の中だけにする（次の行の先頭の識別子を対象として飲み込ま
-// ない）。対象は複数文に展開されることがある（個数形は3文）ため、
-// 文の並びを作って、1つならそのまま、複数ならブロックに包んで返す
+// ない）。対象は複数文に展開されることがある（個数形は次元の数＋2文）
+// ため、文の並びを作って、1つならそのまま、複数ならブロックに包んで返す
 static Node* stmt_input(Token* start, int mode) {
     Node head;
     head.next = NULL;
@@ -533,8 +600,7 @@ static Node* stmt_input(Token* start, int mode) {
     int nstmts = 0;
     do {
         if (input_target_is_count_form()) {
-            append_count_input(&cur, start, mode);
-            nstmts += 3;
+            nstmts += append_count_input(&cur, start, mode);
         } else {
             Node* target = parse_input_target();
             Node* input = create_node(ND_INPUT);

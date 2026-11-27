@@ -144,14 +144,18 @@ put a + b + c</pre>
   対象は <code>&gt;&gt;</code> と同じく空白区切りでも並べられ、カンマと混在できます（空白区切りの継続は同じ行の中だけです）。
 </p>
 
-<h3><code>&gt;&gt; 名前[個数]</code>（個数形）</h3>
+<h3><code>&gt;&gt; 名前[個数][個数]...</code>（個数形）</h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>&gt;&gt; a[n]</code></td><td><code>a = [0] * n</code> のあと <code>i@n { &gt;&gt; a[i]; }</code>（個数式は1回だけ評価される）</td></tr>
   <tr><td><code>&gt;&gt;&gt; s[n]</code></td><td><code>s = [""] * n</code> のあと <code>i@n { &gt;&gt;&gt; s[i]; }</code></td></tr>
+  <tr><td><code>&gt;&gt; a[n][m]</code></td><td><code>a = [[0]; n]</code> のあと <code>i@n { a[i] = [0] * m; j@m { &gt;&gt; a[i][j]; } }</code>（二次元。角括弧を重ねれば n 次元になる）</td></tr>
 </table>
 <p>
   基底名が未束縛のときだけ個数形になります。束縛済みの配列への <code>&gt;&gt; a[2]</code> は従来どおり添字形（1要素へ1つ読む）です。
+  個数形では角括弧の並びが全て個数になり、入れ子配列を作って全要素を行順に読みます（直方体のみ）。
+  小配列は枠ごとに新しい配列になるので、行同士が同じ配列を共有することはありません。
+  いずれかの個数が 0 なら、その方向は空になります。角括弧の継続は同じ行の中だけです。
 </p>
 
 <figure class="code">
@@ -172,6 +176,25 @@ put a</pre>
   <figcaption>出力</figcaption>
 <pre>foo bar
 10 20 30</pre>
+</figure>
+
+<figure class="code">
+  <figcaption>例（二次元）</figcaption>
+<pre>&gt;&gt; h, w, a[h][w]
+put a[0]
+put a[1]</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>入力</figcaption>
+<pre>2 3
+1 2 3 4 5 6</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1 2 3
+4 5 6</pre>
 </figure>
 
 <h3><code>対象- = in[n]</code></h3>
