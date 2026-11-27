@@ -72,7 +72,7 @@
 <table>
   <tr><th>型</th><th>内容</th><th>備考</th></tr>
   <tr><td><code>int</code></td><td>64ビット符号つき整数</td><td>オーバーフローは2の補数で巻き戻る</td></tr>
-  <tr><td><code>bool</code></td><td>真偽値</td><td>リテラルは無い。比較や論理演算が作る（後述）</td></tr>
+  <tr><td><code>bool</code></td><td>真偽値</td><td>リテラルは <code>true</code> / <code>false</code>（短縮形 <code>T</code> / <code>F</code>）。比較や論理演算も作る（後述）</td></tr>
   <tr><td><code>str</code></td><td>文字列</td><td>中身は文字コード（<code>int</code>）の配列</td></tr>
   <tr><td><code>[T]</code></td><td>配列</td><td>要素はすべて同じ型 <code>T</code></td></tr>
   <tr><td><code>Range</code></td><td>範囲 <code>a..b</code> の値</td><td>反復専用に近い。文字列化はできない</td></tr>
