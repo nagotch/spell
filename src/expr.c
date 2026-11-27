@@ -431,11 +431,38 @@ static Node* range() {
 
 static Node* assign() {
     if (lambda_arrow_ahead()) {
-        return parse_lambda(true, token);
+        // `(x, y) -> 式` は形でラムダと区別できるので常に従来どおり。
+        // 裸の識別子 `x -> 式` は、x が現在のスコープで束縛済みなら
+        // 矢印演算子（step 66）として通常の解析へ進み、未束縛なら
+        // ラムダの引数名として扱う。帰結として、束縛済みの変数と
+        // 同名の引数を持つ裸ラムダは書けない（fn 形で書く）
+        if (token->kind != TK_IDENT || !ident_is_bound(token)) {
+            return parse_lambda(true, token);
+        }
     }
     Token* first_token = token;
     Node* node = range();
     Token* error_token = token;
+    // 矢印演算子（step 66）: 代入に準ずる低い優先順位で、右側は完全な式を
+    // 取る。型による解決（dunder 呼び出し・代入・int の比較）は typecheck
+    // で行う。代入先になり得る側は、通常の代入文と同じく bind_target_node
+    // を通す（関数名と同名なら新しい変数への束縛として扱う）
+    if (!at_expr_line_break()) {
+        Token* arrow_tok = token;
+        bool is_left_arrow = consume("<-");
+        bool is_right_arrow = !is_left_arrow && consume("->");
+        if (is_left_arrow || is_right_arrow) {
+            Node* anode = create_node(is_left_arrow ? ND_ARROW_L : ND_ARROW_R);
+            anode->tok = arrow_tok;
+            anode->left_child = is_left_arrow ? bind_target_node(node) : node;
+            bool saved = suppress_multi;
+            suppress_multi = true;
+            Node* rhs = assign();
+            suppress_multi = saved;
+            anode->right_child = is_right_arrow ? bind_target_node(rhs) : rhs;
+            return anode;
+        }
+    }
     if (!suppress_multi && token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ',') {
         // 複数代入: a, b = 値, 値。値は全部評価してから一時置き場経由で代入する
         Node* targets = node;

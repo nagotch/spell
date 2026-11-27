@@ -256,6 +256,43 @@ if len(diags) == 1:
     check("EOF・後ろの行: メッセージに「数値が必要ですが」",
           "数値が必要ですが" in diags[0]["message"], diags[0]["message"])
 
+# 5.10 矢印演算子（step 66）: 正しい矢印は診断なし、dunder を持たない
+# クラスへの矢印はキャプチャモードでも位置つき診断になる
+ARROW_OK_PROGRAM = (
+    "def main() {\n"
+    "    q: Deque<int> = Deque(zero_int);\n"
+    "    q <- 1;\n"
+    "    x <- q;\n"
+    "    return x;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 11},
+                 "contentChanges": [{"text": ARROW_OK_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（矢印・正常）: 診断なし", diags == [], json.dumps(diags, ensure_ascii=False))
+
+ARROW_ERR_PROGRAM = (
+    "class P { x: int; def __init__(self, x: int) { self.x = x; } }\n"
+    "def main() {\n"
+    "    p = P(1);\n"
+    "    p <- 1;\n"
+    "    return 0;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 12},
+                 "contentChanges": [{"text": ARROW_ERR_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（矢印・dunder なし）: 診断1件", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 1:
+    check("矢印・dunder なし: メッセージに「は使えません」",
+          "は使えません" in diags[0]["message"], diags[0]["message"])
+    r = diags[0]["range"]
+    check("矢印・dunder なし: 範囲は <- の位置（line=3, char=6-8）",
+          r["start"] == {"line": 3, "character": 6} and r["end"] == {"line": 3, "character": 8},
+          json.dumps(r))
+
 # 6. didClose: 空の診断が送られて消える
 send({"jsonrpc": "2.0", "method": "textDocument/didClose",
       "params": {"textDocument": {"uri": URI}}})

@@ -139,6 +139,18 @@ static Capture* resolve_capture(Token* tok) {
 static LVar* find_lvar(Token* tok);
 static LVar* find_gvar(Token* tok);
 
+// 名前が現在のスコープで束縛済みか（ローカル・捕捉可能な外側の変数・
+// グローバル・関数名のいずれかに解決されるか）。`x -> 式` の振り分けに
+// 使う（step 66）: 束縛済みなら矢印演算子、未束縛ならラムダの引数名。
+// 束縛の構造はパーサの名前表がそのまま型検査の使うものなので、
+// 振り分けはここで決めてよい（型による push/pop/比較の解決は typecheck）
+bool ident_is_bound(Token* tok) {
+    if (ident_is_value_call(tok)) {
+        return true;
+    }
+    return is_func_name(tok->str, tok->len);
+}
+
 // 識別子＋`(` を、名前呼び出しではなく値経由の呼び出しに振り分けるかの判定。
 // 識別子そのものの解決（create_ident_node）と同じく、変数が関数名・クラス名
 // より優先される: 変数（ローカル・捕捉可能な外側の変数・グローバル）に

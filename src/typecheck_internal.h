@@ -3,6 +3,9 @@
 // typecheck.c
 extern Function* functions;
 
+// parse.c（typecheck の書き換えで数値ノードを作るために使う）
+Node* create_number_node(long num);
+
 // types.c
 bool type_equals(Type* a, Type* b);
 bool type_strict_equals(Type* a, Type* b);

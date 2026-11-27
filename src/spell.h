@@ -165,6 +165,12 @@ typedef enum {
     // `append` メソッド呼び出しをこの組み込みノードへ書き換える。
     // left_child = 代入可能な対象（スロット）、args = 追加する値（1個）
     ND_APPEND,
+    // 矢印演算子（step 66）。`A <- B` が ND_ARROW_L、`A -> B` が
+    // ND_ARROW_R。パース時点では型が分からないためこの形で運び、
+    // typecheck がオペランドの型で dunder 呼び出し・代入・int の
+    // 比較へ書き換える（書き換え後は残らない）
+    ND_ARROW_L,
+    ND_ARROW_R,
 } NodeKind;
 typedef struct Node Node;
 struct Node {

@@ -147,7 +147,7 @@ static const char* cmp_dunder(BinOp op) {
 static Type* rewrite_to_mcall(Node* node, Type* lt, Type* rt, const char* name, int len, Function* method) {
     Class* klass = class_of(lt);
     if (method->nparams != 2) {
-        error_node(node, "クラス`%.*s`のメソッド`%.*s`の引数は1個ですが、%d個が定義されています", klass->len, klass->name, name, method->nparams - 1);
+        error_node(node, "クラス`%.*s`のメソッド`%.*s`の引数は1個ですが、%d個が定義されています", klass->len, klass->name, len, name, method->nparams - 1);
     }
     if (method->param_types[1] && rt->kind != TY_UNKNOWN && !type_equals(method->param_types[1], rt)) {
         error_node(node, "クラス`%.*s`のメソッド`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, len, name, type_text(method->param_types[1]), type_text(rt));
@@ -779,6 +779,169 @@ static Type* check_append(Node* node, Type* obj) {
     return &ty_int;
 }
 
+// 矢印の pop 側の代入を仕上げる。call は検査済みの dunder 呼び出しで、
+// 要素の型 elem を返す。対象がクラスへの添字なら、値としての検査で
+// `__getitem__` 呼び出しへ書き換え済みなので、check_assign と同じく
+// `__setitem__` 呼び出しへ組み替える。それ以外の対象は ND_ASSIGN に
+// 組み替え、右辺は検査済みの前提で check_assign の対象側の型記録だけを
+// なぞる（対象を値として再検査すると添字の書き換えが二重になるため）
+static Type* finish_arrow_assign(Node* node, Node* target, Node* call, Type* elem, const char* opname) {
+    if (target->kind == ND_MCALL && target->func
+            && target->len == 11 && !memcmp(target->name, "__getitem__", 11)) {
+        Node* idx = malloc(sizeof(Node));
+        memcpy(idx, target->args, sizeof(Node));
+        idx->next = NULL;
+        rewrite_to_setitem(node, target->klass, target->left_child, idx, target->args->type, elem, call);
+        return elem;
+    }
+    bool assignable = target->kind == ND_LVAR || target->kind == ND_GVAR
+        || target->kind == ND_CAPVAR || target->kind == ND_INDEX
+        || (target->kind == ND_MEMBER && !target->func);
+    if (!assignable) {
+        error_node(node, "演算子`%s`の代入先は変数・フィールド・配列の要素でなければなりません", opname);
+        return &ty_unknown;
+    }
+    node->kind = ND_ASSIGN;
+    node->left_child = target;
+    node->right_child = call;
+    if (target->kind == ND_LVAR) {
+        Type* recorded = local_types[target->offset / 8];
+        check_assign_type(target, recorded, elem);
+        if (!recorded && elem->kind != TY_UNKNOWN) {
+            local_types[target->offset / 8] = elem;
+        }
+        target->type = local_types[target->offset / 8];
+    } else if (target->kind == ND_GVAR) {
+        Type* recorded = find_global_type(target);
+        check_assign_type(target, recorded, elem);
+        if (recorded->kind == TY_UNKNOWN) {
+            record_global_type(target, elem);
+        }
+        target->type = find_global_type(target);
+    } else if (target->kind == ND_CAPVAR) {
+        // target->type は値としての検査で確定した捕捉変数の型
+        if (target->type && target->type->kind != TY_UNKNOWN && elem->kind != TY_UNKNOWN
+                && !type_equals(target->type, elem)) {
+            error_node(target, "変数`%.*s`の型は`%s`ですが、`%s`が代入されています", target->len, target->name, type_text(target->type), type_text(elem));
+        }
+    } else if (target->kind == ND_INDEX) {
+        // 配列の要素への代入（クラスへの添字は上で処理済み）。
+        // target->type は要素の型
+        if (target->type && target->type->kind != TY_UNKNOWN && elem->kind != TY_UNKNOWN
+                && !type_equals(target->type, elem)) {
+            error_node(node, "配列の要素は`%s`ですが、`%s`が代入されています", type_text(target->type), type_text(elem));
+        }
+    }
+    // ND_MEMBER（フィールド）への代入は check_assign と同様に型照合しない
+    return elem;
+}
+
+// 矢印演算子（step 66）: `A <- B` と `A -> B` を、オペランドの型で
+// dunder プロトコル呼び出し・代入・int の比較へ書き換える。演算子は
+// 通常メソッドを直接呼ばず、step 42 の dunder 書き換えと同じ規則で
+// プロトコルメソッドへだけ展開する（通常メソッドは dunder のラッパー）。
+//   A <- B: 1) A.__push_back__(B)   2) A = B.__pop_front__()   3) A < (-B)
+//   A -> B: 1) B.__push_front__(A)  2) B = A.__pop_back__()    3) A > (-B)
+// どれにも当たらなければエラー。矢印同士の連鎖は、どちらの向きに
+// 結合しても意味が曖昧なのでエラーにする
+static Type* check_arrow(Node* node) {
+    bool left_arrow = node->kind == ND_ARROW_L;
+    const char* opname = left_arrow ? "<-" : "->";
+    Node* a = node->left_child;
+    Node* b = node->right_child;
+    if (a->kind == ND_ARROW_L || a->kind == ND_ARROW_R
+            || b->kind == ND_ARROW_L || b->kind == ND_ARROW_R) {
+        error_node(node, "矢印演算子は連鎖できません");
+        check_node(a);
+        check_node(b);
+        return &ty_unknown;
+    }
+    Type* lt = check_node(a);
+    Type* rt = check_node(b);
+
+    // 1) push 側: `<-` は A の `__push_back__`、`->` は B の `__push_front__`
+    {
+        Type* ct = left_arrow ? lt : rt;
+        Type* vt = left_arrow ? rt : lt;
+        const char* dunder = left_arrow ? "__push_back__" : "__push_front__";
+        int dlen = left_arrow ? 13 : 14;
+        Class* klass = ct->kind == TY_UNKNOWN ? NULL : class_of(ct);
+        Function* method = klass ? find_callable(klass, (char*)dunder, dlen) : NULL;
+        if (method) {
+            if (left_arrow) {
+                return rewrite_to_mcall(node, lt, rt, dunder, dlen, method);
+            }
+            // `A -> B` はレシーバと引数の並びが逆なので、手で組み替える
+            if (method->nparams != 2) {
+                error_node(node, "クラス`%.*s`のメソッド`%.*s`の引数は1個ですが、%d個が定義されています", klass->len, klass->name, dlen, dunder, method->nparams - 1);
+            }
+            if (method->param_types[1] && vt->kind != TY_UNKNOWN && !type_equals(method->param_types[1], vt)) {
+                error_node(node, "クラス`%.*s`のメソッド`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, dlen, dunder, type_text(method->param_types[1]), type_text(vt));
+            }
+            node->kind = ND_MCALL;
+            node->name = (char*)dunder;
+            node->len = dlen;
+            node->func = method;
+            node->klass = klass;
+            node->left_child = b;
+            node->args = a;
+            node->args->next = NULL;
+            return method->return_type ? method->return_type : &ty_unknown;
+        }
+    }
+
+    // 2) pop 側: `<-` は B.__pop_front__() を A へ、`->` は A.__pop_back__() を B へ
+    {
+        Node* cont = left_arrow ? b : a;
+        Type* ct = left_arrow ? rt : lt;
+        Node* target = left_arrow ? a : b;
+        const char* dunder = left_arrow ? "__pop_front__" : "__pop_back__";
+        int dlen = left_arrow ? 13 : 12;
+        Class* klass = ct->kind == TY_UNKNOWN ? NULL : class_of(ct);
+        Function* method = klass ? find_callable(klass, (char*)dunder, dlen) : NULL;
+        if (method) {
+            if (method->nparams != 1) {
+                error_node(node, "クラス`%.*s`の`%.*s`は引数を取れません", klass->len, klass->name, dlen, dunder);
+                return &ty_unknown;
+            }
+            Type* elem = method->return_type ? method->return_type : &ty_unknown;
+            Node* call = create_node(ND_MCALL);
+            call->tok = node->tok;
+            call->left_child = cont;
+            call->klass = klass;
+            call->func = method;
+            call->name = (char*)dunder;
+            call->len = dlen;
+            call->type = elem;
+            return finish_arrow_assign(node, target, call, elem, opname);
+        }
+    }
+
+    // 3) 両辺が int なら比較（相手を符号反転したもの）。右辺のノードは
+    // 1回だけ現れるので、評価はちょうど1回になる
+    if (lt->kind == TY_INT && rt->kind == TY_INT) {
+        Node* neg = create_node(ND_BINOP);
+        neg->op.binop = OP_SUB;
+        neg->tok = node->tok;
+        neg->left_child = create_number_node(0);
+        neg->right_child = b;
+        neg->type = &ty_int;
+        node->kind = ND_BINOP;
+        node->op.binop = OP_LT;
+        if (left_arrow) {
+            node->left_child = a;
+            node->right_child = neg;
+        } else {
+            node->left_child = neg;
+            node->right_child = a;
+        }
+        return bool_type();
+    }
+
+    error_node(node, "`%s`型と`%s`型の値に演算子`%s`は使えません", type_text(lt), type_text(rt), opname);
+    return &ty_unknown;
+}
+
 static Type* check_mcall(Node* node) {
     Type* obj = check_node(node->left_child);
     if (node->len == 3 && !memcmp(node->name, "len", 3) && (obj->kind == TY_ARRAY || obj->kind == TY_UNKNOWN)) {
@@ -1404,6 +1567,10 @@ static Type* check_node(Node* node) {
             break;
         case ND_BINOP:
             result = check_binop(node);
+            break;
+        case ND_ARROW_L:
+        case ND_ARROW_R:
+            result = check_arrow(node);
             break;
         case ND_ASSIGN:
             result = check_assign(node);

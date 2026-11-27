@@ -35,6 +35,9 @@ g_counter = 0;
 def get_g() { return g_val; }
 def bump() { g_counter += 1; return g_counter; }
 
+arrow_cnt = 0;
+def arrow_bump(v: int) -> int { arrow_cnt = arrow_cnt + 1; return v; }
+
 def dbl(x: int) -> int { return x * 2; }
 def apply1(f: fn(int) -> int, x: int) -> int { return f(x); }
 def apply6(f: fn(int, int, int, int, int, int) -> int, a: int) -> int {
@@ -135,6 +138,51 @@ def t037() {
     return r;
 }
 
+def t038() {
+    // step 66: 両辺が int の矢印は比較（相手を符号反転）。
+    // `a <- b` は a < (-b)、`a -> b` は a > (-b) と一致する
+    a = 3; b = 5;
+    r = 0;
+    if (a <- b) { r = r + 1; }
+    if (a -> b) { r = r + 2; }
+    if ((0 - 7) <- (0 - 2)) { r = r + 4; }
+    if ((0 - 7) -> (0 - 2)) { r = r + 8; }
+    if (b <- a) { r = r + 16; }
+    if (b -> a) { r = r + 32; }
+    return r;
+}
+
+def t039() {
+    // step 66: 比較形の右辺はちょうど1回だけ評価される
+    arrow_cnt = 0;
+    a = (3 <- arrow_bump(5));
+    b = ((0 - 3) -> arrow_bump(2));
+    if (a || b) { return -1; }
+    return arrow_cnt;
+}
+
+def t040() {
+    // step 66: ラムダの3形は従来どおり（裸の識別子は未束縛名のとき、
+    // (x, y) 形と fn 形は形で区別される）
+    f: fn(int) -> int = v -> v * 3;
+    g: fn(int, int) -> int = (p, q) -> p - q;
+    h = fn(x: int) -> int { return x + 1; };
+    return f(10) + g(10, 3) + h(1);
+}
+
+def t041() {
+    // step 66: 束縛済みの int 変数と同名では裸ラムダにならず比較になる
+    x = 6;
+    if (x -> 2) { return 1; }
+    return 0;
+}
+
+def t042() {
+    x = 0 - 5;
+    if (x -> 2) { return 1; }
+    return 2;
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -188,6 +236,11 @@ def main() {
     mark(38); fails=fails+check(t035(), 11);
     mark(39); fails=fails+check(t036(), 123);
     mark(40); fails=fails+check(t037(), 11);
+    mark(41); fails=fails+check(t038(), 38);
+    mark(42); fails=fails+check(t039(), 2);
+    mark(43); fails=fails+check(t040(), 39);
+    mark(44); fails=fails+check(t041(), 1);
+    mark(45); fails=fails+check(t042(), 2);
 
     print_str("done"); putchar(10);
     return fails > 0;
