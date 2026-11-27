@@ -64,14 +64,14 @@
   プログラムはトップレベルに文を並べて書きます。文は <code>;</code> で終えますが、<code>;</code> は省略できます。その場合、文の終わりは改行でなければなりません（同じ行に次の文を続けるには <code>;</code> が要ります）。ブロック <code>{ }</code> の直後はどちらも要りません。
   式の途中での改行は、括弧の中では自由です。演算子の直後なら被演算子を次の行に置けますが、行末で式が完結していると次の行は新しい文として読まれます。
   出力の基本は <code>put</code> で、複数の値を空白区切りで1行に出します。
-  糖衣として、文頭の <code>&lt;</code> と <code>&lt;&lt;</code> も同じ出力です。
+  糖衣として、<code>&lt;&lt;</code> も同じ出力です。
 </p>
 
 <figure class="code">
   <figcaption>例</figcaption>
 <pre>put 1, 2, 3;
 &lt;&lt; "moji";
-&lt; 40 + 2;</pre>
+&lt;&lt; 40 + 2;</pre>
 </figure>
 
 <figure class="out">
