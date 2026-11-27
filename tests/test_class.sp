@@ -733,6 +733,22 @@ def t060() {
     return r1 * 100 + r2 * 10 + bag.n;
 }
 
+// ジェネリックなクラスの中でも、[T] フィールドへ append できる
+// （実体化したクローン側で要素型つきに検査される）
+class GBag<T> {
+    a: [T];
+    def __init__(self) { self.a = []; }
+    def add(self, v: T) { self.a.append(v); }
+    def get(self, i: int) -> T { return self.a[i]; }
+    def n(self) -> int { return self.a.len; }
+}
+def t061() {
+    b: GBag<int> = GBag();
+    b.add(5);
+    b.add(6);
+    return b.n() * 100 + b.get(0) * 10 + b.get(1);
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -800,6 +816,7 @@ def main() {
     mark(58); fails=fails+check(t058(), 323);
     mark(59); fails=fails+check(t059(), 51007);
     mark(60); fails=fails+check(t060(), 588);
+    mark(61); fails=fails+check(t061(), 256);
 
     print_str("done"); putchar(10);
     return fails > 0;

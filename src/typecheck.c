@@ -769,6 +769,12 @@ static Type* check_append(Node* node, Type* obj) {
             && !type_equals(obj->elem, arg_types[0])) {
         error_node(node, "`append`の引数には`%s`が必要ですが、`%s`が指定されています", type_text(obj->elem), type_text(arg_types[0]));
     }
+    if (!lvalue || nargs != 1) {
+        // 形が壊れた呼び出しは書き換えない。キャプチャ有効時（LSP）は
+        // error_node から戻ってくるため、ND_APPEND の不変条件（対象は
+        // スロット、引数は1個）を満たさないノードを残さないこと
+        return &ty_unknown;
+    }
     node->kind = ND_APPEND;
     return &ty_int;
 }
@@ -1468,13 +1474,18 @@ static Type* check_node(Node* node) {
         case ND_MEMBER:
             result = check_member(node);
             break;
-        case ND_APPEND:
+        case ND_APPEND: {
             // 通常は check_mcall の書き換えで生まれ、ここへは来ない。
-            // 再検査の経路でも壊れないよう、子だけ検査して int とする
-            check_node(node->left_child);
-            check_node(node->args);
-            result = &ty_int;
+            // 再検査の経路でも、対象と引数の検証はやり直す
+            Type* recv_ty = check_node(node->left_child);
+            if (recv_ty->kind == TY_ARRAY) {
+                result = check_append(node, recv_ty);
+            } else {
+                check_node(node->args);
+                result = &ty_int;
+            }
             break;
+        }
         case ND_MCALL:
             result = check_mcall(node);
             break;

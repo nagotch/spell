@@ -69,6 +69,8 @@ def t057() { a = [0; 1]; i = 0; while (i < 100) { a.append(i * i); i = i + 1; } 
 def t058() { r = [[1, 2]]; r[0].append(growrows(r)); return r.len * 1000 + r[0].len * 100 + r[0][2]; }
 def t059() { s = "ab"; s.chars.append(99); return s.len * 100 + s[2]; }
 def t060() { garr.append(40); garr.append(50); return garr.len * 100 + garr[3] + garr[4]; }
+def t061() { r = [1, 2, 3].rev; r.append(4); return r.len * 1000 + r[0] * 100 + r[3]; }
+def t062() { s = "abc".rev; s.chars.append(100); return s.len * 1000 + s[3]; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -143,6 +145,8 @@ def main() {
     mark(58); fails=fails+check(t058(), 1305);
     mark(59); fails=fails+check(t059(), 399);
     mark(60); fails=fails+check(t060(), 590);
+    mark(61); fails=fails+check(t061(), 4304);
+    mark(62); fails=fails+check(t062(), 4100);
 
     print_str("done"); putchar(10);
     return fails > 0;
