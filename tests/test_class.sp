@@ -903,6 +903,26 @@ def t069() {
     return first * 10000 + s;
 }
 
+class NamedT {
+    T: int;
+    def __init__(self, v: int) { self.T = v; }
+}
+
+class Cell<T> {
+    v: T;
+    def __init__(self, v: T) { self.v = v; }
+}
+
+def t070() {
+    // step 70: 型パラメータ名 T とメンバ名 T は真理値リテラルと無関係に
+    // 従来どおり使え、式の位置の T / true はリテラルとして読める
+    c: Cell<bool> = Cell(F);
+    o = NamedT(40);
+    r = o.T;
+    if (!c.v && T) { r = r + 2; }
+    return r;
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -979,6 +999,7 @@ def main() {
     mark(67); fails=fails+check(t067(), 101);
     mark(68); fails=fails+check(t068(), 1122);
     mark(69); fails=fails+check(t069(), 492401);
+    mark(70); fails=fails+check(t070(), 42);
 
     print_str("done"); putchar(10);
     return fails > 0;

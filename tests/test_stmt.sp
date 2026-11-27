@@ -283,6 +283,25 @@ def t085() {
     return r * 10 + i
 }
 
+def t086() {
+    r = 0
+    if true: r = r + 1
+    if F: r = r + 10
+    else: r = r + 2
+    if (false) { r = r + 100; }
+    while F { r = r + 1000; }
+    return r
+}
+
+def t087() {
+    r = 0
+    if T && !F:
+        r = 7
+    if false || F:
+        r = 99
+    return r
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -381,6 +400,8 @@ def main() {
     mark(83); fails=fails+check(t083(), 14);
     mark(84); fails=fails+check(t084(), 20020);
     mark(85); fails=fails+check(t085(), 53);
+    mark(86); fails=fails+check(t086(), 3);
+    mark(87); fails=fails+check(t087(), 7);
 
     print_str("done"); putchar(10);
     return fails > 0;

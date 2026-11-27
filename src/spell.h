@@ -171,6 +171,10 @@ typedef enum {
     // 比較へ書き換える（書き換え後は残らない）
     ND_ARROW_L,
     ND_ARROW_R,
+    // 真理値リテラル（step 70）。式の位置の `true` / `false` / `T` / `F`
+    // をパーサがこの種別に変換する。val が 1（真）か 0（偽）で、型は
+    // prelude の bool クラス。型の位置やメンバ名は対象外
+    ND_BOOL,
 } NodeKind;
 typedef struct Node Node;
 struct Node {

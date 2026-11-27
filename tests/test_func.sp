@@ -182,6 +182,9 @@ def t042() {
     if (x -> 2) { return 1; }
     return 2;
 }
+def yes() -> bool { return T; }
+def no() -> bool { return false; }
+def t043() { if (yes() && !no()) { return 1; } return 0; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -241,6 +244,7 @@ def main() {
     mark(43); fails=fails+check(t040(), 39);
     mark(44); fails=fails+check(t041(), 1);
     mark(45); fails=fails+check(t042(), 2);
+    mark(46); fails=fails+check(t043(), 1);
 
     print_str("done"); putchar(10);
     return fails > 0;

@@ -391,6 +391,9 @@ static Type* check_assign(Node* node) {
         if (lhs->kind == ND_LAMBDA) {
             error_node(lhs, "ラムダには代入できません");
         }
+        if (lhs->kind == ND_BOOL) {
+            error_node(lhs, "`%.*s`には代入できません", lhs->len, lhs->name);
+        }
     }
     return rhs;
 }
@@ -1539,6 +1542,9 @@ static Type* check_node(Node* node) {
     switch (node->kind) {
         case ND_NUM:
             result = &ty_int;
+            break;
+        case ND_BOOL:
+            result = bool_type();
             break;
         case ND_LVAR:
             result = local_types[node->offset / 8];
