@@ -75,11 +75,12 @@
 <table>
   <tr><th>記号形</th><th>正規形・意味</th></tr>
   <tr><td><code>&lt;&lt; x;</code>、文頭の <code>&lt; x;</code></td><td><code>x</code> を文字列化して1行で出す</td></tr>
-  <tr><td><code>&gt;&gt; x;</code></td><td><code>x = in;</code>（整数を1つ読んで代入）</td></tr>
+  <tr><td><code>&gt;&gt; x;</code>、<code>&gt;&gt; x, y, z;</code></td><td><code>x = in;</code>（整数を読んで代入。複数並べると左から順に1つずつ読む。添字やフィールドも対象にできる）</td></tr>
   <tr><td><code>i@n { }</code></td><td><code>for i in n { }</code>（0 から n−1）</td></tr>
   <tr><td><code>i@a..b { }</code></td><td><code>for i in a..b { }</code></td></tr>
   <tr><td><code>x@a { }</code></td><td><code>for x in a { }</code>（要素の走査）</td></tr>
   <tr><td><code>@n { }</code></td><td>変数なしで n 回繰り返す</td></tr>
+  <tr><td><code>@ { }</code></td><td><code>while true { }</code>（無限ループ。<code>!;</code> で抜ける）</td></tr>
   <tr><td><code>!;</code></td><td><code>break;</code></td></tr>
   <tr><td><code>^;</code></td><td><code>continue;</code></td></tr>
   <tr><td><code>a- = in[n];</code></td><td>整数を n 個読み、各要素から1引いた配列を代入する</td></tr>
@@ -100,6 +101,9 @@
   <tr><td><code>[T]</code>（array）</td><td><code>+</code> 連結、<code>*</code> 繰り返し、<code>==</code> / <code>!=</code>（中身の比較）、<code>len</code>、<code>rev</code>、添字、反復、<code>__hash__</code></td><td><code>[値; 長さ]</code> で埋めて作れる</td></tr>
   <tr><td><code>Range</code></td><td>反復、<code>rev</code></td><td><code>a..b</code> / <code>a..=b</code> の値</td></tr>
   <tr><td><code>Dict&lt;K, V&gt;</code></td><td><code>d[k]</code> 読み（無ければ既定値を生やす）、<code>d[k] = v</code> 書き、<code>has(k)</code>、<code>len</code>、<code>keys()</code>、キー列挙の反復</td><td>構築時に既定値ファクトリを渡す。キーには <code>__hash__</code> が要る</td></tr>
+  <tr><td><code>Vec&lt;T&gt;</code></td><td><code>append(v)</code>、<code>len</code>、添字の読み書き、反復、<code>to_array()</code></td><td>伸びる配列。構築時に既定値ファクトリを渡す。反復はスナップショット</td></tr>
+  <tr><td><code>Deque&lt;T&gt;</code></td><td><code>push_back(v)</code>、<code>push_front(v)</code>、<code>pop_back()</code>、<code>pop_front()</code>、<code>front()</code>、<code>back()</code>、<code>len</code>、添字（0 が先頭）、反復</td><td>両端キュー。構築時に既定値ファクトリを渡す。空への <code>pop</code> は結果不定。反復はスナップショット</td></tr>
+  <tr><td><code>FileData</code></td><td>フィールド <code>ok</code>（bool）、<code>text</code>（str）</td><td><code>read_file</code> の戻り値。読めなかったときは <code>ok</code> が偽になる</td></tr>
   <tr><td><code>fn(A) -&gt; B</code></td><td>呼び出し</td><td>関数値の型。外側の変数は値で捕捉する</td></tr>
 </table>
 
@@ -121,6 +125,11 @@
   <tr><td><code>a- = in[n];</code></td><td>読みながら各要素から1引く（1始まり入力用）</td></tr>
   <tr><td><code>put x;</code>、<code>put x, y;</code></td><td>値を空白区切りで1行に出す。配列は要素を並べて出し、二次元配列も平らに1行になる</td></tr>
   <tr><td><code>yn 条件;</code></td><td>真なら <code>Yes</code>、偽なら <code>No</code> を出す</td></tr>
+  <tr><td><code>eprint(x);</code></td><td><code>print</code> と同じ文字列化で、標準エラーに出す</td></tr>
+  <tr><td><code>args()</code></td><td>コマンドライン引数を <code>[str]</code> で返す（先頭はプログラム名）</td></tr>
+  <tr><td><code>read_file(path)</code></td><td>ファイル全体を <code>FileData</code> で返す</td></tr>
+  <tr><td><code>write_file(path, text)</code></td><td>文字列をファイルに書く。成功で <code>true</code></td></tr>
+  <tr><td><code>exit(code);</code></td><td>出力をフラッシュして、そのコードで終了する</td></tr>
 </table>
 
 <h2 id="s05"><span class="no">05</span>キーワード</h2>
