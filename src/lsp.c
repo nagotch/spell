@@ -658,8 +658,33 @@ static void run_check_child(const char* text, int out_fd, int is_prelude) {
             if (eo > text_len) {
                 eo = text_len;
             }
-            offset_to_pos(copy, so, &od.start_line, &od.start_char);
-            offset_to_pos(copy, eo, &od.end_line, &od.end_char);
+            if (so == text_len) {
+                // ファイル末尾を指す範囲（EOF トークンへのエラー等）。
+                // 末尾オフセットは、本文が改行で終わっていると「最終行の
+                // 次の行」の先頭へ変換されてしまい、エディタの行モデルに
+                // 存在しない位置になる（実際、エディタ側で先頭へ丸められて
+                // 表示された）。また幅ゼロの範囲は下線が描かれないことが
+                // ある。そのため、最終行の最後の1文字を指す範囲に直す。
+                // 末尾の改行は最終行の終端として扱い、最終行が空なら
+                // その行の先頭を指す幅ゼロのままにする
+                long end_off = text_len;
+                if (end_off > 0 && copy[end_off - 1] == '\n') {
+                    end_off--;
+                }
+                offset_to_pos(copy, end_off, &od.end_line, &od.end_char);
+                od.start_line = od.end_line;
+                od.start_char = od.end_char;
+                if (end_off > 0 && copy[end_off - 1] != '\n') {
+                    long prev = end_off - 1;
+                    while (prev > 0 && ((unsigned char)copy[prev] & 0xC0) == 0x80) {
+                        prev--;
+                    }
+                    offset_to_pos(copy, prev, &od.start_line, &od.start_char);
+                }
+            } else {
+                offset_to_pos(copy, so, &od.start_line, &od.start_char);
+                offset_to_pos(copy, eo, &od.end_line, &od.end_char);
+            }
         }
         bool dup = false;
         for (int j = 0; j < res.count; j++) {

@@ -475,17 +475,33 @@ static Node* stmt() {
         expect_stmt_end("文");
         return node;
     } else if (consume(">>")) {
-        // 入力の省略形: >> 対象
-        Node* target = bind_target_node(expr());
+        // 入力の省略形: >> 対象 [, 対象 ...]
+        // 対象が複数なら、各対象へ in を左から順に代入する文の並びに
+        // 展開する（>> a, b は a = in; b = in; と同じ）。対象が1つなら
+        // 従来どおり代入文そのものを返す
+        Node head;
+        head.next = NULL;
+        Node* cur = &head;
+        do {
+            Node* target = parse_input_target();
+            Node* input = create_node(ND_INPUT);
+            input->val = 0;
+            input->tok = start;
+            Node* node = create_node(ND_ASSIGN);
+            node->left_child = target;
+            node->right_child = input;
+            node->tok = target->tok;
+            cur->next = node;
+            cur = node;
+        } while (consume(","));
         expect_stmt_end("文");
-        Node* input = create_node(ND_INPUT);
-        input->val = 0;
-        input->tok = start;
-        Node* node = create_node(ND_ASSIGN);
-        node->left_child = target;
-        node->right_child = input;
-        node->tok = target->tok;
-        return node;
+        if (!head.next->next) {
+            return head.next;
+        }
+        Node* block = create_node(ND_BLOCK);
+        block->body = head.next;
+        block->tok = start;
+        return block;
     } else if (consume_keyword(KW_PUT)) {
         Node* node = create_node(ND_PUT);
         node->tok = start;

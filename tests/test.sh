@@ -110,6 +110,8 @@ error_tests=(
     "def main() { for i in 0..3 { i = 1; } return 0; }|書き戻されないため、代入できません"
     "def main() { x = __spell_argc(1); return 0; }|引数は0個ですが、1個が指定されています"
     "def main() { x = __spell_read_file_chars(\"s\"); return 0; }|ですが、\`str\`が指定されています"
+    # step 62: >> の末尾カンマは対象が必要というエラーになる
+    "def main() { >> a,; return 0; }|数値が必要ですが、\`;\`が見つかりました"
 )
 
 cc -c -o funcs.o funcs.c
@@ -244,6 +246,13 @@ one_io_test "def main() {
     yn x == 9
     return 0
 }" "9\n" "9\n9 9\nYes\n"
+# step 62: >> の複数対象（左から順に in を代入する。空白区切り・改行区切り）
+one_io_test "def main() { >> a, b, c, x; print(a + b + c + x); return 0; }" "1 2 3 4\n" "10\n"
+one_io_test "def main() { >> a, b, c, x; print(a + b + c + x); return 0; }" "1\n2\n3\n4\n" "10\n"
+one_io_test "def main() { arr = [0, 0, 0]; >> arr[0], n; print(arr[0] + n); return 0; }" "40 5\n" "45\n"
+one_io_test "class P { v: int; def __init__(self) { self.v = 0; } } def main() { p = P(); >> p.v, n; print(p.v + n); return 0; }" "10 20\n" "30\n"
+one_io_test "def main() { >> a, b
+    print(a + b); return 0; }" "3 4\n" "7\n"
 one_io_test "def main() { < \"hi\"; return 0; }" "" "hi\n"
 one_io_test "def main() { put 1, 2; return 0; }" "" "1 2\n"
 one_io_test "def main() { yn 1 < 2; yn 1 > 2; return 0; }" "" "Yes\nNo\n"
