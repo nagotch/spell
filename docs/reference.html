@@ -855,7 +855,9 @@ put y, q.to_array()</pre>
   <tr><td><code>in_str</code></td><td>空白区切りのトークンを1つ読む</td></tr>
   <tr><td><code>in_str[n]</code></td><td>トークンを n 個読んで <code>[str]</code> にする</td></tr>
   <tr><td><code>in_line</code></td><td>1行をそのまま読む（行末の改行は含まない）</td></tr>
-  <tr><td><code>&gt;&gt; a, b, c</code></td><td><code>a = in; b = in; c = in</code> の糖衣。左から順に読む。対象は複数代入の左辺と同じ形が使える</td></tr>
+  <tr><td><code>&gt;&gt; a, b, c</code></td><td><code>a = in; b = in; c = in</code> の糖衣。左から順に読む。対象は複数代入の左辺と同じ形が使える。対象は空白区切りでも並べられ、カンマと混在できる（<code>&gt;&gt; a b, c</code>。空白区切りの継続は同じ行の中だけ）</td></tr>
+  <tr><td><code>&gt;&gt;&gt; s, t</code></td><td><code>s = in_str; t = in_str</code> の糖衣。空白区切りのトークンを左から順に読む。対象の並べ方は <code>&gt;&gt;</code> と同じ</td></tr>
+  <tr><td><code>&gt;&gt; a[n]</code> / <code>&gt;&gt;&gt; s[n]</code></td><td>個数形。基底名が未束縛なら、長さ n の配列を作って n 個読む（<code>a = [0] * n</code> のあと各要素へ順に読むのと同じ。<code>&gt;&gt;&gt;</code> 形は <code>[""] * n</code>）。個数式は1回だけ評価される。基底名が束縛済みなら通常の添字形（既存配列の1要素へ1つ読む）。個数形の対象は識別子のみ</td></tr>
   <tr><td><code>yn 式</code></td><td>式が真なら <code>Yes</code>、偽なら <code>No</code> を1行出す糖衣</td></tr>
 </table>
 <p>
@@ -897,6 +899,26 @@ hello world foo
 1 2 3 4 5 6
 tok foo bar hello world foo
 15</pre>
+</figure>
+
+<figure class="code">
+  <figcaption>例（&gt;&gt;&gt; と個数形）</figcaption>
+<pre>&gt;&gt; n, a[n];
+&gt;&gt;&gt; s t;
+put a;
+put s, t;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>入力</figcaption>
+<pre>3 10 20 30
+foo bar</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>10 20 30
+foo bar</pre>
 </figure>
 
 <h3>コマンドライン引数とファイル</h3>

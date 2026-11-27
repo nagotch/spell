@@ -596,6 +596,39 @@ one_io_test "def main():
 " "" "1\n3\n5\n"
 # step 70: 配列の要素・Dict の値としての真理値リテラル
 one_io_test "def main() { a = [true, F, T]; print(a[0]); print(a[1]); print(a.len); d: Dict<str, bool> = Dict(zero_bool); d[\"x\"] = true; print(d[\"x\"]); print(d[\"y\"]); return 0; }" "" "true\nfalse\n3\ntrue\nfalse\n"
+# step 72: >>> は文字列トークンの入力（対象 = in_str と同じ）
+one_io_test "def main() { >>> s; print(s); print(s.len); print(s[1]); return 0; }" "hello\n" "hello\n5\n101\n"
+one_io_test "def main() { >>> s, t; print(s); print(t); return 0; }" "foo bar\n" "foo\nbar\n"
+one_io_test "class P { s: str; def __init__(self) { self.s = \"\"; } } def main() { s2 = \"x\"; >>> s2; print(s2); p = P(); >>> p.s; print(p.s); arr = [\"\", \"\"]; >>> arr[1]; print(arr[1]); return 0; }" "baz qux zzz\n" "baz\nqux\nzzz\n"
+one_io_test "def main() { >> n; >>> s; print(n); print(s); return 0; }" "42 abc\n" "42\nabc\n"
+# step 72: 3重にネストしたジェネリクス注釈（>>> が閉じ括弧3つとして読める）
+one_io_test "class Box<T> { v: T; def __init__(self, v: T) { self.v = v; } } def unwrap(b: Box<Box<Box<int>>>) -> int { return b.v.v.v; } def main() { b: Box<Box<Box<int>>> = Box(Box(Box(42))); print(unwrap(b)); return 0; }" "" "42\n"
+one_io_test "def empty_inner() -> Vec<int> { v: Vec<int> = Vec(zero_int); return v; }
+def empty_mid() -> Vec<Vec<int>> { m: Vec<Vec<int>> = Vec(empty_inner); return m; }
+def main():
+    for k in d: Dict<str, Vec<Vec<int>>> = Dict(empty_mid):
+        print(k)
+    print(999)
+    return 0
+" "" "999\n"
+# step 72: 個数形 >> a[n]（未束縛の基底名は個数形、束縛済みは添字形）
+one_io_test "def main() { >> n, a[n]; print(a.len); print(a); return 0; }" "3 10 20 30\n" "3\n10 20 30\n"
+one_io_test "def main() { >> n; >>> s[n]; print(s); return 0; }" "3 apple banana cherry\n" "apple banana cherry\n"
+one_io_test "def main() { a = [0] * 5; >> a[2]; print(a); return 0; }" "7\n" "0 0 7 0 0\n"
+one_io_test "def main() { >> n, a[n]; print(a.len); return 0; }" "0\n" "0\n"
+one_io_test "def main() { >> n, m, a[n], b[m]; print(a); print(b); return 0; }" "2 1 2 3 4 5 6\n" "2 3\n4\n"
+# step 72: 対象は空白区切りでも並べられる（カンマとの混在も可）
+one_io_test "def main() { >> x y; print(x + y); return 0; }" "1 2\n" "3\n"
+one_io_test "def main() { >>> s t; print(s); print(t); return 0; }" "foo bar\n" "foo\nbar\n"
+one_io_test "def main() { >> x, y z; print(x + y + z); return 0; }" "1 2 3\n" "6\n"
+one_io_test "def main() { >> n a[n]; print(a); return 0; }" "3 7 8 9\n" "7 8 9\n"
+# step 72: 空白区切りの継続は同じ行だけ（次の行の文を飲み込まない）
+one_io_test "def main() {
+    >> x
+    y = 3;
+    print(x + y);
+    return 0;
+}" "10\n" "13\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

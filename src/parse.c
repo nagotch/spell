@@ -420,6 +420,146 @@ static void expect_stmt_end(const char* subject) {
     }
 }
 
+// 個数形の対象 `a[n]` 1つ分の展開を文の並びの末尾に足す（step 72）:
+//   tmp = 個数式; a = [fill] * tmp; @tmp { a[i] = 入力 }
+// 個数式は一時スロットへ1回だけ評価する。fill は整数形（>>）が 0、
+// 文字列形（>>>）が ""。ループは make_for_count と同じ形の ND_FOR
+// （__count_range 経由）で、本体は合成した代入文にする。負数や0の
+// 振る舞いは、展開先の `[fill] * n` と回数ループの振る舞いそのまま
+static void append_count_input(Node** cur, Token* start, int mode) {
+    Token* name = NULL;
+    Node* count = parse_input_count(&name);
+    // 一時スロット（個数式の評価は1回だけ）
+    register_any();
+    int tmp_offset = locals->offset;
+    Node* tmp_var = create_node(ND_LVAR);
+    tmp_var->offset = tmp_offset;
+    tmp_var->tok = name;
+    Node* s1 = create_node(ND_ASSIGN);
+    s1->left_child = tmp_var;
+    s1->right_child = count;
+    s1->tok = name;
+    // a = [fill] * tmp で束縛する
+    Node* lit = create_node(ND_ARRAY);
+    register_array(1);
+    lit->array_len = 1;
+    lit->offset = locals->offset;
+    lit->tok = name;
+    if (mode == 0) {
+        Node* zero = create_number_node(0);
+        zero->tok = name;
+        lit->body = zero;
+    } else {
+        // "" の文字配列を str へ変換する（文字列リテラルと同じ形）
+        Token* fake = calloc(1, sizeof(Token));
+        fake->kind = TK_STR;
+        fake->str = "";
+        fake->len = 0;
+        fake->line = name->line;
+        fake->next = token;
+        token = fake;
+        Node* chars = char_array();
+        Node* str_node = create_node(ND_FUNCALL);
+        str_node->name = "str";
+        str_node->len = 3;
+        str_node->tok = name;
+        str_node->args = chars;
+        lit->body = str_node;
+    }
+    Node* tmp_ref = create_node(ND_LVAR);
+    tmp_ref->offset = tmp_offset;
+    tmp_ref->tok = name;
+    Node* mul = create_binary_operation_node(OP_MUL, lit, tmp_ref);
+    mul->tok = name;
+    Node* s2 = create_node(ND_ASSIGN);
+    s2->left_child = bind_target_node(create_ident_node(name));
+    s2->right_child = mul;
+    s2->tok = name;
+    // @tmp { a[i] = 入力 }
+    Node* loop = create_node(ND_FOR);
+    loop->tok = start;
+    Node* range_call = create_node(ND_FUNCALL);
+    range_call->name = "__count_range";
+    range_call->len = 13;
+    range_call->tok = name;
+    Node* tmp_ref2 = create_node(ND_LVAR);
+    tmp_ref2->offset = tmp_offset;
+    tmp_ref2->tok = name;
+    range_call->args = tmp_ref2;
+    loop->init = range_call;
+    register_any();
+    loop->offset = locals->offset;
+    register_any();
+    Node* loop_var = create_node(ND_LVAR);
+    loop_var->offset = locals->offset;
+    loop_var->tok = name;
+    loop->left_child = loop_var;
+    Node* idx = create_node(ND_INDEX);
+    idx->tok = name;
+    idx->left_child = create_ident_node(name);
+    Node* var_ref = create_node(ND_LVAR);
+    var_ref->offset = loop_var->offset;
+    var_ref->tok = name;
+    idx->right_child = var_ref;
+    Node* input = create_node(ND_INPUT);
+    input->val = mode;
+    input->tok = start;
+    Node* assign = create_node(ND_ASSIGN);
+    assign->left_child = idx;
+    assign->right_child = input;
+    assign->tok = name;
+    Node* body = create_node(ND_BLOCK);
+    body->body = assign;
+    body->tok = name;
+    loop->then = body;
+    (*cur)->next = s1;
+    *cur = s1;
+    (*cur)->next = s2;
+    *cur = s2;
+    (*cur)->next = loop;
+    *cur = loop;
+}
+
+// 入力文 `>> 対象...` / `>>> 対象...`（step 72）。mode は ND_INPUT の
+// val（0 = 整数 in、1 = 文字列トークン in_str）。対象はカンマ区切り・
+// 空白区切りのどちらでも並べられ、混在もできる。空白区切りの継続は
+// 同じ行の中だけにする（次の行の先頭の識別子を対象として飲み込ま
+// ない）。対象は複数文に展開されることがある（個数形は3文）ため、
+// 文の並びを作って、1つならそのまま、複数ならブロックに包んで返す
+static Node* stmt_input(Token* start, int mode) {
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    int nstmts = 0;
+    do {
+        if (input_target_is_count_form()) {
+            append_count_input(&cur, start, mode);
+            nstmts += 3;
+        } else {
+            Node* target = parse_input_target();
+            Node* input = create_node(ND_INPUT);
+            input->val = mode;
+            input->tok = start;
+            Node* node = create_node(ND_ASSIGN);
+            node->left_child = target;
+            node->right_child = input;
+            node->tok = target->tok;
+            cur->next = node;
+            cur = node;
+            nstmts++;
+        }
+    } while (consume(",")
+             || (token->kind == TK_IDENT && token->prev && token->line == token->prev->line));
+    expect_stmt_end("文");
+    if (nstmts == 1) {
+        return head.next;
+    }
+    Node* block = create_node(ND_BLOCK);
+    block->body = head.next;
+    block->tok = start;
+    return block;
+}
+
 static Node* stmt() {
     Token* start = token;
     // 空文（余分な `;`）は読み飛ばす。1つ以上読み飛ばした直後が
@@ -491,34 +631,15 @@ static Node* stmt() {
         node->args = expr();
         expect_stmt_end("文");
         return node;
+    } else if (consume(">>>")) {
+        // 入力の省略形（文字列トークン）: >>> 対象 [, 対象 ...]
+        return stmt_input(start, 1);
     } else if (consume(">>")) {
         // 入力の省略形: >> 対象 [, 対象 ...]
         // 対象が複数なら、各対象へ in を左から順に代入する文の並びに
         // 展開する（>> a, b は a = in; b = in; と同じ）。対象が1つなら
         // 従来どおり代入文そのものを返す
-        Node head;
-        head.next = NULL;
-        Node* cur = &head;
-        do {
-            Node* target = parse_input_target();
-            Node* input = create_node(ND_INPUT);
-            input->val = 0;
-            input->tok = start;
-            Node* node = create_node(ND_ASSIGN);
-            node->left_child = target;
-            node->right_child = input;
-            node->tok = target->tok;
-            cur->next = node;
-            cur = node;
-        } while (consume(","));
-        expect_stmt_end("文");
-        if (!head.next->next) {
-            return head.next;
-        }
-        Node* block = create_node(ND_BLOCK);
-        block->body = head.next;
-        block->tok = start;
-        return block;
+        return stmt_input(start, 0);
     } else if (consume_keyword(KW_PUT)) {
         Node* node = create_node(ND_PUT);
         node->tok = start;

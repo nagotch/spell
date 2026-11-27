@@ -64,6 +64,8 @@ Token* tokenize(char* s) {
 
         bool is_symbol = false;
         char* targets[] = {
+            // 3文字の記号は2文字より先に試す（`>>>` は文字列入力の文）
+            ">>>",
             "==",
             "!=",
             "<=",
