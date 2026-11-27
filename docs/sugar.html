@@ -136,6 +136,45 @@ put a + b + c;</pre>
 <pre>6</pre>
 </figure>
 
+<h3><code>&gt;&gt;&gt; 対象, 対象, ...;</code></h3>
+<table>
+  <tr><th>記号形</th><th>正規形</th></tr>
+  <tr><td><code>&gt;&gt;&gt; s, t;</code></td><td><code>s = in_str; t = in_str;</code>（空白区切りのトークンを左から順に読む）</td></tr>
+</table>
+<p>
+  対象は <code>&gt;&gt;</code> と同じく空白区切りでも並べられ、カンマと混在できます（空白区切りの継続は同じ行の中だけです）。
+</p>
+
+<h3><code>&gt;&gt; 名前[個数];</code>（個数形）</h3>
+<table>
+  <tr><th>記号形</th><th>正規形</th></tr>
+  <tr><td><code>&gt;&gt; a[n];</code></td><td><code>a = [0] * n</code> のあと <code>i@n { &gt;&gt; a[i]; }</code>（個数式は1回だけ評価される）</td></tr>
+  <tr><td><code>&gt;&gt;&gt; s[n];</code></td><td><code>s = [""] * n</code> のあと <code>i@n { &gt;&gt;&gt; s[i]; }</code></td></tr>
+</table>
+<p>
+  基底名が未束縛のときだけ個数形になります。束縛済みの配列への <code>&gt;&gt; a[2];</code> は従来どおり添字形（1要素へ1つ読む）です。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>&gt;&gt;&gt; s t;
+&gt;&gt; n, a[n];
+put s, t;
+put a;</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>入力</figcaption>
+<pre>foo bar
+3 10 20 30</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>foo bar
+10 20 30</pre>
+</figure>
+
 <h3><code>対象- = in[n];</code></h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>

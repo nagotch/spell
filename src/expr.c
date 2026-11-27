@@ -55,6 +55,36 @@ Node* parse_input_target() {
     return target;
 }
 
+// 入力文の対象が「個数形」（未束縛の識別子＋`[式]`）かどうかを、現在の
+// トークン位置から判定する（消費はしない）。基底名が束縛済みなら従来の
+// 添字形（既存配列の1要素への読み取り）になる（step 72 の振り分け規則）
+bool input_target_is_count_form() {
+    if (token->kind != TK_IDENT) {
+        return false;
+    }
+    Token* next = token->next;
+    if (!next || next->kind != TK_SYMBOL || next->len != 1 || next->str[0] != '[') {
+        return false;
+    }
+    return !ident_is_bound(token);
+}
+
+// 個数形の対象 `名前[個数式]` を読み、基底名トークンと個数式を返す。
+// 呼び出し前に input_target_is_count_form() で判定すること。個数式の
+// 解析条件は parse_input_target と同じ（suppress_multi を立てる）
+Node* parse_input_count(Token** name_out) {
+    *name_out = consume_ident();
+    consume("[");
+    bool saved = suppress_multi;
+    suppress_multi = true;
+    expr_depth++;
+    Node* count = expr();
+    expr_depth--;
+    suppress_multi = saved;
+    expect("]");
+    return count;
+}
+
 // put 文の引数列（括弧なし、カンマ区切り）を読む
 Node* parse_put_args() {
     Node head;
@@ -527,6 +557,15 @@ static Token* scan_type(Token* t) {
                 if (depth < 0) {
                     return NULL;
                 }
+            } else if (sym_is(t, ">>>")) {
+                depth -= 3;
+                t = t->next;
+                if (depth == 0) {
+                    return t;
+                }
+                if (depth < 0) {
+                    return NULL;
+                }
             } else {
                 t = t->next;
             }
@@ -747,11 +786,13 @@ static Node* array_literal() {
 }
 
 // 型引数の閉じ括弧。入れ子（GBox<Pair<int, str>>）では >> と1トークンに
-// なるため、>> の前半だけを消費して後半を > として残す
+// なるため、>> の前半だけを消費して後半を > として残す。3重の入れ子
+// （Vec<Vec<Vec<int>>>）では >>> と1トークンになるため、同じく1つだけ
+// 消費して残り（>>）を次の閉じ括弧に回す
 static void expect_type_end() {
-    if (token->kind == TK_SYMBOL && token->len == 2 && !memcmp(token->str, ">>", 2)) {
+    if (token->kind == TK_SYMBOL && token->len >= 2 && token->str[0] == '>' && token->str[1] == '>') {
         token->str++;
-        token->len = 1;
+        token->len--;
         return;
     }
     expect(">");
