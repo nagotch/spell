@@ -396,6 +396,7 @@ static Node* make_for_count(Node* count, Token* kw);
 static Node* stmt_branch(Token* hdr);
 static Node* suite_body(Token* hdr);
 static Node* header_expr();
+static Node* cond_expr();
 
 // 文（やフィールド）の終わり。`;` があれば消費する。なければ、次の
 // トークンが改行の後か、`}` か、ファイル末尾でなければならない
@@ -876,11 +877,7 @@ static Node* stmt_if(Token* kw) {
     Node* node;
     node = create_node(ND_IF);
     node->tok = kw;
-    expect("(");
-    expr_depth++;
-    node->cond = expr();
-    expr_depth--;
-    expect(")");
+    node->cond = cond_expr();
     node->then = stmt_branch(kw);
     Token* else_tok = token;
     if (consume_keyword(KW_ELSE)) {
@@ -897,11 +894,7 @@ static Node* stmt_while(Token* kw) {
     Node* node;
     node = create_node(ND_WHILE);
     node->tok = kw;
-    expect("(");
-    expr_depth++;
-    node->cond = expr();
-    expr_depth--;
-    expect(")");
+    node->cond = cond_expr();
     node->then = stmt_branch(kw);
     return node;
 }
@@ -945,6 +938,20 @@ static Node* make_for_count(Node* count, Token* kw) {
         node->val = locals->offset;
         node->els = stmt_branch(else_tok);
     }
+    return node;
+}
+
+// if / elif / while の条件を読む（step 69: 条件の括弧は任意）。
+// 条件は通常の完全な式として読み、終わりはブロックの開始（`{` か
+// `:`）で判断する。括弧形は primary の括弧式としてそのまま読める
+// ため、従来の書き方もそのまま動く。for の頭と同じく、直後の `:`
+// が suite の区切りと競合するため、型注釈の `:` は「型 = 」と
+// 続く場合だけ注釈として扱う（expr.c の suppress_anno）
+static Node* cond_expr() {
+    bool saved = suppress_anno;
+    suppress_anno = true;
+    Node* node = expr();
+    suppress_anno = saved;
     return node;
 }
 
