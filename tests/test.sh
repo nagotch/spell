@@ -687,6 +687,26 @@ def main() {
     return 0;
 }
 " "1 2 3 4\n" "777\n777\n2\n4\n"
+# step 75: 個数式は左から順に評価される（返す個数が違う関数で順序を区別する）
+one_io_test "def f() -> int { print(111); return 2; }
+def g() -> int { print(222); return 3; }
+def main() {
+    >> a[f()][g()];
+    print(a.len);
+    print(a[0].len);
+    print(a[1][2]);
+    return 0;
+}
+" "1 2 3 4 5 6\n" "111\n222\n2\n3\n6\n"
+# step 75: 角括弧の継続は同じ行だけ（次の行の `[` を個数として飲み込まない）
+one_io_test "def main() {
+    >> a[2]
+    [5]
+    print(a.len);
+    print(a);
+    return 0;
+}
+" "10 20\n" "2\n10 20\n"
 # step 72: 対象は空白区切りでも並べられる（カンマとの混在も可）
 one_io_test "def main() { >> x y; print(x + y); return 0; }" "1 2\n" "3\n"
 one_io_test "def main() { >>> s t; print(s); print(t); return 0; }" "foo bar\n" "foo\nbar\n"
