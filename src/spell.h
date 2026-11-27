@@ -208,6 +208,9 @@ struct Function {
     Capture* captures;
     bool lambda_checked;
     Type* func_type;
+    // 到達可能性（step 63）: codegen が入口から辿って印を付ける。
+    // 印の無い関数はアセンブリへ出さない
+    bool reachable;
 };
 
 typedef struct LVar LVar;

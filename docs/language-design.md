@@ -207,10 +207,14 @@ spell_v0 の現状は、`--submit` で `cerr` を除去できるだけで、境�
 
 - **公開 API は prelude の通常の関数・クラス**: `args() -> [str]`（`[0]` はプログラム名、C / sys.argv と同じ）、`read_file(path) -> FileData`、`write_file(path, text) -> bool`、`exit(code)`、`eprint(x)`（print の stderr 版）
 - **失敗は `FileData { ok: bool, text: str }` で表す**: null も例外も入れない既定どおり。開けない・読み切れないとき `ok = false`、空のファイルは `ok = true` で `text = ""`
-- **中身はコンパイラ組み込みプリミティブ `__spell_*`**: `[int]` の文字コード配列と `int` だけを扱い（`__spell_argc` / `__spell_argv_chars` / `__spell_read_file_chars` / `__spell_io_ok` / `__spell_write_file_chars` / `__spell_stderr_chars` / `__spell_exit`）、型検査に署名表を持ち、誤用は型つき・位置つきエラーにする。codegen は呼び出しをランタイムヘルパ（`__rt_spell_*`、libc のみ使用）への呼び出しとして出す。prelude のラッパ関数が常に出力される以上、ヘルパも常に出す（prelude 本体と同じ扱い）
+- **中身はコンパイラ組み込みプリミティブ `__spell_*`**: `[int]` の文字コード配列と `int` だけを扱い（`__spell_argc` / `__spell_argv_chars` / `__spell_read_file_chars` / `__spell_io_ok` / `__spell_write_file_chars` / `__spell_stderr_chars` / `__spell_exit`）、型検査に署名表を持ち、誤用は型つき・位置つきエラーにする。codegen は呼び出しをランタイムヘルパ（`__rt_spell_*`、libc のみ使用）への呼び出しとして出す。ヘルパの出力は step 63 以降、到達可能なプリミティブ呼び出しがあるものだけに限る
 - **`exit` は prelude 関数にせず、型検査でプリミティブ呼び出しへ書き換える**: spell 関数のラベル `exit` が libc の `exit` と衝突し、ヘルパからの呼び出しが自分自身へ戻ってしまうため（print と同じ方式）。ヘルパ側も、利用者が同名関数を定義した場合に備えて libc の `exit` を名前で呼ばず、`fflush(NULL)` で stdio を流してから `_exit` で終わる（生成コードは atexit を登録しないので観測できる挙動は同じ）。stderr へは libc の `stderr` シンボルを参照せず、fd 2 への `write` で出す（NASM 変換でデータシンボルの extern が要らない）
 - **`cerr` は `eprint` に統合**: 独立した cerr 構文は入れない。Debug / Submit のビルドモードを実装するときは、除去の対象を `eprint` として再検討する
 - **`Vec<T>` を prelude に追加**: 末尾への追加が容量の倍増で均し定数時間になる伸びる配列。生成は Dict と同じく既定値ファクトリを受け取る。添字と `len` は論理長を見て、反復は開始時点のスナップショットに対するもの。なお、テストスイートの自作クラス `Vec`（2次元ベクトル）と名前が衝突したため、テスト側を `Vec2` へ改名した（prelude が名前を取る影響範囲の実例）
+
+## 決定: 生成コードは到達可能な関数だけを含む（step 63）
+
+- **出力は入口（`main` と `__spell_init`）から辿れる関数だけ**: codegen は出力前に AST を辿り、呼び出し・メソッド呼び出し・構築（`__init__`）・関数参照・ラムダの辺を集めて到達可能性を印付けし、印の無い関数はアセンブリへ出さない。prelude の未使用部分（Dict や Vec など）も落ちるため、提出用アセンブリが数千行から実用的な長さになる。ランタイムヘルパ（`__rt_spell_*`）も、到達可能なプリミティブ呼び出しに対応するものだけを出す
 
 ## 未決定事項
 
