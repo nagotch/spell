@@ -595,7 +595,7 @@ static Node* stmt_branch(Token* hdr) {
     }
     if (skipped_semi
             && (t->kind == TK_EOF
-                || (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == '}')
+                || (t->kind == TK_SYMBOL && t->len == 1 && (t->str[0] == '}' || t->str[0] == '|'))
                 || (t->kind == TK_KEYWORD && (t->keyword == KW_ELSE || t->keyword == KW_ELIF)))) {
         token = t;
         Node* node = create_node(ND_BLOCK);
@@ -890,6 +890,17 @@ static Node* stmt_if(Token* kw) {
         Token* elif_tok = token;
         token = token->next;
         node->els = stmt_if(elif_tok);
+    } else if (token_is_char(token, '|')) {
+        // step 74: `|` は else / elif の糖衣（spell_v0 から移植）。
+        // 直後がブロック開始（`:` か `{`）なら else、式が続けば elif
+        // として読み、キーワード形と完全に同じ意味にする
+        Token* pipe_tok = token;
+        token = token->next;
+        if (token_is_char(token, ':') || token_is_char(token, '{')) {
+            node->els = stmt_branch(pipe_tok);
+        } else {
+            node->els = stmt_if(pipe_tok);
+        }
     }
     return node;
 }
@@ -912,7 +923,8 @@ static Node* make_for_iter(Token* var, Node* init, Token* kw) {
     node->left_child = bind_target_node(create_ident_node(var));
     node->then = stmt_branch(kw);
     Token* else_tok = token;
-    if (consume_keyword(KW_ELSE)) {
+    if (consume_keyword(KW_ELSE) || consume("|")) {
+        // step 74: for...else でも `|` を else として受ける（v0 と同じ）
         register_any();
         node->val = locals->offset;
         node->els = stmt_branch(else_tok);
@@ -937,7 +949,8 @@ static Node* make_for_count(Node* count, Token* kw) {
     node->left_child = var;
     node->then = stmt_branch(kw);
     Token* else_tok = token;
-    if (consume_keyword(KW_ELSE)) {
+    if (consume_keyword(KW_ELSE) || consume("|")) {
+        // step 74: for...else でも `|` を else として受ける（v0 と同じ）
         register_any();
         node->val = locals->offset;
         node->els = stmt_branch(else_tok);
