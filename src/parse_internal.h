@@ -21,6 +21,9 @@ Type* parse_type();
 // 式の括弧・角括弧の入れ子深さ。0 の場所では改行をまたいで式を
 // 継続しない（step 55）。parse.c の if/while 条件括弧からも増減する
 extern int expr_depth;
+// for の頭の式を読んでいる間は真。その間、型注釈の `:` は
+// suite の `:` と競合するため、「型 = 」と続く場合だけ注釈にする
+extern bool suppress_anno;
 
 // parse.c（ラムダ）
 Node* parse_lambda(bool arrow, Token* kw);

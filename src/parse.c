@@ -393,7 +393,9 @@ static Node* stmt_while(Token* kw);
 static Node* stmt_for(Token* kw);
 static Node* make_for_iter(Token* var, Node* init, Token* kw);
 static Node* make_for_count(Node* count, Token* kw);
-static Node* stmt_branch();
+static Node* stmt_branch(Token* hdr);
+static Node* suite_body(Token* hdr);
+static Node* header_expr();
 
 // 文（やフィールド）の終わり。`;` があれば消費する。なければ、次の
 // トークンが改行の後か、`}` か、ファイル末尾でなければならない
@@ -464,21 +466,21 @@ static Node* stmt() {
         expect_stmt_end("文");
         return node;
     } else if (consume("@")) {
-        if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '{') {
-            // `@ {}` は while true {} の省略形（無限ループ）
+        if (token->kind == TK_SYMBOL && token->len == 1 && (token->str[0] == '{' || token->str[0] == ':')) {
+            // `@ {}` / `@:` は while true の省略形（無限ループ）
             Node* node = create_node(ND_WHILE);
             node->tok = start;
             node->cond = create_node(ND_NUM);
             node->cond->val = 1;
             node->cond->tok = start;
-            node->then = stmt_branch();
+            node->then = stmt_branch(start);
             return node;
         }
-        return make_for_count(expr(), start);
+        return make_for_count(header_expr(), start);
     } else if (token->kind == TK_IDENT && token->next->kind == TK_SYMBOL && token->next->len == 1 && token->next->str[0] == '@') {
         Token* var = consume_ident();
         consume("@");
-        return make_for_iter(var, expr(), start);
+        return make_for_iter(var, header_expr(), start);
     } else if (consume("<<") || consume("<")) {
         // 出力の省略形: << 式 / < 式（print と同じ）
         Node* node = create_node(ND_FUNCALL);
@@ -573,8 +575,17 @@ static Node* stmt() {
 // 分岐位置（if/while/for の本体）専用の文読み取り。区切り（`;`）だけが
 // あって本体が空の場合（`if (c) ; else ...` など）は空ブロックを返す。
 // リスト文脈では使わない: `}`・else・elif・末尾で消費せずに戻すのは、
-// それらを消費できる呼び出し側（stmt_if 等）がいる場所だけにする
-static Node* stmt_branch() {
+// それらを消費できる呼び出し側（stmt_if 等）がいる場所だけにする。
+// 本体が `:` で始まればインデント形式のブロック（suite）として読む。
+// hdr は頭（if/while/for/@ など）のトークンで、suite のインデントが
+// 頭の行より深いことの判定に使う
+static Node* stmt_branch(Token* hdr) {
+    if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+        Node* node = create_node(ND_BLOCK);
+        node->tok = hdr;
+        node->body = suite_body(hdr);
+        return node;
+    }
     Token* t = token;
     bool skipped_semi = false;
     while (t->kind == TK_SYMBOL && t->len == 1 && t->str[0] == ';') {
@@ -632,6 +643,178 @@ static void skip_to_stmt_boundary(bool consume_close) {
         }
         token = token->next;
     }
+}
+
+// トークンのある行のインデント（行頭の空白の列数）。空白は1列、
+// タブは次の8の倍数の列まで進める（Python と同じ数え方）。
+// トークンの行番号から行頭を探すので、文字列トークン（str が
+// ソースを指さない）でも安全に呼べる
+static int line_indent_of(Token* tok) {
+    char* p = src;
+    for (int line = 1; line < tok->line; line++) {
+        p = strchr(p, '\n');
+        if (!p) {
+            return 0;
+        }
+        p++;
+    }
+    int col = 0;
+    while (*p == ' ' || *p == '\t') {
+        if (*p == ' ') {
+            col++;
+        } else {
+            col = (col / 8 + 1) * 8;
+        }
+        p++;
+    }
+    return col;
+}
+
+// トークンがその行の最初のトークンか。空行とコメントだけの行は
+// トークンを生まないため、インデント判定に自然に影響しない
+static bool token_starts_line(Token* tok) {
+    return !tok->prev || tok->line > tok->prev->line;
+}
+
+// suite 内で文の解析に失敗したときのリカバリ（キャプチャ有効時）:
+// 失敗した文の残りを読み飛ばし、suite の段以下へ戻る行頭か、
+// 文の中で開いたブロックの閉じか、文の区切り `;` で止まる。
+// 1文字も進まずに戻ると呼び出し側が同じ場所で失敗を繰り返すため、
+// 段が同じ行頭で止まるのは、何か消費した後に限る
+static void skip_suite_rest(int suite_indent) {
+    int depth = 0;
+    bool moved = false;
+    while (token->kind != TK_EOF) {
+        if (depth == 0 && token_starts_line(token)) {
+            int ind = line_indent_of(token);
+            if (ind < suite_indent) {
+                return;
+            }
+            if (ind == suite_indent && moved) {
+                return;
+            }
+        }
+        if (token_is_char(token, '{')) {
+            depth++;
+        } else if (token_is_char(token, '}')) {
+            if (depth == 0) {
+                return;
+            }
+            depth--;
+            token = token->next;
+            moved = true;
+            if (depth == 0) {
+                return;
+            }
+            continue;
+        } else if (depth == 0 && token_is_char(token, ';')) {
+            token = token->next;
+            return;
+        }
+        token = token->next;
+        moved = true;
+    }
+}
+
+// `:` で始まるインデント形式のブロック（suite）を読む。現在の
+// トークンが `:` であることが前提。文の並び（next でつないだ
+// 連鎖）を返す。hdr は頭のトークンで、suite の段が頭の行より
+// 深いことの判定に使う。
+// INDENT / DEDENT トークンは字句側で出さず、パーサ側でトークンの
+// 行番号と行頭の空白から段を判定する。理由: spell では深さ0でも
+// 演算子の後などで式が改行をまたいで続く（step 55）ため、論理行の
+// 終わりは字句側だけでは決められず、文の完了を知っている stmt() に
+// 合わせて段を見るほうが既存の書き方を壊さない。振る舞いは
+// Python と同じで、段は suite ごとの再帰で持ち、dedent がどの
+// 段にも合わない場合はエラーにする
+static Node* suite_body(Token* hdr) {
+    Token* colon = token;
+    expect(":");
+    // 1行形: `:` の同じ行に文を1つ書く
+    if (token->line == colon->line) {
+        if (token->kind == TK_EOF || token_is_char(token, '}') || token_is_char(token, ';')) {
+            error_at(token_start(colon), token_end(colon), "`:`の後に文がありません");
+        }
+        return stmt();
+    }
+    if (token->kind == TK_EOF) {
+        error_at(token_start(colon), token_end(colon), "`:`の後に文がありません");
+    }
+    int ref = line_indent_of(hdr);
+    int suite_indent = line_indent_of(token);
+    if (suite_indent <= ref) {
+        char* actual = token_text(token);
+        if (actual) {
+            error_at(token_start(token), token_end(token), "インデントされたブロックが必要ですが、%sが見つかりました", actual);
+        } else {
+            error_at(token_start(token), token_end(token), "インデントされたブロックが必要ですが、ファイルの末尾に達しました");
+        }
+    }
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    int attempts = 0;
+    while (true) {
+        // 文の頭にある余分な `;` は読み飛ばす（文末の `;` は
+        // expect_stmt_end が消費済みなので、ここで見るのは余りだけ）
+        while (token_is_char(token, ';')) {
+            token = token->next;
+        }
+        if (token->kind == TK_EOF || token_is_char(token, '}')) {
+            break;
+        }
+        if (token_starts_line(token)) {
+            int ind = line_indent_of(token);
+            if (ind < suite_indent) {
+                // dedent で suite が終わる。頭の行より深い段への
+                // dedent は、どの suite の段にも一致しない中途半端な
+                // 位置なのでエラーにする（外側に同じ段の suite が
+                // ある場合は、頭の行の段以下へ戻る形になる）
+                if (ind > ref) {
+                    error_at(token_start(token), token_end(token), "インデントが揃っていません");
+                }
+                break;
+            }
+            if (ind > suite_indent) {
+                error_at(token_start(token), token_end(token), "インデントが揃っていません");
+            }
+        }
+        attempts++;
+        if (!error_capture_enabled()) {
+            cur->next = stmt();
+            cur = cur->next;
+            continue;
+        }
+        // キャプチャ有効時: 文の解析に失敗したら、その文を捨てて
+        // suite の境界まで読み飛ばし、次の文から再開する
+        // （parse_stmt_list のリカバリと同じ方針）
+        jmp_buf jb;
+        LVar* saved_locals = locals;
+        LVar* saved_globals = globals;
+        LambdaParse* saved_lambda = lambda_stack;
+        int saved_depth = expr_depth;
+        jmp_buf* saved_recover = error_capture_set_recover(&jb);
+        if (setjmp(jb) == 0) {
+            Node* s = stmt();
+            error_capture_set_recover(saved_recover);
+            cur->next = s;
+            cur = cur->next;
+        } else {
+            error_capture_set_recover(saved_recover);
+            locals = saved_locals;
+            globals = saved_globals;
+            lambda_stack = saved_lambda;
+            expr_depth = saved_depth;
+            if (token->kind == TK_EOF) {
+                break;
+            }
+            skip_suite_rest(suite_indent);
+        }
+    }
+    if (attempts == 0) {
+        error_at(token_start(colon), token_end(colon), "`:`の後に文がありません");
+    }
+    return head.next;
 }
 
 // 「}」まで文を読み、連結リストで返す
@@ -698,9 +881,10 @@ static Node* stmt_if(Token* kw) {
     node->cond = expr();
     expr_depth--;
     expect(")");
-    node->then = stmt_branch();
+    node->then = stmt_branch(kw);
+    Token* else_tok = token;
     if (consume_keyword(KW_ELSE)) {
-        node->els = stmt_branch();
+        node->els = stmt_branch(else_tok);
     } else if (token->kind == TK_KEYWORD && token->keyword == KW_ELIF) {
         Token* elif_tok = token;
         token = token->next;
@@ -718,7 +902,7 @@ static Node* stmt_while(Token* kw) {
     node->cond = expr();
     expr_depth--;
     expect(")");
-    node->then = stmt_branch();
+    node->then = stmt_branch(kw);
     return node;
 }
 
@@ -729,11 +913,12 @@ static Node* make_for_iter(Token* var, Node* init, Token* kw) {
     register_any();
     node->offset = locals->offset;
     node->left_child = bind_target_node(create_ident_node(var));
-    node->then = stmt_branch();
+    node->then = stmt_branch(kw);
+    Token* else_tok = token;
     if (consume_keyword(KW_ELSE)) {
         register_any();
         node->val = locals->offset;
-        node->els = stmt_branch();
+        node->els = stmt_branch(else_tok);
     }
     return node;
 }
@@ -753,12 +938,24 @@ static Node* make_for_count(Node* count, Token* kw) {
     Node* var = create_node(ND_LVAR);
     var->offset = locals->offset;
     node->left_child = var;
-    node->then = stmt_branch();
+    node->then = stmt_branch(kw);
+    Token* else_tok = token;
     if (consume_keyword(KW_ELSE)) {
         register_any();
         node->val = locals->offset;
-        node->els = stmt_branch();
+        node->els = stmt_branch(else_tok);
     }
+    return node;
+}
+
+// for の頭の式（反復対象・回数）を読む。その直後の `:` は suite の
+// 区切りになり得るため、式の中の型注釈は「型 = 」と続く場合だけ
+// 注釈として扱う（expr.c の suppress_anno）
+static Node* header_expr() {
+    bool saved = suppress_anno;
+    suppress_anno = true;
+    Node* node = expr();
+    suppress_anno = saved;
     return node;
 }
 
@@ -766,9 +963,9 @@ static Node* stmt_for(Token* kw) {
     if (token->kind == TK_IDENT && token->next->kind == TK_KEYWORD && token->next->keyword == KW_IN) {
         Token* var = consume_ident();
         consume_keyword(KW_IN);
-        return make_for_iter(var, expr(), kw);
+        return make_for_iter(var, header_expr(), kw);
     }
-    return make_for_count(expr(), kw);
+    return make_for_count(header_expr(), kw);
 }
 
 // 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数の数を返す
@@ -815,8 +1012,15 @@ static Function* function(Class* klass) {
     if (consume("->")) {
         return_type = parse_type();
     }
-    expect("{");
-    Node* body = parse_stmt_list();
+    Node* body;
+    if (consume("{")) {
+        body = parse_stmt_list();
+    } else if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+        body = suite_body(tok);
+    } else {
+        expect("{");
+        body = NULL;
+    }
     Function* func = calloc(1, sizeof(Function));
     func->name = name;
     func->len = len;
@@ -997,6 +1201,92 @@ Class* parsing_klass = NULL;
 
 static void class_member(Function** cur, Class* klass, int* offset);
 
+// クラス本体を `:` ＋インデント形式で読む。現在のトークンが `:`
+// であることが前提。parsing_klass は呼び出し側（class_decl）が
+// 設定済み。文の suite（suite_body）と対になる、メンバ版の読み取り
+static void class_colon_body(Function** cur, Class* klass, int* offset, Token* hdr) {
+    Token* colon = token;
+    expect(":");
+    // 1行形: `:` の同じ行にメンバを並べる
+    if (token->line == colon->line) {
+        int attempts = 0;
+        while (token->kind != TK_EOF && !token_is_char(token, '}')) {
+            attempts++;
+            class_member(cur, klass, offset);
+            if (token_starts_line(token)) {
+                break;
+            }
+        }
+        if (attempts == 0) {
+            error_at(token_start(colon), token_end(colon), "`:`の後にメンバがありません");
+        }
+        return;
+    }
+    if (token->kind == TK_EOF) {
+        error_at(token_start(colon), token_end(colon), "`:`の後にメンバがありません");
+    }
+    int ref = line_indent_of(hdr);
+    int member_indent = line_indent_of(token);
+    if (member_indent <= ref) {
+        char* actual = token_text(token);
+        if (actual) {
+            error_at(token_start(token), token_end(token), "インデントされたブロックが必要ですが、%sが見つかりました", actual);
+        } else {
+            error_at(token_start(token), token_end(token), "インデントされたブロックが必要ですが、ファイルの末尾に達しました");
+        }
+    }
+    int attempts = 0;
+    while (true) {
+        if (token->kind == TK_EOF || token_is_char(token, '}')) {
+            break;
+        }
+        if (token_starts_line(token)) {
+            int ind = line_indent_of(token);
+            if (ind < member_indent) {
+                // suite_body と同じく、頭の行より深い段への
+                // dedent はどの段にも一致しないためエラーにする
+                if (ind > ref) {
+                    error_at(token_start(token), token_end(token), "インデントが揃っていません");
+                }
+                break;
+            }
+            if (ind > member_indent) {
+                error_at(token_start(token), token_end(token), "インデントが揃っていません");
+            }
+        }
+        attempts++;
+        if (!error_capture_enabled()) {
+            class_member(cur, klass, offset);
+            continue;
+        }
+        // キャプチャ有効時: メンバの解析に失敗したら、そのメンバを
+        // 捨てて境界まで読み飛ばし、次のメンバから再開する
+        jmp_buf jb;
+        LVar* saved_locals = locals;
+        LVar* saved_globals = globals;
+        LambdaParse* saved_lambda = lambda_stack;
+        int saved_depth = expr_depth;
+        jmp_buf* saved_recover = error_capture_set_recover(&jb);
+        if (setjmp(jb) == 0) {
+            class_member(cur, klass, offset);
+            error_capture_set_recover(saved_recover);
+        } else {
+            error_capture_set_recover(saved_recover);
+            locals = saved_locals;
+            globals = saved_globals;
+            lambda_stack = saved_lambda;
+            expr_depth = saved_depth;
+            if (token->kind == TK_EOF) {
+                break;
+            }
+            skip_suite_rest(member_indent);
+        }
+    }
+    if (attempts == 0) {
+        error_at(token_start(colon), token_end(colon), "`:`の後にメンバがありません");
+    }
+}
+
 static void class_decl(Function** cur) {
     consume_keyword(KW_CLASS);
     Token* tok = consume_ident();
@@ -1026,9 +1316,14 @@ static void class_decl(Function** cur) {
         }
         expect(">");
     }
-    expect("{");
     int offset = 0;
     parsing_klass = klass;
+    if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+        class_colon_body(cur, klass, &offset, tok);
+        parsing_klass = NULL;
+        return;
+    }
+    expect("{");
     while (!consume("}")) {
         if (!error_capture_enabled()) {
             class_member(cur, klass, &offset);
@@ -1148,9 +1443,17 @@ Function* program() {
     }
     // トップレベル関数の名前も先に登録しておく。関数参照（関数名を値として
     // 使う）が、定義より前の位置からでも解決できるようにするため。
-    // 波括弧の深さ0にある def 名と `:` 形の関数名だけを対象にする
+    // 波括弧の深さ0にある def 名と `:` 形の関数名だけを対象にする。
+    // `:` ＋インデント形式のクラスは波括弧を開かないため、その本体
+    // （メソッド定義）まで深さ0に見えてしまう。クラス行のインデントを
+    // 覚えておき、本体の中では登録しない（波括弧形式のクラスで
+    // メソッド名が登録されないのと同じ扱いにする）
     int depth = 0;
+    int class_indent = -1;
     for (Token* t = head_t; t->kind != TK_EOF; t = t->next) {
+        if (class_indent >= 0 && t->prev && t->line > t->prev->line && line_indent_of(t) <= class_indent) {
+            class_indent = -1;
+        }
         if (token_is_symbol(t, "{")) {
             depth++;
             continue;
@@ -1161,6 +1464,26 @@ Function* program() {
         }
         if (depth != 0) {
             continue;
+        }
+        if (class_indent >= 0) {
+            continue;
+        }
+        if (t->kind == TK_KEYWORD && t->keyword == KW_CLASS && t->next->kind == TK_IDENT) {
+            // ヘッダ（名前と型パラメータ）の直後が `{` なら波括弧形式、
+            // `:` ならインデント形式。ヘッダの途中では名前・`<`・
+            // `>`・`,` しか現れないので、それ以外が来たら諦める
+            for (Token* u = t->next; u->kind != TK_EOF; u = u->next) {
+                if (token_is_symbol(u, "{")) {
+                    break;
+                }
+                if (token_is_symbol(u, ":")) {
+                    class_indent = line_indent_of(t);
+                    break;
+                }
+                if (u->kind != TK_IDENT && !token_is_symbol(u, "<") && !token_is_symbol(u, ">") && !token_is_symbol(u, ",")) {
+                    break;
+                }
+            }
         }
         if (t->kind == TK_KEYWORD && t->keyword == KW_DEF && t->next->kind == TK_IDENT) {
             register_func_name(t->next->str, t->next->len);
