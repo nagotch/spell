@@ -155,6 +155,15 @@ def main():
     "def main() { T = 0; return 0; }|\`T\`には代入できません"
     # step 73: `?` は文頭の if 糖衣専用で、式の中では使えない
     "def main() { x = true ? 1 : 2; return 0; }|文の終わりには\`;\`か改行が必要ですが"
+    # step 76: 構築時の型引数の個数が合わない
+    "def main() { q = Deque<int, int>(); return 0; }|型引数は1個ですが、2個が指定されています"
+    "class Pair<A, B> { a: A; b: B; def __init__(self, a: A, b: B) { self.a = a; self.b = b; } } def main() { p = Pair<int>(1); return 0; }|型引数は2個ですが、1個が指定されています"
+    # step 76: 明示的な型引数が期待型（注釈）と矛盾する
+    "def main() { q: Deque<int> = Deque<str>(); return 0; }|と矛盾します"
+    # step 76: 要素型がクラスの引数なし構築は、ファクトリを渡すよう促す
+    "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { q = Deque<P>(); return 0; }|要素型がクラスの場合はファクトリを渡してください"
+    # step 76: 要素型が配列の引数なし構築も、既定値を自動で作れない
+    "def main() { v = Vec<[int]>(); return 0; }|既定値は自動で作れないため、ファクトリを渡してください"
 )
 
 cc -c -o funcs.o funcs.c
@@ -731,6 +740,108 @@ one_io_test "def main():
     ? x == 7 { print(4); }
     return 0
 " "7\n" "2\n4\n"
+# step 76: 引数なし構築。要素型の既定は int で、push / pop / len /
+# 反復まで通常の Deque<int> として動く
+one_io_test "def main() {
+    q = Deque();
+    q.push_back(10);
+    q.push_back(20);
+    q.push_front(5);
+    print(q.len);
+    print(q.pop_front());
+    print(q.pop_back());
+    s = 0;
+    for x in q { s = s + x; }
+    print(s);
+    return 0;
+}" "" "3\n5\n20\n10\n"
+# step 76: Vec() の引数なし構築。容量の倍増（補ったファクトリが呼ばれる
+# 経路）でも中身が保たれる
+one_io_test "def main() {
+    v = Vec();
+    i = 0;
+    while (i < 20) { v.append(i * 2); i = i + 1; }
+    print(v.len);
+    print(v[19]);
+    v[0] = 99;
+    print(v[0]);
+    print(v[1]);
+    return 0;
+}" "" "20\n38\n99\n2\n"
+# step 76: 構築時の型引数（Deque<str> / Deque<bool>）
+one_io_test "def main() {
+    q = Deque<str>();
+    q.push_back(\"aa\");
+    q.push_front(\"bb\");
+    print(q.pop_front());
+    print(q.pop_back());
+    print(q.len);
+    b = Deque<bool>();
+    b.push_back(true);
+    b.push_back(F);
+    print(b.pop_front());
+    print(b.pop_back());
+    return 0;
+}" "" "bb\naa\n0\ntrue\nfalse\n"
+# step 76: 期待型が効く引数なし構築（関数の引数位置と注釈）
+one_io_test "def take(q: Deque<str>) -> int {
+    q.push_back(\"in\");
+    return q.len;
+}
+def main() {
+    print(take(Deque()));
+    r: Deque<str> = Deque();
+    r.push_back(\"zz\");
+    print(r.pop_front());
+    v: Vec<str> = Vec();
+    v.append(\"s1\");
+    v.append(\"s2\");
+    print(v[1]);
+    return 0;
+}" "" "1\nzz\ns2\n"
+# step 76: ユーザー定義ジェネリッククラスでの型引数明示（注釈なし構築）。
+# 入れ子の Vec<Vec<int>> も、ファクトリを渡せば従来どおり構築できる
+one_io_test "class Pair<A, B> {
+    a: A;
+    b: B;
+    def __init__(self, a: A, b: B) { self.a = a; self.b = b; }
+}
+class Cell<T> {
+    v: T;
+    def __init__(self, v: T) { self.v = v; }
+    def get(self) -> T { return self.v; }
+}
+def main() {
+    p = Pair<int, str>(42, \"xy\");
+    print(p.a);
+    print(p.b);
+    c = Cell<bool>(F);
+    print(c.get());
+    w = Vec<Vec<int>>(fn() -> Vec<int> { return Vec(zero_int); });
+    print(w.len);
+    n = Vec<int>();
+    n.append(7);
+    print(n[0]);
+    return 0;
+}" "" "42\nxy\nfalse\n0\n7\n"
+# step 76: Dict<str, int>(zero_int) を注釈なしで構築できる（型引数の
+# 明示は一般機能）。無いキーの読み取りでは初期値が入る（意味論は不変）
+one_io_test "def main() {
+    d = Dict<str, int>(zero_int);
+    d[\"a\"] = 5;
+    print(d[\"a\"]);
+    print(d[\"missing\"]);
+    print(d.len);
+    return 0;
+}" "" "5\n0\n2\n"
+# step 76: ファクトリ形でも、注釈が無ければ要素型の既定 int が効く
+one_io_test "def main() {
+    q = Deque(zero_int);
+    q.push_back(3);
+    q.push_back(4);
+    print(q.pop_front() + q.pop_front());
+    return 0;
+}" "" "7\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

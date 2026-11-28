@@ -204,6 +204,12 @@ struct Node {
     Capture* captures;
     // ND_FUNCALL のときだけ使う: 組み込みプリミティブならその種類
     int builtin;
+    // 構築時の明示的な型引数（step 76）。`名前<型, ...>(引数...)` の
+    // 形で書かれた場合だけ parse が詰める。ctor_targ_count == 0 は
+    // 指定なし（推論・期待型・既定に委ねる）。呼び出しなしで式の位置に
+    // `名前<型, ...>` と書く形は無い
+    Type* ctor_targs[MAX_TPARAMS];
+    int ctor_targ_count;
 };
 
 struct Function {

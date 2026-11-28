@@ -504,8 +504,10 @@ true false
 <p>
   構築時の型引数は、<code>__init__</code> の引数の値と、代入先の注釈・関数の引数位置・戻り値といった期待型の両方から推論されます。
   どちらからも決まらない場合は「型引数を推論できません」というエラーになります。
-  とくに <code>Dict</code> / <code>Vec</code> / <code>Deque</code> は、ファクトリの引数だけでは型引数が決まらないため、注釈などの期待型が必須です。
-  型引数は注釈の中に <code>Pair&lt;int, str&gt;</code> と書けます（入れ子も可）。構築式そのものに型引数を書く形はありません。
+  型引数は注釈の中に <code>Pair&lt;int, str&gt;</code> と書けるほか、構築式そのものにも <code>Pair&lt;int, str&gt;(42, "x")</code> のように書けます（入れ子も可）。
+  明示した型引数が期待型と矛盾する場合はエラーになります。
+  とくに <code>Dict</code> は、ファクトリの引数だけでは型引数が決まらないため、注釈などの期待型か、構築時の型引数の明示が必須です。
+  <code>Vec</code> / <code>Deque</code> はどちらも無ければ要素型が <code>int</code> になるため、注釈なしでも構築できます（§11）。
 </p>
 
 <figure class="code">
@@ -521,13 +523,16 @@ true false
 p: Pair&lt;int, str&gt; = Pair(42, "x")
 put p.fst, p.snd
 q = Pair("a", 7)
-put q.fst, q.snd</pre>
+put q.fst, q.snd
+r = Pair&lt;int, str&gt;(7, "y")
+put r.fst, r.snd</pre>
 </figure>
 
 <figure class="out">
   <figcaption>出力</figcaption>
 <pre>42 x
-a 7</pre>
+a 7
+7 y</pre>
 </figure>
 
 <h2 id="s09"><span class="no">09</span>組み込み型（基本）</h2>
@@ -713,6 +718,8 @@ for v in Count(3) { put v }</pre>
 <p>
   構築には既定値ファクトリが必須で、<code>d: Dict&lt;str, int&gt; = Dict(zero_int)</code> のように書きます
   （ファクトリは「無かったキー」を生やすための既定値を作る関数で、キーごとに呼ばれます）。
+  型引数を構築に明示すれば、注釈なしでも <code>d = Dict&lt;str, int&gt;(zero_int)</code> と書けます。
+  ファクトリの値は読み取りで観測できるため、<code>Vec</code> / <code>Deque</code> のような引数なし構築はありません。
   読み取り <code>d[k]</code> は、キーが無ければファクトリで作った既定値を登録してから返します（defaultdict 式）。
   キーに使えるのは <code>__hash__</code> と <code>__eq__</code> を持つ型で、等しいキーは等しいハッシュを返す必要があります。
   既定のファクトリとして <code>zero_int</code>（0）、<code>zero_bool</code>（偽）、<code>zero_str</code>（空文字列）があり、
@@ -750,7 +757,10 @@ a</pre>
 
 <h3>Vec&lt;T&gt; — 伸びる配列</h3>
 <p>
-  構築は <code>v: Vec&lt;int&gt; = Vec(zero_int)</code> のように、既定値ファクトリと注釈（などの期待型）が必須です。
+  構築は、引数なしの <code>v = Vec()</code>（要素型は <code>int</code>）、型引数つきの <code>v = Vec&lt;str&gt;()</code>、
+  注釈つきの <code>v: Vec&lt;str&gt; = Vec()</code>、既定値ファクトリを渡す <code>v: Vec&lt;int&gt; = Vec(zero_int)</code> の各形で書けます。
+  引数なしの場合、バッファの埋め草は要素型の既定値（<code>int</code> は 0、<code>bool</code> は偽、<code>str</code> は空文字列）で補われます。
+  要素型がクラスの場合は自動で補えないため、ファクトリを渡してください。
   末尾への追加は容量の倍増で均し定数時間です。
 </p>
 <table>
@@ -764,7 +774,9 @@ a</pre>
 
 <h3>Deque&lt;T&gt; — 両端キュー</h3>
 <p>
-  Queue としても Stack としても使える両端キューです。構築は <code>q: Deque&lt;int&gt; = Deque(zero_int)</code> のように、ファクトリと注釈が必須です。
+  Queue としても Stack としても使える両端キューです。構築は <code>Vec</code> と同じく、引数なしの <code>q = Deque()</code>（要素型は <code>int</code>）、
+  型引数つきの <code>q = Deque&lt;str&gt;()</code>、注釈つきの <code>q: Deque&lt;str&gt; = Deque()</code>、ファクトリを渡す <code>q: Deque&lt;int&gt; = Deque(zero_int)</code> の各形で書けます。
+  引数なしの場合の埋め草の扱いも <code>Vec</code> と同じです。
   出し入れの実体はダンダー <code>__push_back__</code> / <code>__push_front__</code> / <code>__pop_back__</code> / <code>__pop_front__</code> で、
   公開メソッドはその薄いラッパーです。矢印演算子（§02）でも出し入れできます。
   空のときに <code>pop_front</code> / <code>pop_back</code> / <code>front</code> / <code>back</code> を呼ぶのは誤りで、結果は不定です（検査はしません）。

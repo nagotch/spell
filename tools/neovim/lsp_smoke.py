@@ -347,6 +347,43 @@ send({"jsonrpc": "2.0", "method": "textDocument/didChange",
 diags = wait_diagnostics()
 check("didChange（パイプ else / elif）: 診断ゼロ", diags == [], json.dumps(diags, ensure_ascii=False))
 
+# 5.14 構築の簡略化（step 76）: 引数なし構築と型引数つき構築は診断ゼロ、
+# クラス要素の引数なし構築は構築位置に診断が出る
+CTOR_OK_PROGRAM = (
+    "def main() {\n"
+    "    q = Deque();\n"
+    "    q.push_back(1);\n"
+    "    s = Deque<str>();\n"
+    "    s.push_back(\"x\");\n"
+    "    return q.len + s.len;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 16},
+                 "contentChanges": [{"text": CTOR_OK_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（引数なし構築・型引数）: 診断ゼロ", diags == [], json.dumps(diags, ensure_ascii=False))
+
+CTOR_ERR_PROGRAM = (
+    "class P { x: int; def __init__(self, x: int) { self.x = x; } }\n"
+    "def main() {\n"
+    "    q = Deque<P>();\n"
+    "    return 0;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 17},
+                 "contentChanges": [{"text": CTOR_ERR_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（クラス要素の引数なし構築）: 診断1件", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 1:
+    check("クラス要素の引数なし構築: メッセージに「ファクトリを渡してください」",
+          "ファクトリを渡してください" in diags[0]["message"], diags[0]["message"])
+    r = diags[0]["range"]
+    check("クラス要素の引数なし構築: 範囲は Deque の位置（line=2, char=8-13）",
+          r["start"] == {"line": 2, "character": 8} and r["end"] == {"line": 2, "character": 13},
+          json.dumps(r))
+
 # 6. didClose: 空の診断が送られて消える
 send({"jsonrpc": "2.0", "method": "textDocument/didClose",
       "params": {"textDocument": {"uri": URI}}})

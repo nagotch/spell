@@ -125,6 +125,11 @@ static Node* clone_node(Node* n, Class* tmpl, Type* targs[]) {
     c->func = NULL;
     c->klass = NULL;
     c->anno = subst_type(n->anno, tmpl, targs);
+    // 構築時の明示的な型引数（step 76）も、外側の型変数を含むことが
+    // あるため anno と同じく置換する（個数は *c = *n で複写済み）
+    for (int i = 0; i < n->ctor_targ_count && i < MAX_TPARAMS; i++) {
+        c->ctor_targs[i] = subst_type(n->ctor_targs[i], tmpl, targs);
+    }
     if (n->kind == ND_LAMBDA && n->func) {
         // ラムダは実体化ごとに専用の関数へ複製する（型と検査状態を共有しない）
         c->func = clone_lambda_func(n->func, tmpl, targs);

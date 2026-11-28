@@ -190,6 +190,7 @@ static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index
 }
 
 static Type* check_node(Node* node);
+static Type* check_funcref(Node* node);
 
 // 引数を全部検査し、型を最大 6 個まで記録する。引数の数を返す。
 // expected_list があれば、各引数の期待型として渡す（ラムダの型決定用）
@@ -398,6 +399,41 @@ static Type* check_assign(Node* node) {
     return rhs;
 }
 
+// prelude の Vec / Deque かどうか（実体化済みなら origin で判定する）。
+// 要素型の既定 int と引数なし構築は、埋め草のファクトリが意味論を
+// 持たないこの2クラスだけの特例（step 76）
+static bool is_vec_or_deque(Class* klass) {
+    Class* o = klass->origin ? klass->origin : klass;
+    return (o->len == 3 && !memcmp(o->name, "Vec", 3))
+        || (o->len == 5 && !memcmp(o->name, "Deque", 5));
+}
+
+// 要素型の既定値を返す prelude 関数の参照ノードを作る。自動で作れるのは
+// int / bool / str だけで、それ以外は NULL を返す。利用者が手で書いた
+// `Deque(zero_int)` の引数と全く同じ形のノードにする
+static Node* make_zero_factory(Node* node, Type* elem) {
+    const char* name = NULL;
+    if (elem->kind == TY_INT) {
+        name = "zero_int";
+    } else if (elem->kind == TY_CLASS && elem->klass) {
+        Class* o = elem->klass->origin ? elem->klass->origin : elem->klass;
+        if (o->len == 4 && !memcmp(o->name, "bool", 4)) {
+            name = "zero_bool";
+        } else if (o->len == 3 && !memcmp(o->name, "str", 3)) {
+            name = "zero_str";
+        }
+    }
+    if (!name) {
+        return NULL;
+    }
+    Node* fref = calloc(1, sizeof(Node));
+    fref->kind = ND_FUNCREF;
+    fref->name = (char*)name;
+    fref->len = (int)strlen(name);
+    fref->tok = node->tok;
+    return fref;
+}
+
 static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int nargs, Type* expected_ty) {
     if (klass->type->kind != TY_CLASS) {
         error_node(node, "`%.*s`はクラスではありません", klass->len, klass->name);
@@ -408,6 +444,32 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
         if (ginit) {
             for (int i = 0; i < nargs && i + 1 < ginit->nparams; i++) {
                 unify_type(ginit->param_types[i + 1], arg_types[i], klass, gtargs);
+            }
+        }
+        // 構築時の明示的な型引数（step 76）は、引数からの推論より優先
+        // する。個数が合わなければエラー。期待型があるのに矛盾する
+        // 場合もエラーにする（黙ってどちらかを採らない）
+        if (node->ctor_targ_count > 0) {
+            if (node->ctor_targ_count != klass->tparam_count) {
+                error_node(node, "クラス`%.*s`の型引数は%d個ですが、%d個が指定されています", klass->len, klass->name, klass->tparam_count, node->ctor_targ_count);
+                // 個数が合わないまま実体化すると NULL の型が紛れ込むため、
+                // キャプチャ有効時（error_node から戻る場合）は打ち切る
+                return &ty_unknown;
+            }
+            if (expected_ty && expected_ty->kind == TY_CLASS
+                    && expected_ty->targ_count == klass->tparam_count) {
+                Class* ek = expected_ty->klass->origin ? expected_ty->klass->origin : expected_ty->klass;
+                Class* tk = klass->origin ? klass->origin : klass;
+                if (ek == tk) {
+                    for (int i = 0; i < klass->tparam_count; i++) {
+                        if (!type_equals(expected_ty->targs[i], node->ctor_targs[i])) {
+                            error_node(node, "クラス`%.*s`の型引数`%s`が、期待される型`%s`と矛盾します", klass->len, klass->name, type_text(node->ctor_targs[i]), type_text(expected_ty));
+                        }
+                    }
+                }
+            }
+            for (int i = 0; i < klass->tparam_count; i++) {
+                gtargs[i] = node->ctor_targs[i];
             }
         }
         // 引数から決まらなかった型引数は、この構築式への期待型（注釈・
@@ -423,6 +485,16 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
                     if (!gtargs[i]) {
                         gtargs[i] = expected_ty->targs[i];
                     }
+                }
+            }
+        }
+        // Vec / Deque は、それでも決まらない要素型の既定を int とする
+        // （step 76）。Dict のファクトリは無いキーの初期値として観測
+        // できる意味論を持つため、一般のジェネリッククラスには広げない
+        if (is_vec_or_deque(klass)) {
+            for (int i = 0; i < klass->tparam_count; i++) {
+                if (!gtargs[i]) {
+                    gtargs[i] = &ty_int;
                 }
             }
         }
@@ -443,6 +515,27 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
     node->klass = klass;
     Function* init = find_callable(klass, "__init__", 8);
     node->func = init;
+    // Vec / Deque の引数なし構築（step 76）: 埋め草のファクトリを要素型の
+    // 既定値で補う。要素型が int / bool / str 以外（クラス・配列・関数型）
+    // の既定値は自動で作れないため、ファクトリを渡すよう促すエラーに
+    // する。補った引数は、この後の通常の引数照合にそのままかける
+    if (nargs == 0 && init && init->nparams == 2 && klass->targ_count == 1 && is_vec_or_deque(klass)) {
+        Type* elem = klass->targs[0];
+        Node* fref = make_zero_factory(node, elem);
+        if (!fref) {
+            if (elem->kind == TY_CLASS) {
+                error_node(node, "要素型がクラスの場合はファクトリを渡してください");
+            } else {
+                error_node(node, "要素型`%s`の既定値は自動で作れないため、ファクトリを渡してください", type_text(elem));
+            }
+            // 補えないまま個数照合へ進むと二重の診断になるため、
+            // キャプチャ有効時（error_node から戻る場合）は打ち切る
+            return &ty_unknown;
+        }
+        arg_types[0] = check_funcref(fref);
+        node->args = fref;
+        nargs = 1;
+    }
     int expected = init ? init->nparams - 1 : 0;
     if (nargs != expected) {
         error_node(node, "クラス`%.*s`の`__init__`の引数は%d個ですが、%d個が指定されています", klass->len, klass->name, expected, nargs);
