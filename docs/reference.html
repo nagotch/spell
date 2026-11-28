@@ -103,11 +103,13 @@ put x</pre>
 
 <h3>bool 値</h3>
 <p>
-  <code>true</code> / <code>false</code> というリテラルはありません。<code>bool</code> 値は比較や論理演算の結果として得ます
-  （確実に真が欲しいときは <code>1 == 1</code>、偽は <code>1 == 0</code> と書きます）。
+  リテラルは <code>true</code> / <code>false</code>（短縮形 <code>T</code> / <code>F</code>）で、比較や論理演算の結果としても得ます。
   表示すると <code>true</code> / <code>false</code> になります。
-  条件式は <code>bool</code> で書くのが基本ですが、判定は「0でないか」で行われるため、
-  <code>int</code>（0が偽、それ以外が真）や参照型の値もそのまま条件に使えます。
+  条件式（<code>if</code> / <code>while</code> の条件と、<code>!</code> / <code>&amp;&amp;</code> / <code>||</code> の被演算子）では、値が真理値として解釈されます。
+  <code>bool</code> はそのまま、<code>int</code> は 0 が偽でそれ以外が真です。
+  クラス・配列・文字列の値は、その型に <code>__bool__() -&gt; bool</code> が定義されていればその結果で判定します
+  （<code>str</code>・配列・<code>Vec</code>・<code>Deque</code>・<code>Dict</code> は「長さが 0 でないこと」）。
+  <code>__bool__</code> の無いクラスを条件に使うとコンパイルエラーになります。
 </p>
 
 <h3>文字列リテラル</h3>
@@ -227,8 +229,9 @@ put a &lt;- b, a -&gt; b, a &lt; -b, a &gt; -b</pre>
   複合代入 <code>x += e</code> は <code>x = x + e</code> と同じですが、代入先が添字の場合は添字式が2回評価されます（副作用のある添字式には注意してください）。
 </p>
 <p class="note">
-  未束縛の名前を読むとエラーにはならず、未初期化の変数として扱われます（値は不定）。
-  名前の書き間違いが実行時まで残ることがあるので、束縛は代入で明示するのが安全です。
+  どこにも代入されていない名前を読むと、コンパイルエラーになります（定義の判定は文の前後関係ではなく、プログラム全体・関数全体での代入の有無で行います。
+  そのため、後方で代入されるグローバルを関数から読む前方参照は問題ありません）。
+  近い名前の変数が1つだけあれば、エラーメッセージに「ヒント: もしかして `名前` ですか（定義は N 行目）」と候補が出ます。
 </p>
 
 <figure class="code">
@@ -565,6 +568,7 @@ a 7
   <tr><td><code>__add__</code></td><td>連結</td></tr>
   <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較。<code>&lt;</code> 系の順序比較はない</td></tr>
   <tr><td><code>__hash__</code></td><td>文字コード列からのハッシュ</td></tr>
+  <tr><td><code>__bool__</code></td><td>空でなければ真（条件での判定）</td></tr>
   <tr><td><code>__iter__</code></td><td>1文字ずつの <code>str</code> を返す（<code>StrIter</code>）。ループ変数への代入は元の文字列へ書き戻される</td></tr>
   <tr><td><code>rev</code></td><td>逆順にした新しい文字列</td></tr>
   <tr><td><code>__str__</code></td><td>自分自身</td></tr>
@@ -601,6 +605,7 @@ cba</pre>
   <tr><td><code>__mul__</code></td><td><code>a * n</code> で n 回繰り返した新しい配列</td></tr>
   <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較。<code>&lt;</code> 系の順序比較はない（エラーになる）</td></tr>
   <tr><td><code>__hash__</code></td><td>要素のハッシュの合成。配列は書き換え可能なので、辞書のキーにした後で中身を変えると、そのエントリは引けなくなる</td></tr>
+  <tr><td><code>__bool__</code></td><td>空でなければ真（条件での判定）</td></tr>
   <tr><td><code>__iter__</code></td><td>要素の走査（<code>ArrayIter</code>）。配列そのものへの反復で、ループ変数への代入は要素へ書き戻される</td></tr>
   <tr><td><code>rev</code></td><td>逆順にした新しい配列（元の配列は変わらない）</td></tr>
   <tr><td><code>__str__</code></td><td>要素を空白区切りで並べた文字列。入れ子の配列も平らに並ぶ</td></tr>
@@ -734,6 +739,7 @@ for v in Count(3) { put v }</pre>
   <tr><td><code>len</code></td><td>エントリ数</td></tr>
   <tr><td><code>keys()</code></td><td>挿入順のキー配列のコピー</td></tr>
   <tr><td><code>__iter__</code></td><td>キーの列挙（開始時点のスナップショット）</td></tr>
+  <tr><td><code>__bool__</code></td><td>空でなければ真（条件での判定）</td></tr>
 </table>
 
 <figure class="code">
@@ -773,6 +779,7 @@ a</pre>
   <tr><td><code>v[i]</code>（<code>__getitem__</code> / <code>__setitem__</code>）</td><td>内部バッファへの直接の読み書き。論理要素数以上の添字も検査されず、容量の範囲では埋め草（ファクトリの値）が見える</td></tr>
   <tr><td><code>to_array()</code></td><td>論理要素数分の通常配列のコピー</td></tr>
   <tr><td><code>__iter__</code></td><td>開始時点のスナップショット（<code>to_array()</code>）への反復</td></tr>
+  <tr><td><code>__bool__</code></td><td>空でなければ真（条件での判定）</td></tr>
 </table>
 
 <h3>Deque&lt;T&gt; — 両端キュー</h3>
@@ -794,6 +801,7 @@ a</pre>
   <tr><td><code>q[i]</code>（<code>__getitem__</code>）</td><td>論理位置の読み取り（0 が先頭）。書き込み用の <code>__setitem__</code> は無い</td></tr>
   <tr><td><code>to_array()</code></td><td>先頭から末尾の順の通常配列のコピー</td></tr>
   <tr><td><code>__iter__</code></td><td>開始時点のスナップショットへの反復（先頭から末尾）</td></tr>
+  <tr><td><code>__bool__</code></td><td>空でなければ真（条件での判定）</td></tr>
 </table>
 
 <figure class="code">
@@ -863,6 +871,7 @@ put d[(1, 2)], d[(3, 3)]</pre>
   <tr><td><code>__eq__</code> <code>__ne__</code></td><td><code>==</code> <code>!=</code>、<code>Dict</code> のキー照合</td><td><code>__eq__</code> が無いクラスの <code>==</code> は同一性</td></tr>
   <tr><td><code>__lt__</code> <code>__le__</code></td><td><code>&lt;</code> <code>&lt;=</code> と連鎖比較</td><td><code>&gt;</code> <code>&gt;=</code> は左右を入れ替えて <code>__lt__</code> / <code>__le__</code> に帰着。<code>&gt;=</code> の右辺が複合式だと左結合の意味に化ける既知の制限がある</td></tr>
   <tr><td><code>__hash__() -&gt; int</code></td><td><code>Dict</code> のキー</td><td><code>__eq__</code> と対で実装する。<code>Dict</code> は <code>__hash__</code> の無い型をキーにできない</td></tr>
+  <tr><td><code>__bool__() -&gt; bool</code></td><td>条件（<code>if</code> / <code>while</code> の条件、<code>!</code> / <code>&amp;&amp;</code> / <code>||</code> の被演算子）</td><td>クラス・配列・文字列を条件に使うとその結果で判定する。無いクラスを条件に使うのはコンパイルエラー。<code>str</code>・配列・<code>Vec</code>・<code>Deque</code>・<code>Dict</code> は「長さが 0 でないこと」で実装されている</td></tr>
   <tr><td><code>__str__() -&gt; str</code></td><td><code>print</code> / <code>put</code>、文字列連結での自動変換</td><td>無ければ出力時にエラー（<code>Range</code> や <code>Dict</code> はこちら）</td></tr>
   <tr><td><code>__getitem__(i)</code> / <code>__setitem__(i, v)</code></td><td><code>a[i]</code> の読み書き、複合代入の対象</td><td>添字の型は任意（辞書のキーは任意の型）</td></tr>
   <tr><td><code>__iter__() -&gt; イテレータ</code></td><td><code>for x in obj</code></td><td>イテレータ側は <code>__has_next__() -&gt; bool</code> と <code>__next__()</code> を実装。任意で <code>__set_current__(v)</code>（ループ変数の書き戻し）</td></tr>

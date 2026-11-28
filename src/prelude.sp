@@ -44,6 +44,10 @@ class str {
         return self;
     }
 
+    def __bool__(self) -> bool {
+        return self.len > 0;
+    }
+
     def __iter__(self) -> StrIter {
         return StrIter(self);
     }
@@ -207,6 +211,10 @@ class array<T> {
             i = i + 1;
         }
         return r;
+    }
+
+    def __bool__(self) -> bool {
+        return self.len > 0;
     }
 
     def __iter__(self) -> ArrayIter<T> {
@@ -396,6 +404,10 @@ class Dict<K, V> {
 
     def len(self) -> int {
         return self.count;
+    }
+
+    def __bool__(self) -> bool {
+        return self.count > 0;
     }
 
     def has(self, key: K) -> bool {
@@ -603,6 +615,10 @@ class Vec<T> {
         return self.n;
     }
 
+    def __bool__(self) -> bool {
+        return self.n > 0;
+    }
+
     def append(self, v: T) {
         if (self.n == self.buf.len) {
             cap = self.buf.len * 2;
@@ -665,6 +681,10 @@ class Deque<T> {
 
     def len(self) -> int {
         return self.n;
+    }
+
+    def __bool__(self) -> bool {
+        return self.n > 0;
     }
 
     def grow(self) {
