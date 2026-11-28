@@ -74,6 +74,124 @@ class str {
     def rev(self) -> str {
         return str(self.chars.rev);
     }
+
+    // 部分文字列（スライス `s[lo:hi]` の実体）。境界は型検査が
+    // 正規化済み（0 <= lo <= hi <= 長さ）で渡してくる
+    def __slice__(self, lo: int, hi: int) -> str {
+        return str(self.chars.__slice__(lo, hi));
+    }
+
+    // t で始まるかどうか
+    def starts_with(self, t: str) -> bool {
+        if (t.len > self.len) { return 1 == 0; }
+        i = 0;
+        while (i < t.len) {
+            if (self.chars[i] != t.chars[i]) { return 1 == 0; }
+            i = i + 1;
+        }
+        return 1 == 1;
+    }
+
+    // t で終わるかどうか
+    def ends_with(self, t: str) -> bool {
+        if (t.len > self.len) { return 1 == 0; }
+        base = self.len - t.len;
+        i = 0;
+        while (i < t.len) {
+            if (self.chars[base + i] != t.chars[i]) { return 1 == 0; }
+            i = i + 1;
+        }
+        return 1 == 1;
+    }
+
+    // t が最初に現れる位置。無ければ -1。空の t は 0（Python と同じ）
+    def find(self, t: str) -> int {
+        n = self.len;
+        m = t.len;
+        i = 0;
+        while (i + m <= n) {
+            j = 0;
+            while (j < m && self.chars[i + j] == t.chars[j]) {
+                j = j + 1;
+            }
+            if (j == m) { return i; }
+            i = i + 1;
+        }
+        return -1;
+    }
+
+    // t を含むかどうか
+    def contains(self, t: str) -> bool {
+        return self.find(t) >= 0;
+    }
+
+    // sep で分割した部分文字列の配列。区切りが連続・端にある場合は
+    // 空文字列が含まれる（Python の str.split(sep) と同じ）。
+    // sep が空文字列の場合は分割せず、自分だけからなる配列を返す
+    def split(self, sep: str) -> [str] {
+        if (sep.len == 0) { return [self]; }
+        cnt = 1;
+        i = 0;
+        while (i + sep.len <= self.len) {
+            if (self.__slice__(i, i + sep.len) == sep) {
+                cnt = cnt + 1;
+                i = i + sep.len;
+            } else {
+                i = i + 1;
+            }
+        }
+        r = [self; cnt];
+        k = 0;
+        start = 0;
+        i = 0;
+        while (i + sep.len <= self.len) {
+            if (self.__slice__(i, i + sep.len) == sep) {
+                r[k] = self.__slice__(start, i);
+                k = k + 1;
+                i = i + sep.len;
+                start = i;
+            } else {
+                i = i + 1;
+            }
+        }
+        r[k] = self.__slice__(start, self.len);
+        return r;
+    }
+
+    // a の要素を、自分の文字列を区切りにしてつないだ文字列
+    def join(self, a: [str]) -> str {
+        r = "";
+        i = 0;
+        while (i < a.len) {
+            if (i > 0) { r = r + self; }
+            r = r + a[i];
+            i = i + 1;
+        }
+        return r;
+    }
+
+    // atoi 式の変換: 先頭の空白（空白・タブ・改行など）と符号を
+    // 読み、数字が続く間だけ読む。数字以外で止まり、数字が
+    // 無ければ 0
+    def to_int(self) -> int {
+        i = 0;
+        while (i < self.len && (self.chars[i] == 32 || (self.chars[i] >= 9 && self.chars[i] <= 13))) {
+            i = i + 1;
+        }
+        sign = 1;
+        if (i < self.len && self.chars[i] == 45) {
+            sign = -1;
+            i = i + 1;
+        } elif (i < self.len && self.chars[i] == 43) {
+            i = i + 1;
+        }
+        n = 0;
+        while (i < self.len && self.chars[i] >= 48 && self.chars[i] <= 57) {
+            n = n * 10 + (self.chars[i] - 48);
+            i = i + 1;
+        }
+        return sign * n;
+    }
 }
 
 class StrIter {
@@ -369,6 +487,21 @@ class array<T> {
             i = i + 1;
         }
         return c;
+    }
+
+    // 部分配列（スライス `a[lo:hi]` の実体）。境界は型検査が
+    // 正規化済み（0 <= lo <= hi <= 長さ）で渡してくる。要素を
+    // コピーした新しい配列を返す（元の配列は変わらない）
+    def __slice__(self, lo: int, hi: int) -> [T] {
+        n = hi - lo;
+        if (n == 0) { return []; }
+        r = [self[lo]; n];
+        i = 0;
+        while (i < n) {
+            r[i] = self[lo + i];
+            i = i + 1;
+        }
+        return r;
     }
 
     def __str__(self) -> str {

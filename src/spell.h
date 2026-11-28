@@ -181,6 +181,14 @@ typedef enum {
     // 一時スロット列の先頭。typecheck が範囲チェック（bool）と
     // 通常の添え字・論理演算へ書き換えるため、codegen には残らない
     ND_SAFEIDX,
+    // スライス（step 85）。`対象[lo:hi]`（端は省略可）をパーサが
+    // この種別で運ぶ。left_child が対象、right_child が下限の式
+    // （省略時は NULL）、args が上限の式（省略時は NULL）、offset が
+    // 型検査の書き換えで使う一時スロット列の先頭（対象・下限・
+    // 上限の3枠）。typecheck が境界を正規化して prelude の
+    // `__slice__(lo, hi)` 呼び出しへ書き換えるため、codegen には
+    // 残らない
+    ND_SLICE,
 } NodeKind;
 typedef struct Node Node;
 struct Node {

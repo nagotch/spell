@@ -366,9 +366,18 @@ static Node* primary() {
                     && (expr_depth > 0 || nb == 0 || token->line == token->prev->line)) {
                 consume("[");
                 expr_depth++;
+                // 角括弧の中では `:` はスライスの印なので、型注釈の
+                // 判定は先読み方式にする（条件式と同じ。step 85）
+                bool saved_anno = suppress_anno;
+                suppress_anno = true;
                 cur->next = expr();
+                suppress_anno = saved_anno;
                 expr_depth--;
                 cur = cur->next;
+                if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+                    // 安全添え字の中のスライスは対象外（step 85）
+                    error_at(token_start(token), token_end(token), "安全添え字の中ではスライスは使えません");
+                }
                 expect("]");
                 nb++;
             }
@@ -389,13 +398,58 @@ static Node* primary() {
         }
         if (consume("[")) {
             expr_depth++;
-            Node* right_child = expr();
+            // スライス（step 85）: `[下限:上限]` の形。端は省略でき、
+            // 省略した側は NULL で運ぶ。ステップ（2つ目の `:`）は無い。
+            // 角括弧の中では `:` はスライスの印なので、境界の式を
+            // 読む間は型注釈の判定を先読み方式にする（条件式と同じ）
+            bool saved_anno = suppress_anno;
+            suppress_anno = true;
+            Node* lo = NULL;
+            Node* hi = NULL;
+            bool is_slice = false;
+            if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+                is_slice = true;
+            } else {
+                lo = expr();
+                if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+                    is_slice = true;
+                }
+            }
+            if (is_slice) {
+                consume(":");
+                if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+                    error_at(token_start(token), token_end(token), "スライスにステップは指定できません");
+                }
+                if (!(token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ']')) {
+                    hi = expr();
+                    if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+                        error_at(token_start(token), token_end(token), "スライスにステップは指定できません");
+                    }
+                }
+            }
+            suppress_anno = saved_anno;
             expr_depth--;
             expect("]");
+            if (is_slice) {
+                Node* snode = create_node(ND_SLICE);
+                snode->tok = postfix_tok;
+                snode->left_child = node;
+                snode->right_child = lo;
+                snode->args = hi;
+                // 一時スロット: 対象・正規化前の下限・上限の退避先
+                // の3枠（使うかどうかは型検査が決める。Pos 添字の
+                // 一時置き場と同じ方式）
+                register_any();
+                snode->offset = locals->offset;
+                register_any();
+                register_any();
+                node = snode;
+                continue;
+            }
             Node* new_node = create_node(ND_INDEX);
             new_node->tok = postfix_tok;
             new_node->left_child = node;
-            new_node->right_child = right_child;
+            new_node->right_child = lo;
             // Pos 添字の糖衣（step 77）で使う一時置き場。添字の型は
             // パース時点では分からないため、全ての添字式に1枠ずつ
             // 確保しておき、使うかどうかは型検査が決める（複数代入の

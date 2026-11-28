@@ -404,6 +404,11 @@ static Type* check_assign(Node* node) {
     if (node->left_child->kind == ND_SAFEIDX) {
         error_node(node->left_child, "安全添え字には代入できません");
     }
+    // スライスは読み取り専用（step 85）。安全添え字と同じく、
+    // 右辺の検査より先に判定する
+    if (node->left_child->kind == ND_SLICE) {
+        error_node(node->left_child, "スライスには代入できません");
+    }
     // 右辺への期待型: 注釈があれば注釈、なければ代入先の記録済みの型
     if (node->anno) {
         expected_type = node->anno;
@@ -1769,6 +1774,146 @@ static Type* check_index(Node* node) {
     return lt->kind == TY_ARRAY ? lt->elem : &ty_unknown;
 }
 
+// ---- スライス（step 85） ----
+
+// 型つきの二項演算ノード（safe_binop は bool 固定なので、算術用に
+// こちらを使う）。合成ノードは再検査されないため、型は手で付ける
+static Node* slice_op(Node* at, BinOp op, Node* l, Node* r, Type* type) {
+    Node* b = create_node(ND_BINOP);
+    b->op.binop = op;
+    b->tok = at->tok;
+    b->left_child = l;
+    b->right_child = r;
+    b->type = type;
+    return b;
+}
+
+// 対象スロットの長さを読むノード（safe_len と同じ。対象は退避済み
+// スロットを読む形で渡す）
+static Node* slice_len(Node* node, int base, Type* lt) {
+    return safe_len(node, safe_slot(node, base, lt), lt);
+}
+
+// 境界1つ分の正規化式を組む。off はその境界の一時スロット、raw は
+// 退避前の境界式（呼び出し側で省略時の値に置き換えて渡す）。
+// 正規化は Python 式: 負数は末尾から数え（長さを足す）、[0, 長さ]
+// に丸める。戻り値の式は「評価すると正規化された境界になり、
+// スロットにも同じ値が残る」代入式で、各段の代入を次の段の左端に
+// 埋め込むことで評価順を保証する（比較は 0/1 として算術に使う）
+static Node* slice_norm(Node* node, int base, Type* lt, Node* raw, int off) {
+    Node* v = safe_assign(node, safe_slot(node, off, &ty_int), raw, &ty_int);
+    // v = v + (v < 0) * 長さ
+    Node* c1 = safe_binop(node, OP_LT, safe_slot(node, off, &ty_int), safe_num(node, 0));
+    v = safe_assign(node, safe_slot(node, off, &ty_int),
+                    slice_op(node, OP_ADD, v,
+                             slice_op(node, OP_MUL, c1, slice_len(node, base, lt), &ty_int),
+                             &ty_int),
+                    &ty_int);
+    // v = v * (1 - (v < 0)): まだ負なら 0 に丸める
+    Node* c2 = safe_binop(node, OP_LT, safe_slot(node, off, &ty_int), safe_num(node, 0));
+    v = safe_assign(node, safe_slot(node, off, &ty_int),
+                    slice_op(node, OP_MUL, v,
+                             slice_op(node, OP_SUB, safe_num(node, 1), c2, &ty_int),
+                             &ty_int),
+                    &ty_int);
+    // v = v + (長さ < v) * (長さ - v): 長さを超えたら長さに丸める
+    Node* c3 = safe_binop(node, OP_LT, slice_len(node, base, lt), safe_slot(node, off, &ty_int));
+    Node* diff = slice_op(node, OP_SUB, slice_len(node, base, lt), safe_slot(node, off, &ty_int), &ty_int);
+    v = safe_assign(node, safe_slot(node, off, &ty_int),
+                    slice_op(node, OP_ADD, v,
+                             slice_op(node, OP_MUL, c3, diff, &ty_int),
+                             &ty_int),
+                    &ty_int);
+    return v;
+}
+
+// スライス `対象[lo:hi]` を、境界を正規化して prelude の
+// `__slice__(lo, hi)` を呼ぶ形へ書き換える。対象は1回だけ評価して
+// 一時スロットへ退避する。__slice__ は正規化済みの境界
+// （0 <= lo <= hi <= 長さ）だけを受け取る
+static Type* check_slice(Node* node, Type* expected) {
+    Type* lt = check_node(node->left_child);
+    if (!lt) {
+        lt = &ty_unknown;
+    }
+    Type* lot = node->right_child ? check_node(node->right_child) : NULL;
+    Type* hit = node->args ? check_node(node->args) : NULL;
+    if (lot && lot->kind != TY_UNKNOWN && lot->kind != TY_INT) {
+        error_node(node->right_child, "スライスの境界には`int`が必要ですが、`%s`が指定されています", type_text(lot));
+    }
+    if (hit && hit->kind != TY_UNKNOWN && hit->kind != TY_INT) {
+        error_node(node->args, "スライスの境界には`int`が必要ですが、`%s`が指定されています", type_text(hit));
+    }
+    if (lt->kind == TY_UNKNOWN && expected
+            && (expected->kind == TY_ARRAY || is_str_type(expected))) {
+        // 対象の型が分からなくても、期待型が配列か str ならそれを採る
+        lt = expected;
+    }
+    if (lt->kind != TY_ARRAY && !is_str_type(lt)) {
+        if (lt->kind == TY_UNKNOWN) {
+            error_node(node, "スライスの対象の型が分かりません（型注釈で型を明示してください）");
+        } else {
+            error_node(node, "スライスは配列と文字列にだけ使えます（`%s`型には使えません）", type_text(lt));
+        }
+        return &ty_unknown;
+    }
+    if (node->offset == 0) {
+        // パースで一時置き場を確保していないスライス（コンパイラ
+        // 内部で合成されたノード）は対象外。通常の利用者のスライス
+        // は全て primary の後置解析で確保される
+        error_node(node, "スライスはここでは使えません");
+        return &ty_unknown;
+    }
+    Class* klass = class_of(lt);
+    Function* fn = klass ? find_callable(klass, "__slice__", 9) : NULL;
+    if (!fn) {
+        error_node(node, "クラス`%.*s`に`__slice__`は定義されていません", klass->len, klass->name);
+        return &ty_unknown;
+    }
+    if (fn->nparams != 3) {
+        error_node(node, "クラス`%.*s`のメソッド`__slice__`の引数は2個ですが、%d個が定義されています", klass->len, klass->name, fn->nparams - 1);
+    }
+    if (fn->param_types[1] && !type_equals(fn->param_types[1], &ty_int)) {
+        error_node(node, "クラス`%.*s`のメソッド`__slice__`の引数には`int`が必要ですが、`%s`が定義されています", klass->len, klass->name, type_text(fn->param_types[1]));
+    }
+    if (fn->param_types[2] && !type_equals(fn->param_types[2], &ty_int)) {
+        error_node(node, "クラス`%.*s`のメソッド`__slice__`の引数には`int`が必要ですが、`%s`が定義されています", klass->len, klass->name, type_text(fn->param_types[2]));
+    }
+    int base = node->offset;
+    int lo_off = base + 8;
+    int hi_off = base + 16;
+    // レシーバは対象の退避代入（値が対象自身になる）。引数より先に
+    // 評価されるため、対象は1回だけ評価される
+    Node* recv = safe_assign(node, safe_slot(node, base, lt), node->left_child, lt);
+    // 省略した端は、下限が 0、上限が長さ
+    Node* lo_raw = node->right_child ? node->right_child : safe_num(node, 0);
+    Node* hi_raw = node->args ? node->args : slice_len(node, base, lt);
+    Node* lo_arg = slice_norm(node, base, lt, lo_raw, lo_off);
+    Node* hi_arg = slice_norm(node, base, lt, hi_raw, hi_off);
+    // 上限が下限未満なら上限を下限に合わせる（空のスライス）。
+    // 引数は左から評価されるため、この時点で下限スロットは
+    // 正規化済み
+    Node* c4 = safe_binop(node, OP_LT, safe_slot(node, hi_off, &ty_int), safe_slot(node, lo_off, &ty_int));
+    Node* d4 = slice_op(node, OP_SUB, safe_slot(node, lo_off, &ty_int), safe_slot(node, hi_off, &ty_int), &ty_int);
+    hi_arg = safe_assign(node, safe_slot(node, hi_off, &ty_int),
+                         slice_op(node, OP_ADD, hi_arg,
+                                  slice_op(node, OP_MUL, c4, d4, &ty_int),
+                                  &ty_int),
+                         &ty_int);
+    Node* call = make_mcall(recv, klass, fn, "__slice__", 9);
+    call->tok = node->tok;
+    call->args = lo_arg;
+    lo_arg->next = hi_arg;
+    hi_arg->next = NULL;
+    Type* rt = fn->return_type ? fn->return_type : lt;
+    call->type = rt;
+    Node* nxt = node->next;
+    *node = *call;
+    node->next = nxt;
+    node->type = rt;
+    return rt;
+}
+
 static Type* check_return(Node* node) {
     expected_type = current_return;
     Type* rt = check_node(node->left_child);
@@ -2530,7 +2675,7 @@ static Type* check_node(Node* node) {
     // 期待型は直属のラムダ・配列リテラル・構築（関数呼び出し）だけが
     // 受け取り、それ以外へは漏らさない
     Type* my_expected = NULL;
-    if (node->kind == ND_LAMBDA || node->kind == ND_ARRAY || node->kind == ND_FUNCALL) {
+    if (node->kind == ND_LAMBDA || node->kind == ND_ARRAY || node->kind == ND_FUNCALL || node->kind == ND_SLICE) {
         my_expected = expected_type;
     }
     expected_type = NULL;
@@ -2628,6 +2773,11 @@ static Type* check_node(Node* node) {
         }
         case ND_INDEX:
             result = check_index(node);
+            break;
+        case ND_SLICE:
+            // スライスは境界を正規化した `__slice__` 呼び出しへ
+            // 書き換わる（step 85）
+            result = check_slice(node, my_expected);
             break;
         case ND_SAFEIDX: {
             // 安全添え字の単独形は「全段とも範囲内か」の bool
