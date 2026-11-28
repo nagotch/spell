@@ -187,6 +187,7 @@ def t128() { b = [42]; return b[1] * 1000 + b[-1] * 100 + b[2] * 10 + b[-2]; }
 def t129() { a = [10, 20, 30]; a[-3] = 1; a[6] = 2; a[-4] = 3; a[7] = 4; return a[0] * 10000 + a[1] * 100 + a[2]; }
 def t130() { a = [10, 20, 30]; i = 0 - 3; r = a[i]; i = 6; r = r * 100 + a[i]; i = 0 - 4; r = r * 100 + a[i]; i = 7; r = r * 100 + a[i]; return r; }
 def t131() { s = "abc"; r = 0; if (s[-3] == "a") { r = r + 1; } if (s[6] == "a") { r = r + 2; } if (s[-4] == "c") { r = r + 4; } if (s[7] == "b") { r = r + 8; } return r; }
+def t132() { a = [10, 20, 30]; return a[5] * 100 + a[-2]; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -332,6 +333,7 @@ def main() {
     mark(129); fails=fails+check(t129(), 20403);
     mark(130); fails=fails+check(t130(), 10103020);
     mark(131); fails=fails+check(t131(), 15);
+    mark(132); fails=fails+check(t132(), 3020);
 
     print_str("done"); putchar(10);
     return fails > 0;
