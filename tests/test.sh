@@ -148,6 +148,17 @@ tests=(
     "def main() { s = f\"{f'{'}'}'}\"; if (s == \"}\") { return 42; } return 0; }|42"
     "def main() { s = f\"{f\"{ '}' }\"}\"; if (s == \"}\") { return 42; } return 0; }|42"
     "def main() { s = f\"\" + f\"x\"; t = 'q'; u = f'{t}'; if (s == \"x\" && u == \"q\") { return 42; } return 0; }|42"
+    # step 97: `&` / `*` の正当な利用（ディープコピーしたくないときの
+    # 逃げ道）。アドレスは変数に保持でき、算術・比較・戻り値推論でも
+    # アドレスとして受け渡せる
+    "def inc(p) { *p = *p + 1; } def main() { x = 41; inc(&x); return x; }|42"
+    "def main() { x = 1; p = &x; *p = 42; return x; }|42"
+    "def f(p) { (*p)[0] = 42; } def main() { a = [1, 2, 3]; f(&a); return a[0]; }|42"
+    "def set_first(p, v) { *p = v; } def main() { a = [1, 2, 3]; set_first(&a[0], 42); return a[0]; }|42"
+    "def main() { a = [1, 2, 3]; p = &a[0]; p = p + 8; *p = 42; return a[1]; }|42"
+    "g = 7; def get() { return &g; } def main() { p = get(); *p = 42; return g; }|42"
+    "def main() { a = [1, 2, 3]; if (&a[0] < &a[1] && &a[0] == &a[0]) { return 42; } return 0; }|42"
+    "class Pt { x: int; def __init__(self, x: int) { self.x = x; } } def main() { pt = Pt(1); p = &pt.x; *p = 42; return pt.x; }|42"
 )
 
 error_tests=(
@@ -458,6 +469,18 @@ def main():
     "def main() { a = [1, 2]; b = [x for x a]; return 0; }|内包表記の\`in\`が必要ですが"
     "def main() { p = Pos2(1, 2); b = [v for v in p]; return 0; }|\`Pos2\`型の値は反復できません"
     "def main() { a = [1, 2]; b = [x x@a].append(9); return 0; }|\`append\`の対象は変数・フィールド・配列の要素でなければなりません"
+    # step 97: 型が確定していてアドレスでない値への `*` は位置つき
+    # エラー（fill の個数に `* h` と書く元の事故の形を含む）
+    "def main() { h = 3; w = 2; d = [[-1; w]; * h]; return 0; }|\`*\`にはアドレスが必要ですが、\`int\`が指定されています"
+    "def main() { a = [1, 2]; x = *a; return 0; }|\`*\`にはアドレスが必要ですが、\`\[int\]\`が指定されています"
+    "def main() { s = \"a\"; x = *s; return 0; }|\`*\`にはアドレスが必要ですが、\`str\`が指定されています"
+    "def main() { b = true; x = *b; return 0; }|\`*\`にはアドレスが必要ですが、\`bool\`が指定されています"
+    # step 97: 注釈で int と決まった変数はアドレスを入れても int と
+    # して扱い、その後の `*` はエラーで一貫させる
+    "def main() { y = 3; x: int = &y; return *x; }|\`*\`にはアドレスが必要ですが、\`int\`が指定されています"
+    # step 97: `&` の対象が左辺値でない式は位置つきエラー
+    # （以前は codegen の内部エラーになっていた）
+    "def main() { x = &(1 + 2); return 0; }|\`&\`の対象は変数・要素・フィールドでなければなりません"
 )
 
 cc -c -o funcs.o funcs.c

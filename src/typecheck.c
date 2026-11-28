@@ -711,6 +711,28 @@ static Type* check_binop_rest(Node* node, Type* lt, Type* rt) {
         node->right_child = boolify(node->right_child, rt);
         return bool_type();
     }
+    if (lt->kind == TY_ADDR || rt->kind == TY_ADDR) {
+        // アドレスの算術と比較（step 97）。アドレス ± int はアドレス、
+        // アドレス − アドレスは int、int やアドレスとの比較は bool。
+        // 相手がそれ以外の確定した型なら、通常の経路（異型エラー等）
+        // に落とす
+        Type* at = lt->kind == TY_ADDR ? lt : rt;
+        Type* ot = lt->kind == TY_ADDR ? rt : lt;
+        bool partner_ok = ot->kind == TY_INT || ot->kind == TY_ADDR
+            || ot->kind == TY_UNKNOWN || ot->kind == TY_VAR;
+        if (partner_ok) {
+            if (node->op.binop == OP_ADD) {
+                return ot->kind == TY_ADDR ? &ty_unknown : at;
+            }
+            if (node->op.binop == OP_SUB) {
+                return ot->kind == TY_ADDR ? &ty_int : at;
+            }
+            if (node->op.binop == OP_EQ || node->op.binop == OP_NE
+                    || node->op.binop == OP_LT || node->op.binop == OP_LE) {
+                return bool_type();
+            }
+        }
+    }
     const char* dunder = arith_dunder(node->op.binop);
     if (dunder) {
         if (lt->kind == TY_CLASS) {
@@ -2896,7 +2918,8 @@ static Node* make_mcall(Node* receiver, Class* klass, Function* fn, const char* 
 // 出しへ書き換える。定義が無ければ位置つきエラーにする（以前は
 // ポインタの真偽で常に真として黙って通っていた）
 static Node* boolify(Node* expr, Type* t) {
-    if (!t || t->kind == TY_UNKNOWN || t->kind == TY_INT) {
+    // アドレスの実体は int なので、条件では int と同じく素通しする
+    if (!t || t->kind == TY_UNKNOWN || t->kind == TY_INT || t->kind == TY_ADDR) {
         return expr;
     }
     if (t->kind == TY_CLASS && t->klass && t->klass->len == 4
@@ -3987,6 +4010,34 @@ static Type* check_node(Node* node) {
                 // `!` の被演算子は真理値として解釈する（step 79）
                 node->left_child = boolify(node->left_child, operand);
                 result = bool_type();
+            } else if (node->op.unop == OP_ADDR) {
+                // `&` の対象は左辺値（変数・要素・フィールド）だけ。
+                // それ以外は codegen が内部エラーで落ちていたため、
+                // ここで位置つきエラーにする（step 97）。子は検査済み
+                // なので、添え字が __getitem__ 呼び出しへ書き換わる
+                // クラス（Dict 等）の要素も対象外として弾ける
+                Node* target = node->left_child;
+                bool lvalue = target->kind == ND_LVAR || target->kind == ND_GVAR
+                    || target->kind == ND_CAPVAR || target->kind == ND_INDEX
+                    || (target->kind == ND_MEMBER && !target->func)
+                    || (target->kind == ND_UNARY && target->op.unop == OP_DEREF);
+                if (!lvalue) {
+                    error_node(node, "`&`の対象は変数・要素・フィールドでなければなりません");
+                }
+                result = addr_type(operand);
+            } else if (node->op.unop == OP_DEREF) {
+                // `*` の対象はアドレスだけ（step 97）。型不明と型変数は
+                // 従来どおり緩く通す（無注釈パラメータ経由の逃げ道の
+                // 利用がここに懸かっている）。型が確定していて
+                // アドレスでない値への `*` は位置つきエラー
+                if (operand->kind == TY_ADDR) {
+                    result = operand->elem ? operand->elem : &ty_unknown;
+                } else if (operand->kind == TY_UNKNOWN || operand->kind == TY_VAR) {
+                    result = &ty_unknown;
+                } else {
+                    error_node(node, "`*`にはアドレスが必要ですが、`%s`が指定されています", type_text(operand));
+                    result = &ty_unknown;
+                }
             }
             break;
         }
