@@ -248,7 +248,7 @@ put s;</pre>
   配列と文字列の反復では、ループ変数への代入がその要素へ書き戻ります
   （<code>break</code> / <code>continue</code> で抜ける場合も、その時点の値が書き戻ります）。
   範囲や Dict のキーの反復では書き戻し先がないため、ループ変数への代入はエラーになります。
-  文字列を反復すると1文字ずつの文字列が得られます（添字 <code>s[i]</code> は文字コードの <code>int</code> を返します）。
+  文字列を反復すると1文字ずつの文字列が得られます（添字 <code>s[i]</code> も1文字の <code>str</code> を返します。文字コードが欲しい場合は <code>s.chars[i]</code> です）。
 </p>
 
 <figure class="code">
@@ -344,7 +344,7 @@ put a;</pre>
 
 <p>
   文字列 <code>str</code> も同じ作りで、<code>+</code> で連結、<code>==</code> で比較、<code>.len</code> と <code>.rev</code> を持ちます。
-  添字で取り出すと文字コード（<code>int</code>）が返ります。
+  添字で取り出すと1文字の <code>str</code> が返ります（文字コードが欲しい場合は <code>.chars</code> の添字です）。
 </p>
 
 <figure class="code">
@@ -356,7 +356,7 @@ put "A"[0];</pre>
 <figure class="out">
   <figcaption>出力</figcaption>
 <pre>cba
-65</pre>
+A</pre>
 </figure>
 
 <h2 id="s06"><span class="no">06</span>関数</h2>

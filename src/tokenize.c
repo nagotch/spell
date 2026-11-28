@@ -193,7 +193,7 @@ Token* tokenize(char* s) {
             continue;
         }
 
-        if (**endptr == '\"') {
+        if (**endptr == '\"' || **endptr == '\'') {
             last_token_ptr = tokenize_str_literal(endptr, last_token_ptr);
             continue;
         }
@@ -220,13 +220,16 @@ Token* tokenize(char* s) {
 
 static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
     char* first = *endptr;
+    // 開始クォート（`"` または `'`）と同じ文字で閉じる。どちらの形でも
+    // 同じ文字列リテラルで、エスケープの規則も共通
+    char quote = **endptr;
     last_token_ptr = new_token(TK_STR, last_token_ptr);
     int len = 0;
     (*endptr)++;
     char* buf = malloc(strlen(*endptr) + 1);
-    while (**endptr != '\"') {
+    while (**endptr != quote) {
         if (**endptr == '\0' || **endptr == '\n') {
-            error_at(first - src, first - src + 1, "文字列を閉じる`\"`がないまま、ファイルの末尾に達しました");
+            error_at(first - src, first - src + 1, "文字列を閉じる`%c`がないまま、ファイルの末尾に達しました", quote);
         }
         if (**endptr == '\\') {
             if ((*endptr)[1] == 'n') {
@@ -237,6 +240,8 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
                 buf[len] = 92;
             } else if ((*endptr)[1] == '\"') {
                 buf[len] = 34;
+            } else if ((*endptr)[1] == '\'') {
+                buf[len] = 39;
             } else if ((*endptr)[1] == '0') {
                 buf[len] = 0;
             } else {
@@ -249,8 +254,8 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
         (*endptr)++;
         len++;
     }
-    if (**endptr != '\"') {
-        error_at(first - src, first - src + 1, "文字列を閉じる`\"`がないまま、ファイルの末尾に達しました");
+    if (**endptr != quote) {
+        error_at(first - src, first - src + 1, "文字列を閉じる`%c`がないまま、ファイルの末尾に達しました", quote);
         exit(1);
     }
     (*endptr)++;

@@ -85,6 +85,7 @@ error_tests=(
     "def main() { return (1 + 2; }|\`)\`が必要ですが、\`;\`が見つかりました"
     "def main() { return }; }|数値が必要ですが、\`}\`が見つかりました"
     "def main() { s = \"abc; return 1; }|文字列を閉じる"
+    "def main() { s = 'abc; return 1; }|文字列を閉じる"
     "def main() { x: int = 1 < 2; return 0; }|が代入されています"
     "def main() { x = 1; x = 1 < 2; return 0; }|が代入されています"
     "def main() { x: foo = 1; return 0; }|は定義されていません"
@@ -477,7 +478,7 @@ one_driver_test "def main() { print(\"before\"); exit(3); print(\"after\"); retu
 one_io_test "def main() { a = [1, 2, 3]; a.append(4); a.append(5); print(a); print(a.len); return 0; }" "" "1 2 3 4 5\n5\n"
 # step 65: ランタイムヘルパが作る配列（read_file の文字コード列）にも
 # cap が書かれていて、append で伸ばせること。100回伸ばして中身を確かめる
-one_driver_test "def main() { ok = write_file(\"drv_data.txt\", \"ab\"); d = read_file(\"drv_data.txt\"); i = 0; while (i < 100) { d.text.chars.append(99); i = i + 1; } print(d.text.len); print(d.text[0]); print(d.text[101]); return 0; }" "102\n97\n99\n" "" 0
+one_driver_test "def main() { ok = write_file(\"drv_data.txt\", \"ab\"); d = read_file(\"drv_data.txt\"); i = 0; while (i < 100) { d.text.chars.append(99); i = i + 1; } print(d.text.len); print(d.text.chars[0]); print(d.text.chars[101]); return 0; }" "102\n97\n99\n" "" 0
 # step 65: 読み取り失敗時に返る空配列（ヘルパの失敗経路）への append
 one_driver_test "def main() { d = read_file(\"drv_missing.txt\"); d.text.chars.append(65); print(d.text); print(d.text.len); return 0; }" "A\n1\n" "" 0
 # step 66: 矢印で書く BFS と、メソッド形との等価性
@@ -498,7 +499,7 @@ one_io_test "def main() {
             nr = r + dr[k];
             nc = c + dc[k];
             if (0 <= nr && nr < 4 && 0 <= nc && nc < 4) {
-                if (rows[nr][nc] != 35 && dist[nr * 4 + nc] == 0 - 1) {
+                if (rows[nr][nc] != \"#\" && dist[nr * 4 + nc] == 0 - 1) {
                     dist[nr * 4 + nc] = dist[cur] + 1;
                     q <- nr * 4 + nc;
                 }
@@ -699,7 +700,7 @@ one_io_test "def main():
 # step 70: 配列の要素・Dict の値としての真理値リテラル
 one_io_test "def main() { a = [true, F, T]; print(a[0]); print(a[1]); print(a.len); d: Dict<str, bool> = Dict(zero_bool); d[\"x\"] = true; print(d[\"x\"]); print(d[\"y\"]); return 0; }" "" "true\nfalse\n3\ntrue\nfalse\n"
 # step 72: >>> は文字列トークンの入力（対象 = in_str と同じ）
-one_io_test "def main() { >>> s; print(s); print(s.len); print(s[1]); return 0; }" "hello\n" "hello\n5\n101\n"
+one_io_test "def main() { >>> s; print(s); print(s.len); print(s[1]); return 0; }" "hello\n" "hello\n5\ne\n"
 one_io_test "def main() { >>> s, t; print(s); print(t); return 0; }" "foo bar\n" "foo\nbar\n"
 one_io_test "class P { s: str; def __init__(self) { self.s = \"\"; } } def main() { s2 = \"x\"; >>> s2; print(s2); p = P(); >>> p.s; print(p.s); arr = [\"\", \"\"]; >>> arr[1]; print(arr[1]); return 0; }" "baz qux zzz\n" "baz\nqux\nzzz\n"
 one_io_test "def main() { >> n; >>> s; print(n); print(s); return 0; }" "42 abc\n" "42\nabc\n"
@@ -1021,7 +1022,7 @@ one_io_test "def main() {
         for d in dirs:
             np = p + d
             if np.x < 0 || np.x >= w || np.y < 0 || np.y >= h: continue
-            if s[np.y][np.x] == 35: continue
+            if s[np.y][np.x] == \"#\": continue
             if dist.has(np): continue
             dist[np] = dist[p] + 1
             q <- np

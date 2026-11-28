@@ -23,17 +23,17 @@ def t021() { n = 5; a = [0; n]; for i in a.len a[i] = i * 2; s = 0; for x in a s
 def make(n) { return [9; n]; }
 def t022() { a = make(3); return a[2] + a.len; }
 def t023() { s = "hello"; return s.len; }
-def t024() { s = "hello"; return s[0]; }
-def t025() { s = "A\n"; return s[1]; }
+def t024() { s = "hello"; return s.chars[0]; }
+def t025() { s = "A\n"; return s.chars[1]; }
 def t026() { s = "abc".chars; s[1] = 120; return s[1]; }
 def t027() { s = "hello"; c = 0; for ch in s.chars if (ch == 108) c = c + 1; return c; }
-def t028() { s = "hi"; putchar(s[0]); putchar(s[1]); return 0; }
+def t028() { s = "hi"; putchar(s.chars[0]); putchar(s.chars[1]); return 0; }
 def t029() { s = ""; return s.len; }
 def t030() { a = [1, 2] + [3]; return a[0] * 100 + a[1] * 10 + a[2]; }
 def t031() { r = 0; if ([1, 2] == [1, 2]) { r = r + 1; } if ([1, 2] != [1, 3]) { r = r + 2; } if ([1, 2] == [1, 3]) { r = r + 4; } return r; }
 def t032() { a = [7] * 2; b = 3 * [1]; return a.len * 10 + b.len; }
 def t033() { s = "ab" + "cd"; r = 0; if (s == "abcd") { r = 1; } return s.len * 10 + r; }
-def t034() { s = "hello"; return s[1] + s.len; }
+def t034() { s = "hello"; return s.chars[1] + s.len; }
 def t035() { t = 0; for s in ["ab", "cde"] { t = t + s.len; } return t; }
 def t036() { s = 0; for x in [1, 2, 3, 4] { if (x == 3) { break; } s = s + x; } return s; }
 def t037() { s = 0; for a in [[1, 2], [3]] { for x in a { s = s + x; } } return s; }
@@ -67,10 +67,10 @@ def t055() { a = [1, 2, 3]; f = fn() -> int { a.append(4); return a.len; }; r = 
 def t056() { a: [int] = []; return a.append(10) * 100 + a.append(20) * 10 + a.len; }
 def t057() { a = [0; 1]; i = 0; while (i < 100) { a.append(i * i); i = i + 1; } return a[51] + a.len; }
 def t058() { r = [[1, 2]]; r[0].append(growrows(r)); return r.len * 1000 + r[0].len * 100 + r[0][2]; }
-def t059() { s = "ab"; s.chars.append(99); return s.len * 100 + s[2]; }
+def t059() { s = "ab"; s.chars.append(99); return s.len * 100 + s.chars[2]; }
 def t060() { garr.append(40); garr.append(50); return garr.len * 100 + garr[3] + garr[4]; }
 def t061() { r = [1, 2, 3].rev; r.append(4); return r.len * 1000 + r[0] * 100 + r[3]; }
-def t062() { s = "abc".rev; s.chars.append(100); return s.len * 1000 + s[3]; }
+def t062() { s = "abc".rev; s.chars.append(100); return s.len * 1000 + s.chars[3]; }
 
 // step 83: 配列メソッド sort / sorted / sum / min / max / count
 class Item {
@@ -149,6 +149,14 @@ class Cnt {
 def t091() { a = [Cnt(1), Cnt(2), Cnt(1)]; return a.count(Cnt(1)); }
 def t092() { f = fn() -> int { a = [3, 1, 2]; a.sort(); return a[0] * 10 + a[2]; }; return f(); }
 def t093() { a = [Cnt(1), Cnt(2), Cnt(3)]; s = 0; for x in a { s = s + x.v; } return s; }
+def t094() { s = "hello"; c = s[1]; if (c == "e" && c.len == 1) { return 1; } return 0; }
+def t095() { s = "abc"; t = s[0] + s[2]; if (t == "ac") { return 1; } return 0; }
+def t096() { s = "Az"; return s.chars[0] * 1000 + s.chars[1]; }
+def t097() { rows = ["S..", ".#.", "..G"]; if (rows[1][1] == "#" && rows[0][0] == "S" && rows[2][2] == "G") { return 1; } return 0; }
+def t098() { a = 'hello'; b = "hello"; if (a == b && a.len == 5) { return 1; } return 0; }
+def t099() { a = 'it\'s'; if (a == "it's" && a.len == 4) { return 1; } return 0; }
+def t100() { a = 'say "hi"'; b = 'x' + "y"; if (a == "say \"hi\"" && b == "xy") { return 1; } return 0; }
+def t101() { s = "abc"; if (s[1] == 'b' && s[0] == 'a') { return 1; } return 0; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -256,6 +264,14 @@ def main() {
     mark(91); fails=fails+check(t091(), 2);
     mark(92); fails=fails+check(t092(), 13);
     mark(93); fails=fails+check(t093(), 6);
+    mark(94); fails=fails+check(t094(), 1);
+    mark(95); fails=fails+check(t095(), 1);
+    mark(96); fails=fails+check(t096(), 65122);
+    mark(97); fails=fails+check(t097(), 1);
+    mark(98); fails=fails+check(t098(), 1);
+    mark(99); fails=fails+check(t099(), 1);
+    mark(100); fails=fails+check(t100(), 1);
+    mark(101); fails=fails+check(t101(), 1);
 
     print_str("done"); putchar(10);
     return fails > 0;
