@@ -107,7 +107,7 @@ put x</pre>
 <p>
   リテラルは <code>true</code> / <code>false</code>（短縮形 <code>T</code> / <code>F</code>）で、比較や論理演算の結果としても得ます。
   表示すると <code>true</code> / <code>false</code> になります。
-  条件式（<code>if</code> / <code>while</code> の条件と、<code>!</code> / <code>&amp;&amp;</code> / <code>||</code> の被演算子）では、値が真理値として解釈されます。
+  条件式（<code>if</code> / <code>while</code> の条件と、<code>!</code> / <code>&amp;&amp;</code> / <code>||</code>（英字形 <code>not</code> / <code>and</code> / <code>or</code>）の被演算子）では、値が真理値として解釈されます。
   <code>bool</code> はそのまま、<code>int</code> は 0 が偽でそれ以外が真です。
   クラス・配列・文字列の値は、その型に <code>__bool__() -&gt; bool</code> が定義されていればその結果で判定します
   （<code>str</code>・配列・<code>Vec</code>・<code>Deque</code>・<code>Dict</code> は「長さが 0 でないこと」）。
@@ -153,7 +153,7 @@ q"q
   <tr><th>分類</th><th>演算子</th><th>備考</th></tr>
   <tr><td>算術</td><td><code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code></td><td><code>/</code> は床除算、<code>%</code> は除数と同じ符号の剰余（Python 式）。型ごとの意味はダンダーメソッドで定義される</td></tr>
   <tr><td>比較</td><td><code>==</code> <code>!=</code> <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td><td>連鎖できる（<code>0 &lt; x &lt; 10</code>）。中間の値は1回だけ評価される。配列と <code>str</code> に <code>&lt;</code> 系はない</td></tr>
-  <tr><td>論理</td><td><code>&amp;&amp;</code> <code>||</code> <code>!</code></td><td><code>&amp;&amp;</code> と <code>||</code> は短絡評価。<code>!</code> は否定</td></tr>
+  <tr><td>論理</td><td><code>&amp;&amp;</code> <code>||</code> <code>!</code></td><td><code>&amp;&amp;</code> と <code>||</code> は短絡評価。<code>!</code> は否定。英字形 <code>and</code> / <code>or</code> / <code>not</code> もあり、意味も優先順位も記号形と完全に同じ（混在可）</td></tr>
   <tr><td>代入</td><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code></td><td>代入は式で、値は代入した値。<code>a = b = 3</code> とつなげられる。複数代入 <code>a, b = b, a</code> も可</td></tr>
   <tr><td>増減</td><td><code>++</code> <code>--</code></td><td>後置のみ。<code>x++</code> は <code>x += 1</code> と同じで、式の値は代入後の値</td></tr>
   <tr><td>範囲</td><td><code>..</code> <code>..=</code></td><td><code>a..b</code> は半開、<code>a..=b</code> は終端を含む。降順も可（<a href="#s10">§10</a>）</td></tr>

@@ -30,6 +30,9 @@ typedef enum {
     KW_PUT,
     KW_YN,
     KW_FN,
+    KW_AND,
+    KW_OR,
+    KW_NOT,
 } Keyword;
 
 typedef enum {

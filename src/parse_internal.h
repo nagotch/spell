@@ -2,6 +2,7 @@
 
 // parse.c
 bool consume(char* symbol);
+bool consume_keyword(Keyword keyword);
 void expect(char* symbol);
 Token* consume_ident();
 Node* char_array();

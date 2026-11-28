@@ -504,6 +504,34 @@ def t101() {
     return s * 10 + i
 }
 
+def t102() {
+    a = 0
+    if not false and true:
+        a = 1
+    if true and not true:
+        a = 2
+    return a
+}
+
+def t103() {
+    i = 0
+    while i < 10 and not (i == 4):
+        i += 1
+    s = 0
+    while s < 3 or false:
+        s += 1
+    return i * 10 + s
+}
+
+def t104() {
+    a = 2
+    ? not a == 1 or false:
+        a = 5
+    @? a < 10 and a > 0:
+        a += 5
+    return a
+}
+
 def main() {
     fails = 0;
 
@@ -608,6 +636,9 @@ def main() {
     mark(99); fails=fails+check(t099(), 123);
     mark(100); fails=fails+check(t100(), 163);
     mark(101); fails=fails+check(t101(), 62);
+    mark(102); fails=fails+check(t102(), 1);
+    mark(103); fails=fails+check(t103(), 43);
+    mark(104); fails=fails+check(t104(), 12);
 
     print_str("done"); putchar(10);
     return fails > 0;
