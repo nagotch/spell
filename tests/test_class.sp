@@ -1056,6 +1056,314 @@ class Bag98 {
 }
 def t088() { b = Bag98([[1, 2], [3, 4]], [5, 6, 7]); for row in b.rows { row[0] = 99; } return b.rows[0][0] * 10 + b.rows[1][0]; }
 def t089() { b = Bag98([[1]], [5, 6, 7]); for x in b.vals { x = x * 2; } return b.vals[0] * 100 + b.vals[1] * 10 + b.vals[2]; }
+// ---- step 99: SegTree / LazySegTree ----
+def seg_add(a: int, b: int) -> int { return a + b; }
+def seg_min(a: int, b: int) -> int { if (a < b) { return a; } return b; }
+def seg_max(a: int, b: int) -> int { if (a > b) { return a; } return b; }
+def seg_gcd(a: int, b: int) -> int { while (b != 0) { t = a % b; a = b; b = t; } return a; }
+def seg_add_map(f: int, x: int) -> int { return x + f; }
+def seg_psum(a: Pos2, b: Pos2) -> Pos2 { return Pos2(a.x + b.x, a.y + b.y); }
+def seg_psum_map(f: int, x: Pos2) -> Pos2 { return Pos2(x.x + f * x.y, x.y); }
+def seg_asg_map(f: int, x: int) -> int { if (f < 0) { return x; } return f; }
+def seg_asg_comp(f: int, g: int) -> int { if (f < 0) { return g; } return f; }
+def seg_asg_map2(f: int, x: Pos2) -> Pos2 { if (f < 0) { return x; } return Pos2(f * x.y, x.y); }
+
+def t090() {
+    t = SegTree([3, 1, 4, 1, 5], 0, seg_add);
+    r = t.all_prod() + t.prod(1, 4) * 10 + t.len * 100;
+    t.set(2, 10);
+    return r + t.all_prod() * 1000 + t.get(2) * 10000 + t.prod(2, 2) * 100000;
+}
+def t091() {
+    t = SegTree(5, 1000000, seg_min);
+    t.set(0, 7); t.set(1, 3); t.set(2, 9); t.set(3, 3); t.set(4, 8);
+    u = SegTree(5, -1000000, seg_max);
+    u.set(0, 7); u.set(1, 3); u.set(2, 9); u.set(3, 3); u.set(4, 8);
+    return t.prod(0, 5) + t.prod(2, 4) * 10 + u.all_prod() * 100 + u.prod(0, 2) * 1000;
+}
+def t092() {
+    t = SegTree([12, 18, 30], 0, seg_gcd);
+    u = SegTree(3, 0, seg_gcd);
+    u.set(0, 14); u.set(1, 21); u.set(2, 35);
+    return t.all_prod() + t.prod(0, 2) * 10 + u.all_prod() * 100;
+}
+def t093() {
+    act: Act<int, int> = Act(0, seg_add_map, seg_add);
+    t = LazySegTree([3, 1, 4, 1, 5], -100, seg_max, act);
+    r = t.all_prod();
+    t.apply(1, 4, 10);
+    r = r * 100 + t.all_prod();
+    t.apply(2, 100);
+    r = r * 100 + t.get(2);
+    t.set(2, 7);
+    return r * 100 + t.prod(0, 5);
+}
+def t094() {
+    init: [Pos2] = [Pos2(1, 1), Pos2(2, 1), Pos2(3, 1), Pos2(4, 1)];
+    act: Act<Pos2, int> = Act(0, seg_psum_map, seg_add);
+    t = LazySegTree(init, Pos2(0, 0), seg_psum, act);
+    r = t.all_prod().x;
+    t.apply(0, 4, 5);
+    r = r * 100 + t.all_prod().x;
+    r = r * 100 + t.prod(1, 3).x;
+    t.apply(2, 1);
+    return r * 100 + t.get(2).x;
+}
+def t095() {
+    act: Act<int, int> = Act(-1, seg_asg_map, seg_asg_comp);
+    t = LazySegTree(5, -1000000, seg_max, act);
+    t.apply(0, 5, 3);
+    r = t.all_prod();
+    t.apply(1, 3, 9);
+    r = r * 100 + t.all_prod();
+    r = r * 100 + t.get(0);
+    t.apply(4, 2);
+    r = r * 100 + t.prod(0, 5);
+    init: [Pos2] = [Pos2(1, 1), Pos2(2, 1), Pos2(3, 1)];
+    act2: Act<Pos2, int> = Act(-1, seg_asg_map2, seg_asg_comp);
+    u = LazySegTree(init, Pos2(0, 0), seg_psum, act2);
+    u.apply(0, 3, 7);
+    return r * 100 + u.all_prod().x;
+}
+
+// 差分テスト用の決定的疑似乱数（LCG）
+seg_seed = 987654321;
+def seg_rnd(n: int) -> int {
+    seg_seed = (seg_seed * 1103515245 + 12345) % 2147483648;
+    return seg_seed % n;
+}
+
+// SegTree を素朴な配列実装と突き合わせる。折り畳みは素朴側も同じ
+// op / e で行う。不一致の数を返す（0 が正常。比較回数が不足したら 999）
+def seg_diff(op: fn(int, int) -> int, e: int) -> int {
+    n = 37;
+    t = SegTree(n, e, op);
+    a = [0; n];
+    bad = 0;
+    cmps = 0;
+    i = 0;
+    while (i < n) { v = seg_rnd(100); t.set(i, v); a[i] = v; i = i + 1; }
+    k = 0;
+    while (k < 2000) {
+        o = seg_rnd(4);
+        if (o == 0) {
+            i = seg_rnd(n); v = seg_rnd(100); t.set(i, v); a[i] = v;
+        } else if (o == 1) {
+            i = seg_rnd(n); cmps = cmps + 1;
+            if (t.get(i) != a[i]) { bad = bad + 1; }
+        } else if (o == 2) {
+            l = seg_rnd(n + 1); r = seg_rnd(n + 1);
+            if (l > r) { tmp = l; l = r; r = tmp; }
+            s = e; j = l;
+            while (j < r) { s = op(s, a[j]); j = j + 1; }
+            cmps = cmps + 1;
+            if (t.prod(l, r) != s) { bad = bad + 1; }
+        } else {
+            s = e; j = 0;
+            while (j < n) { s = op(s, a[j]); j = j + 1; }
+            cmps = cmps + 1;
+            if (t.all_prod() != s) { bad = bad + 1; }
+        }
+        k = k + 1;
+    }
+    if (cmps < 500) { return 999; }
+    return bad;
+}
+def t096() {
+    return seg_diff(seg_add, 0) + seg_diff(seg_min, 1000000) + seg_diff(seg_max, -1000000);
+}
+
+// LazySegTree 区間 add・区間 max の差分
+def seg_diff_lazy_max() -> int {
+    n = 33;
+    act: Act<int, int> = Act(0, seg_add_map, seg_add);
+    t = LazySegTree(n, -1000000, seg_max, act);
+    a = [0; n];
+    bad = 0;
+    cmps = 0;
+    i = 0;
+    while (i < n) { v = seg_rnd(100); t.set(i, v); a[i] = v; i = i + 1; }
+    k = 0;
+    while (k < 2000) {
+        o = seg_rnd(5);
+        if (o == 0) {
+            l = seg_rnd(n + 1); r = seg_rnd(n + 1);
+            if (l > r) { tmp = l; l = r; r = tmp; }
+            f = seg_rnd(10); t.apply(l, r, f);
+            j = l; while (j < r) { a[j] = a[j] + f; j = j + 1; }
+        } else if (o == 1) {
+            i = seg_rnd(n); f = seg_rnd(10); t.apply(i, f); a[i] = a[i] + f;
+        } else if (o == 2) {
+            i = seg_rnd(n); v = seg_rnd(100); t.set(i, v); a[i] = v;
+        } else if (o == 3) {
+            i = seg_rnd(n); cmps = cmps + 1;
+            if (t.get(i) != a[i]) { bad = bad + 1; }
+        } else {
+            l = seg_rnd(n + 1); r = seg_rnd(n + 1);
+            if (l > r) { tmp = l; l = r; r = tmp; }
+            s = -1000000; j = l;
+            while (j < r) { s = seg_max(s, a[j]); j = j + 1; }
+            cmps = cmps + 1;
+            if (t.prod(l, r) != s) { bad = bad + 1; }
+            s = -1000000; j = 0;
+            while (j < n) { s = seg_max(s, a[j]); j = j + 1; }
+            cmps = cmps + 1;
+            if (t.all_prod() != s) { bad = bad + 1; }
+        }
+        k = k + 1;
+    }
+    if (cmps < 500) { return 999; }
+    return bad;
+}
+
+// LazySegTree 区間 add・区間和（Pos2 で (合計, 長さ) を持つ）の差分
+def seg_diff_lazy_sum() -> int {
+    n = 33;
+    init = [Pos2(0, 1); n];
+    a = [0; n];
+    i = 0;
+    while (i < n) { v = seg_rnd(100); init[i] = Pos2(v, 1); a[i] = v; i = i + 1; }
+    act: Act<Pos2, int> = Act(0, seg_psum_map, seg_add);
+    t = LazySegTree(init, Pos2(0, 0), seg_psum, act);
+    bad = 0;
+    cmps = 0;
+    k = 0;
+    while (k < 2000) {
+        o = seg_rnd(5);
+        if (o == 0) {
+            l = seg_rnd(n + 1); r = seg_rnd(n + 1);
+            if (l > r) { tmp = l; l = r; r = tmp; }
+            f = seg_rnd(10); t.apply(l, r, f);
+            j = l; while (j < r) { a[j] = a[j] + f; j = j + 1; }
+        } else if (o == 1) {
+            i = seg_rnd(n); f = seg_rnd(10); t.apply(i, f); a[i] = a[i] + f;
+        } else if (o == 2) {
+            i = seg_rnd(n); v = seg_rnd(100); t.set(i, Pos2(v, 1)); a[i] = v;
+        } else if (o == 3) {
+            i = seg_rnd(n); cmps = cmps + 1;
+            if (t.get(i).x != a[i]) { bad = bad + 1; }
+        } else {
+            l = seg_rnd(n + 1); r = seg_rnd(n + 1);
+            if (l > r) { tmp = l; l = r; r = tmp; }
+            s = 0; j = l;
+            while (j < r) { s = s + a[j]; j = j + 1; }
+            cmps = cmps + 1;
+            if (t.prod(l, r).x != s) { bad = bad + 1; }
+            s = 0; j = 0;
+            while (j < n) { s = s + a[j]; j = j + 1; }
+            cmps = cmps + 1;
+            if (t.all_prod().x != s) { bad = bad + 1; }
+        }
+        k = k + 1;
+    }
+    if (cmps < 500) { return 999; }
+    return bad;
+}
+def t097() {
+    return seg_diff_lazy_max() + seg_diff_lazy_sum();
+}
+
+// LazySegTree 区間代入の差分（区間 max と、Pos2 での区間和）
+def seg_diff_lazy_asg() -> int {
+    n = 33;
+    act: Act<int, int> = Act(-1, seg_asg_map, seg_asg_comp);
+    t = LazySegTree(n, -1000000, seg_max, act);
+    a = [0; n];
+    bad = 0;
+    cmps = 0;
+    i = 0;
+    while (i < n) { v = seg_rnd(100); t.set(i, v); a[i] = v; i = i + 1; }
+    k = 0;
+    while (k < 2000) {
+        o = seg_rnd(5);
+        if (o == 0) {
+            l = seg_rnd(n + 1); r = seg_rnd(n + 1);
+            if (l > r) { tmp = l; l = r; r = tmp; }
+            f = seg_rnd(10); t.apply(l, r, f);
+            j = l; while (j < r) { a[j] = f; j = j + 1; }
+        } else if (o == 1) {
+            i = seg_rnd(n); f = seg_rnd(10); t.apply(i, f); a[i] = f;
+        } else if (o == 2) {
+            i = seg_rnd(n); v = seg_rnd(100); t.set(i, v); a[i] = v;
+        } else if (o == 3) {
+            i = seg_rnd(n); cmps = cmps + 1;
+            if (t.get(i) != a[i]) { bad = bad + 1; }
+        } else {
+            l = seg_rnd(n + 1); r = seg_rnd(n + 1);
+            if (l > r) { tmp = l; l = r; r = tmp; }
+            s = -1000000; j = l;
+            while (j < r) { s = seg_max(s, a[j]); j = j + 1; }
+            cmps = cmps + 1;
+            if (t.prod(l, r) != s) { bad = bad + 1; }
+            s = -1000000; j = 0;
+            while (j < n) { s = seg_max(s, a[j]); j = j + 1; }
+            cmps = cmps + 1;
+            if (t.all_prod() != s) { bad = bad + 1; }
+        }
+        k = k + 1;
+    }
+    if (cmps < 500) { return 999; }
+    return bad;
+}
+def seg_diff_lazy_asg_sum() -> int {
+    n = 33;
+    init = [Pos2(0, 1); n];
+    a = [0; n];
+    i = 0;
+    while (i < n) { v = seg_rnd(100); init[i] = Pos2(v, 1); a[i] = v; i = i + 1; }
+    act: Act<Pos2, int> = Act(-1, seg_asg_map2, seg_asg_comp);
+    t = LazySegTree(init, Pos2(0, 0), seg_psum, act);
+    bad = 0;
+    cmps = 0;
+    k = 0;
+    while (k < 2000) {
+        o = seg_rnd(5);
+        if (o == 0) {
+            l = seg_rnd(n + 1); r = seg_rnd(n + 1);
+            if (l > r) { tmp = l; l = r; r = tmp; }
+            f = seg_rnd(10); t.apply(l, r, f);
+            j = l; while (j < r) { a[j] = f; j = j + 1; }
+        } else if (o == 1) {
+            i = seg_rnd(n); f = seg_rnd(10); t.apply(i, f); a[i] = f;
+        } else if (o == 2) {
+            i = seg_rnd(n); v = seg_rnd(100); t.set(i, Pos2(v, 1)); a[i] = v;
+        } else if (o == 3) {
+            i = seg_rnd(n); cmps = cmps + 1;
+            if (t.get(i).x != a[i]) { bad = bad + 1; }
+        } else {
+            l = seg_rnd(n + 1); r = seg_rnd(n + 1);
+            if (l > r) { tmp = l; l = r; r = tmp; }
+            s = 0; j = l;
+            while (j < r) { s = s + a[j]; j = j + 1; }
+            cmps = cmps + 1;
+            if (t.prod(l, r).x != s) { bad = bad + 1; }
+            s = 0; j = 0;
+            while (j < n) { s = s + a[j]; j = j + 1; }
+            cmps = cmps + 1;
+            if (t.all_prod().x != s) { bad = bad + 1; }
+        }
+        k = k + 1;
+    }
+    if (cmps < 500) { return 999; }
+    return bad;
+}
+def t098() {
+    return seg_diff_lazy_asg() + seg_diff_lazy_asg_sum();
+}
+
+// 非可換な演算（文字列連結）で prod の左から右への順序を固定する
+def seg_cat(a: str, b: str) -> str { return a + b; }
+def t099() {
+    t = SegTree(["a", "b", "c", "d"], "", seg_cat);
+    r = 0;
+    if (t.prod(0, 4) == "abcd") { r = r + 1; }
+    if (t.prod(1, 3) == "bc") { r = r + 2; }
+    if (t.all_prod() == "abcd") { r = r + 4; }
+    t.set(0, "z");
+    if (t.prod(0, 2) == "zb") { r = r + 8; }
+    if (t.get(3) == "d") { r = r + 16; }
+    return r;
+}
 
 def check(got, expected) {
     if (got != expected) return 1;
@@ -1153,6 +1461,16 @@ def main() {
     mark(87); fails=fails+check(t087(), 1210);
     mark(88); fails=fails+check(t088(), 1089);
     mark(89); fails=fails+check(t089(), 1134);
+    mark(90); fails=fails+check(t090(), 120574);
+    mark(91); fails=fails+check(t091(), 7933);
+    mark(92); fails=fails+check(t092(), 766);
+    mark(93); fails=fails+check(t093(), 5151411);
+    mark(94); fails=fails+check(t094(), 10301509);
+    mark(95); fails=fails+check(t095(), 309030921);
+    mark(96); fails=fails+check(t096(), 0);
+    mark(97); fails=fails+check(t097(), 0);
+    mark(98); fails=fails+check(t098(), 0);
+    mark(99); fails=fails+check(t099(), 31);
 
     print_str("done"); putchar(10);
     return fails > 0;

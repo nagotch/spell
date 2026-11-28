@@ -4683,12 +4683,11 @@ void typecheck(Function* prog) {
         if (fn->klass && fn->klass->tparam_count > 0) {
             continue;
         }
-        // 実体化されたクラスの __init__ は、実際に検査されたものだけを
-        // 完全性検査の対象にする。未検査の本体はフィールドのオフセット
-        // が未解決（parse 時点の 0）で、検査の前提を満たさない。呼ばれ
-        // ていない __init__ は遅延検査（step 83）で未検査のまま残り
-        // うる（step 98: 借用モードで配列の __iter__ への需要が減り、
-        // 未検査の ArrayIter 実体化が残るようになって表面化した）
+        // 実体化クローンのうち一度も呼ばれず本体が検査されなかった
+        // `__init__` は対象外（step 83 の遅延検査の割り切りと同じ。
+        // 未検査の本体では ND_MEMBER の offset が確定しておらず、
+        // 流れ解析が代入を見落として誤った未初期化エラーになる。
+        // step 98 と step 99 で独立に表面化した）
         if (fn->klass && fn->klass->origin && !fn->tc_done) {
             continue;
         }
