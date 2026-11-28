@@ -1755,8 +1755,9 @@ static Node* safe_pos_comp(Node* at, Node* recv, Type* pos_type, int d) {
 //   使って浅い段から順に1回だけ評価・退避する代入を含む
 // - value: guard が真のときにだけ評価してよい要素アクセス。
 //   スロット読みだけで組み立てる
-// 対象の型が分からない場合は guard を NULL にし、value に通常の
-// 添え字の連鎖を入れて従来どおり緩く通す。戻り値は要素の型
+// 対象の型が分からない場合は、範囲チェックを組み立てられないため
+// 位置つきエラーにする（step 90。step 87 までは通常の添え字の連鎖
+// として緩く通し、範囲外読みが静かに起きていた）。戻り値は要素の型
 static Type* build_safe_parts(Node* node, Node** guard_out, Node** value_out) {
     *guard_out = NULL;
     *value_out = NULL;
@@ -1773,16 +1774,11 @@ static Type* build_safe_parts(Node* node, Node** guard_out, Node** value_out) {
         idx_types[bi] = check_node(a);
     }
     if (lt->kind == TY_UNKNOWN) {
-        Node* cur = node->left_child;
-        for (int i = 0; i < nb; i++) {
-            Node* step = create_node(ND_INDEX);
-            step->tok = node->tok;
-            step->left_child = cur;
-            step->right_child = idx_nodes[i];
-            step->type = &ty_unknown;
-            cur = step;
-        }
-        *value_out = cur;
+        // 型が分からなければ長さが分からず、範囲チェックを組み立て
+        // られない。step 88 の型不明メソッドと同じく、型注釈で型を
+        // 明示するよう案内する位置つきエラーにする（step 90）
+        error_node(node, "型が分からない値に安全添え字は使えません（型注釈で型を明示してください）");
+        *value_out = safe_num(node, 0);
         free(idx_nodes);
         free(idx_types);
         return &ty_unknown;

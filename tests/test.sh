@@ -367,6 +367,18 @@ def main():
     "class A88 { v: int; def __init__(self, v: int) { self.v = v; } } def main() { b = A88(1) != \"x\"; return 0; }|\`A88\`型と\`str\`型の値に演算子\`!=\`は使えません"
     # step 88: 連鎖比較の中でも異型の `==` はエラーになる
     "def main() { b = 1 < 2 == \"a\"; return 0; }|\`bool\`型と\`str\`型の値に演算子\`==\`は使えません"
+    # step 90: 型が分からない対象への安全添え字は、範囲チェックなしで
+    # 通さず位置つきエラーにする（単独形と比較形の両方）
+    "def g(x) { b = x?[0]; return 0; } def main() { return g([1, 2]); }|型が分からない値に安全添え字は使えません"
+    "def g(x) { if (x?[0] == 1) { return 1; } return 0; } def main() { return g([1, 2]); }|型が分からない値に安全添え字は使えません"
+    # step 90: 未知のエスケープと、不正な `\x` は位置つきエラー
+    "def main() { s = \"a\\qb\"; return 0; }|文字列ではエスケープ"
+    "def main() { s = \"\\xzz\"; return 0; }|16進数2桁が必要です"
+    "def main() { s = \"\\x4\"; return 0; }|16進数2桁が必要です"
+    "def main() { s = \"\\x\"; return 0; }|16進数2桁が必要です"
+    # step 90: 文字列の繰り返しは str * int の向きだけ。逆向きは
+    # 反射演算子の仕組みが無いため異型エラーになる
+    "def main() { s = 3 * \"ab\"; return 0; }|\`int\`型と\`str\`型の値に演算子\`\*\`は使えません"
 )
 
 cc -c -o funcs.o funcs.c

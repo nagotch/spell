@@ -218,6 +218,19 @@ Token* tokenize(char* s) {
     return first_token.next;
 }
 
+static int hex_digit_value(char c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    }
+    if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    }
+    return -1;
+}
+
 static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
     char* first = *endptr;
     // 開始クォート（`"` または `'`）と同じ文字で閉じる。どちらの形でも
@@ -232,20 +245,45 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
             error_at(first - src, first - src + 1, "文字列を閉じる`%c`がないまま、ファイルの末尾に達しました", quote);
         }
         if (**endptr == '\\') {
-            if ((*endptr)[1] == 'n') {
+            // エスケープの対応表（step 90 で棚卸しして確定）:
+            // \n \t \r \\ \" \' \0 と \xHH（16進2桁）。それ以外は
+            // 黙って文字化けさせず、位置つきエラーにする
+            char e = (*endptr)[1];
+            if (e == 'n') {
                 buf[len] = 10;
-            } else if ((*endptr)[1] == 't') {
+            } else if (e == 't') {
                 buf[len] = 9;
-            } else if ((*endptr)[1] == '\\') {
+            } else if (e == 'r') {
+                buf[len] = 13;
+            } else if (e == '\\') {
                 buf[len] = 92;
-            } else if ((*endptr)[1] == '\"') {
+            } else if (e == '\"') {
                 buf[len] = 34;
-            } else if ((*endptr)[1] == '\'') {
+            } else if (e == '\'') {
                 buf[len] = 39;
-            } else if ((*endptr)[1] == '0') {
+            } else if (e == '0') {
+                buf[len] = 0;
+            } else if (e == 'x') {
+                int hi = hex_digit_value((*endptr)[2]);
+                // [2] が終端なら [3] は読みに行かない
+                int lo = (*endptr)[2] ? hex_digit_value((*endptr)[3]) : -1;
+                if (hi < 0 || lo < 0) {
+                    // 不正な場合は16進2桁分を読み進めない（直後の
+                    // 閉じ引用符や終端を越えて進まないため）
+                    error_at(*endptr - src, *endptr - src + 2, "`\\x`の後には16進数2桁が必要です");
+                    buf[len] = 0;
+                } else {
+                    buf[len] = hi * 16 + lo;
+                    *endptr += 2;
+                }
+            } else if (e == '\0') {
+                // バックスラッシュの直後で入力が尽きた。通常の
+                // 未終了エラーとして扱う
+                error_at(first - src, first - src + 1, "文字列を閉じる`%c`がないまま、ファイルの末尾に達しました", quote);
                 buf[len] = 0;
             } else {
-                buf[len] = (*endptr)[1];
+                error_at(*endptr - src, *endptr - src + 2, "文字列ではエスケープ`\\%c`は使えません", e);
+                buf[len] = e;
             }
             (*endptr)++;
         } else {

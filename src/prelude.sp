@@ -22,6 +22,13 @@ class str {
         return str(self.chars + o.chars);
     }
 
+    // 繰り返し（step 90）。配列の `__mul__` に委ねる。回数が 0 以下
+    // なら空文字列（Python と同じ）
+    def __mul__(self, n: int) -> str {
+        if (n <= 0) { return ""; }
+        return str(self.chars * n);
+    }
+
     def __eq__(self, o: str) -> bool {
         return self.chars == o.chars;
     }
