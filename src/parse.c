@@ -270,10 +270,23 @@ void register_any() {
     note_top_used(lvar->offset, 0);
 }
 
-static void register_lvar(Token* tok) {
+LVar* register_lvar(Token* tok) {
     register_any();
     locals->name = tok->str;
     locals->len = tok->len;
+    return locals;
+}
+
+// トップレベル文の解析で is_top_level を落とした区間（内包表記の
+// 解析中、step 95）に登録されたスロットは note_top_used を通らない。
+// その区間が終わった後に locals 全体をフレーム使用量へ反映し直す
+void note_top_all_locals() {
+    if (!is_top_level) {
+        return;
+    }
+    for (LVar* v = locals; v; v = v->next) {
+        note_top_used(v->offset, v->array_len);
+    }
 }
 
 static void register_gvar(Token* tok) {

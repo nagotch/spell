@@ -192,6 +192,14 @@ typedef enum {
     // `__slice__(lo, hi)` 呼び出しへ書き換えるため、codegen には
     // 残らない
     ND_SLICE,
+    // 内包表記（step 95）。`[要素式 for 変数 in 対象 if 条件]` と
+    // 糖衣形 `[要素式 変数@対象 if 条件]` をパーサがこの種別で運ぶ。
+    // init が反復対象、left_child がループ変数（内包表記専用
+    // スロットの ND_LVAR）、right_child が要素式、cond が条件の
+    // 並び（複数 if は next でつなぐ。無ければ NULL）、offset が
+    // イテレータスロット、val が結果スロット。typecheck が for 文と
+    // 同じ部品で ND_BLOCK へ書き換えるため、codegen には残らない
+    ND_COMPREHENSION,
 } NodeKind;
 typedef struct Node Node;
 struct Node {

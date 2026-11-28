@@ -423,6 +423,15 @@ def main():
     "def main() { b = min(true, false); return 0; }|クラス\`bool\`に演算子\`<\`は定義されていません"
     # step 92: abs は int 用（prelude 関数なので通常の引数照合が効く）
     "def main() { x = abs(\"a\"); return 0; }|関数\`abs\`の引数には\`int\`が必要ですが"
+    # step 95: 内包表記（for 節は1つだけ、ループ変数への代入は禁止、
+    # 反復できない対象は for 文と同じ診断、結果は一時値なので
+    # append の対象にはならない）
+    "def main() { a = [1, 2]; b = [x for x in a for y in a]; return 0; }|内包表記の\`for\`節は1つだけです"
+    "def main() { a = [1, 2]; b = [(x = 5) for x in a]; return 0; }|内包表記の中ではループ変数\`x\`へ代入できません"
+    "def main() { a = [1, 2]; b = [x for x in a if (x = 2) == 2]; return 0; }|内包表記の中ではループ変数\`x\`へ代入できません"
+    "def main() { a = [1, 2]; b = [x for x a]; return 0; }|内包表記の\`in\`が必要ですが"
+    "def main() { p = Pos2(1, 2); b = [v for v in p]; return 0; }|\`Pos2\`型の値は反復できません"
+    "def main() { a = [1, 2]; b = [x x@a].append(9); return 0; }|\`append\`の対象は変数・フィールド・配列の要素でなければなりません"
 )
 
 cc -c -o funcs.o funcs.c

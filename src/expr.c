@@ -1147,6 +1147,182 @@ Node* expr() {
     return assign();
 }
 
+// 内包表記の先読み（step 95）: `[` の内側の先頭からトークンをたどり、
+// 内包表記ならループ変数のトークンを返し、通常のリテラルなら NULL を
+// 返す。判定は括弧の深さ0の並びだけを見る。要素式の中に `for` や
+// `@` は現れない（どちらも文の位置でしか使わない）ため、深さ0で
+// `for` キーワード（正規形）か「識別子の直後の `@`」（糖衣形）が
+// あれば内包表記の節の開始と決められ、`,` `;` `]` が先に来れば
+// 通常のリテラルと決められる。あくまで候補と変数名の特定までで、
+// 束縛と診断は実際のパース（parse_comprehension）が行う
+static Token* comprehension_var_ahead(bool* sugar) {
+    int depth = 0;
+    for (Token* t = token; t && t->kind != TK_EOF; t = t->next) {
+        if (t->kind == TK_SYMBOL && t->len == 1) {
+            char c = t->str[0];
+            if (c == '[' || c == '(' || c == '{') {
+                depth++;
+                continue;
+            }
+            if (c == ']' || c == ')' || c == '}') {
+                if (depth == 0) {
+                    return NULL;
+                }
+                depth--;
+                continue;
+            }
+            if (depth == 0 && (c == ',' || c == ';')) {
+                return NULL;
+            }
+        }
+        if (depth != 0) {
+            continue;
+        }
+        if (t->kind == TK_KEYWORD && t->keyword == KW_FOR) {
+            Token* var = t->next;
+            if (var && var->kind == TK_IDENT) {
+                *sugar = false;
+                return var;
+            }
+            return NULL;
+        }
+        if (t->kind == TK_IDENT && t->next && t->next->kind == TK_SYMBOL
+                && t->next->len == 1 && t->next->str[0] == '@') {
+            *sugar = true;
+            return t;
+        }
+    }
+    return NULL;
+}
+
+// 内包表記（step 95）: `[要素式 for 変数 in 対象 if 条件...]` と糖衣形
+// `[要素式 変数@対象 if 条件...]` を読む。var_tok は先読みで特定した
+// ループ変数、sugar は糖衣形かどうか。開き括弧は消費済みで、閉じ
+// 括弧まで消費して ND_COMPREHENSION を返す。
+// ループ変数は専用スロットに束縛し、内包表記の外からは見えない
+// ようにする（外側の同名変数を壊さない）:
+//  - 要素式を読む前に変数を登録する（要素式中の参照を束縛するため）
+//  - 対象を読む間は変数を無名化する（対象は外側のスコープで評価
+//    される。Python と同じ）。対象の中で同じ名前が暗黙に生まれた
+//    場合はそちらも無名化し、条件の参照がループ変数へ解決される
+//    ようにする
+//  - 読み終えたら変数を無名化してスコープを閉じる（エントリ自体は
+//    フレーム確保のためリストに残す）
+// トップレベル文の中では、ループ変数をグローバルにしないため
+// is_top_level を解析中だけ落とす（スロットは合成関数のフレームに
+// 取る。解析後にフレーム使用量へ反映し直す）
+static Node* parse_comprehension(Token* var_tok, bool sugar) {
+    bool saved_top = is_top_level;
+    is_top_level = false;
+    bool saved_multi = suppress_multi;
+    suppress_multi = true;
+
+    LVar* var_entry = register_lvar(var_tok);
+    int var_offset = var_entry->offset;
+    Node* elem = expr();
+
+    if (sugar) {
+        Token* v = consume_ident();
+        if (!v) {
+            error_at(token_start(token), token_end(token), "内包表記のループ変数が必要ですが、%sが見つかりました", token_text(token));
+        }
+        if (v->len != var_tok->len || memcmp(v->str, var_tok->str, v->len)) {
+            error_at(token_start(v), token_end(v), "内包表記のループ変数は`%.*s`ですが、`%.*s`が見つかりました", var_tok->len, var_tok->str, v->len, v->str);
+        }
+        expect("@");
+    } else {
+        if (!consume_keyword(KW_FOR)) {
+            char* actual = token_text(token);
+            if (actual) {
+                error_at(token_start(token), token_end(token), "内包表記の`for`が必要ですが、%sが見つかりました", actual);
+            } else {
+                error_at(token_start(token), token_end(token), "内包表記の`for`が必要ですが、ファイルの末尾に達しました");
+            }
+        }
+        Token* v = consume_ident();
+        if (!v) {
+            error_at(token_start(token), token_end(token), "内包表記のループ変数が必要ですが、%sが見つかりました", token_text(token));
+        }
+        if (v->len != var_tok->len || memcmp(v->str, var_tok->str, v->len)) {
+            error_at(token_start(v), token_end(v), "内包表記のループ変数は`%.*s`ですが、`%.*s`が見つかりました", var_tok->len, var_tok->str, v->len, v->str);
+        }
+        if (!consume_keyword(KW_IN)) {
+            char* actual = token_text(token);
+            if (actual) {
+                error_at(token_start(token), token_end(token), "内包表記の`in`が必要ですが、%sが見つかりました", actual);
+            } else {
+                error_at(token_start(token), token_end(token), "内包表記の`in`が必要ですが、ファイルの末尾に達しました");
+            }
+        }
+    }
+    // 対象は外側のスコープで読む
+    LVar* mark = locals;
+    var_entry->name = NULL;
+    var_entry->len = 0;
+    Node* iterable = expr();
+    // 対象の解析中に変数と同じ名前が暗黙に生まれていたら、条件を
+    // 読む間だけ無名化する（条件の参照が、対象で生まれた名前では
+    // なくループ変数へ解決されるようにするため。対象側のノードは
+    // オフセットで束縛済みなので影響しない）。閉じ括弧の後で名前
+    // を戻し、対象で生まれた外側の変数として後から見えるように
+    // する（Luna レビューの指摘で修正。同名の暗黙登録は最初の
+    // 参照で作られ、以降はそれが見つかるため、実際には高々1件）
+    LVar* hidden[64];
+    int nhidden = 0;
+    for (LVar* e = locals; e && e != mark; e = e->next) {
+        if (e->name && e->len == var_tok->len && !memcmp(e->name, var_tok->str, e->len)) {
+            if (nhidden < 64) {
+                hidden[nhidden++] = e;
+            }
+            e->name = NULL;
+            e->len = 0;
+        }
+    }
+    var_entry->name = var_tok->str;
+    var_entry->len = var_tok->len;
+    Node* conds = NULL;
+    Node** cond_tail = &conds;
+    while (consume_keyword(KW_IF)) {
+        *cond_tail = expr();
+        cond_tail = &(*cond_tail)->next;
+    }
+    if (token->kind == TK_KEYWORD && token->keyword == KW_FOR) {
+        error_at(token_start(token), token_end(token), "内包表記の`for`節は1つだけです");
+    }
+    expect("]");
+    for (int i = 0; i < nhidden; i++) {
+        hidden[i]->name = var_tok->str;
+        hidden[i]->len = var_tok->len;
+    }
+    var_entry->name = NULL;
+    var_entry->len = 0;
+    suppress_multi = saved_multi;
+    is_top_level = saved_top;
+    if (saved_top) {
+        note_top_all_locals();
+    }
+
+    register_any();
+    int iter_offset = locals->offset;
+    register_any();
+    int result_offset = locals->offset;
+
+    Node* node = create_node(ND_COMPREHENSION);
+    node->init = iterable;
+    Node* var = create_node(ND_LVAR);
+    var->name = var_tok->str;
+    var->len = var_tok->len;
+    var->offset = var_offset;
+    var->tok = var_tok;
+    node->left_child = var;
+    node->right_child = elem;
+    node->cond = conds;
+    node->offset = iter_offset;
+    node->val = result_offset;
+    node->tok = var_tok;
+    return node;
+}
+
 static Node* array_literal() {
     Node* node;
     expr_depth++;
@@ -1156,6 +1332,13 @@ static Node* array_literal() {
         node->array_len = 0;
         node->body = NULL;
         node->offset = locals->offset;
+        expr_depth--;
+        return node;
+    }
+    bool sugar = false;
+    Token* comp_var = comprehension_var_ahead(&sugar);
+    if (comp_var) {
+        node = parse_comprehension(comp_var, sugar);
         expr_depth--;
         return node;
     }

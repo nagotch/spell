@@ -3019,6 +3019,10 @@ static void collect_defs_node(Node* node, DefName** locals) {
         }
     } else if (node->kind == ND_FOR) {
         collect_def_target(node->left_child, locals);
+    } else if (node->kind == ND_COMPREHENSION) {
+        // 内包表記のループ変数は、そのスロットへの読み取りを定義
+        // 済みとして扱うために拾う（step 95。照合はオフセット）
+        collect_def_target(node->left_child, locals);
     } else if (node->kind == ND_ARROW_L || node->kind == ND_ARROW_R) {
         // 矢印は向きと型で代入先が決まる。収集の段階では判別できないが、
         // 代入先になりうる側は向きで決まっている（`A <- B` なら A、
@@ -3353,11 +3357,15 @@ static void rewrite_breaks_stmt(Node* node, int flag_offset) {
     }
 }
 
-static Type* check_for(Node* node) {
-    Type* iterable = check_node(node->init);
-    // プロトコル検査。壊れている場合は protocol_ok を倒し、while への
-    // 書き換えはしない。ただしループ変数の型記録と本体の検査は続け、
-    // 本体側の独立したエラーを拾う（要素型は不明として扱う）
+// 反復プロトコルの検査（for 文と内包表記で共用）。対象の型から
+// __iter__ / __has_next__ / __next__（と任意の __set_current__）を
+// 解決し、要素型を *elem_out へ返す。壊れている場合は位置つき
+// エラーを出して false を返す（呼び出し側は要素型不明として本体・
+// 要素式の検査を続け、書き換えはしない）
+static bool check_iter_protocol(Node* node, Type* iterable,
+        Class** klass_out, Class** iklass_out, Function** iter_fn_out,
+        Function** has_next_fn_out, Function** next_fn_out,
+        Function** set_current_fn_out, Type** elem_out) {
     Class* klass = NULL;
     Class* iklass = NULL;
     Function* iter_fn = NULL;
@@ -3419,6 +3427,30 @@ static Type* check_for(Node* node) {
             }
         }
     }
+    *klass_out = klass;
+    *iklass_out = iklass;
+    *iter_fn_out = iter_fn;
+    *has_next_fn_out = has_next_fn;
+    *next_fn_out = next_fn;
+    *set_current_fn_out = set_current_fn;
+    *elem_out = elem;
+    return protocol_ok;
+}
+
+static Type* check_for(Node* node) {
+    Type* iterable = check_node(node->init);
+    // プロトコル検査。壊れている場合は protocol_ok を倒し、while への
+    // 書き換えはしない。ただしループ変数の型記録と本体の検査は続け、
+    // 本体側の独立したエラーを拾う（要素型は不明として扱う）
+    Class* klass = NULL;
+    Class* iklass = NULL;
+    Function* iter_fn = NULL;
+    Function* has_next_fn = NULL;
+    Function* next_fn = NULL;
+    Function* set_current_fn = NULL;
+    Type* elem = &ty_unknown;
+    bool protocol_ok = check_iter_protocol(node, iterable, &klass, &iklass,
+            &iter_fn, &has_next_fn, &next_fn, &set_current_fn, &elem);
 
     Node* get_iter = create_node(ND_ASSIGN);
     get_iter->left_child = iter_slot_node(node);
@@ -3507,6 +3539,149 @@ static Type* check_for(Node* node) {
         get_iter->next = loop;
     }
     return &ty_unknown;
+}
+
+// 内包表記（step 95）: for 文と同じ部品で ND_BLOCK へ書き換える。
+//   結果スロット = []
+//   イテレータスロット = 対象.__iter__()
+//   while (イテレータ.__has_next__()) {
+//       変数 = イテレータ.__next__()
+//       if (条件...) { 結果スロット.append(要素式) }
+//   }
+//   結果スロット（最後の文がブロックの値になる）
+// 構築した部分は再検査しない（check_for と同じ規律）。append は
+// ND_APPEND を直接構築する。結果配列の要素型は要素式の型で作る
+// ため、check_append の引数照合は自明に満たされる
+static Type* check_comprehension(Node* node, Type* expected) {
+    Type* iterable = check_node(node->init);
+    Class* klass = NULL;
+    Class* iklass = NULL;
+    Function* iter_fn = NULL;
+    Function* has_next_fn = NULL;
+    Function* next_fn = NULL;
+    Function* set_current_fn = NULL;
+    Type* elem = &ty_unknown;
+    bool protocol_ok = check_iter_protocol(node, iterable, &klass, &iklass,
+            &iter_fn, &has_next_fn, &next_fn, &set_current_fn, &elem);
+
+    Node* var = node->left_child;
+    if (elem->kind != TY_UNKNOWN) {
+        local_types[var->offset / 8] = elem;
+    }
+    var->type = elem;
+
+    // ループ変数への代入は、for 文の __set_current__ 書き戻しを
+    // 持ち込まず位置つきエラーにする（v1 の制限。黙って書き
+    // 戻さないより明示する。複合代入と ++/-- は desugar 済みで
+    // ND_ASSIGN になっているため、find_var_assign で拾える）
+    Node* assign = find_var_assign(node->right_child, var);
+    if (!assign) {
+        assign = find_var_assign(node->cond, var);
+    }
+    if (assign) {
+        error_node(assign, "内包表記の中ではループ変数`%.*s`へ代入できません", var->len, var->name);
+    }
+
+    // 要素式の検査。期待型が配列なら要素型を伝播する（配列
+    // リテラルの要素と同じ）
+    Type* elem_expected = expected && expected->kind == TY_ARRAY ? expected->elem : NULL;
+    expected_type = elem_expected;
+    Type* elem_t = check_node(node->right_child);
+    expected_type = NULL;
+
+    // 条件は1つずつ検査して真理値化する（ND_IF の条件と同じ扱い）
+    for (Node** cp = &node->cond; *cp;) {
+        Node* c = *cp;
+        Node* nxt = c->next;
+        c->next = NULL;
+        Type* ct = check_node(c);
+        Node* b = boolify(c, ct);
+        b->next = nxt;
+        *cp = b;
+        cp = &b->next;
+    }
+
+    if (!protocol_ok) {
+        // プロトコルが壊れている場合は書き換えをしない（for と同じ）
+        return &ty_unknown;
+    }
+    Type* result_t = array_type(elem_t);
+    local_types[node->val / 8] = result_t;
+
+    Node* result_ref = create_node(ND_LVAR);
+    result_ref->offset = (int)node->val;
+    result_ref->type = result_t;
+    result_ref->tok = node->tok;
+    Node* empty = create_node(ND_ARRAY);
+    empty->array_len = 0;
+    empty->type = result_t;
+    empty->tok = node->tok;
+    Node* init_result = create_node(ND_ASSIGN);
+    init_result->left_child = result_ref;
+    init_result->right_child = empty;
+    init_result->tok = node->tok;
+
+    Node* get_iter = create_node(ND_ASSIGN);
+    get_iter->left_child = iter_slot_node(node);
+    get_iter->right_child = make_mcall(node->init, klass, iter_fn, "__iter__", 8);
+
+    Node* set_var = create_node(ND_ASSIGN);
+    set_var->left_child = var;
+    set_var->right_child = make_mcall(iter_slot_node(node), iklass, next_fn, "__next__", 8);
+
+    Node* append = create_node(ND_APPEND);
+    Node* append_target = create_node(ND_LVAR);
+    append_target->offset = (int)node->val;
+    append_target->type = result_t;
+    append_target->tok = node->tok;
+    append->left_child = append_target;
+    append->args = node->right_child;
+    append->tok = node->tok;
+
+    // 条件を内側から包む（並びの後ろの条件ほど内側になるため、
+    // 評価は並び順に短絡する）
+    Node* stmt = append;
+    int nconds = 0;
+    for (Node* c = node->cond; c; c = c->next) {
+        nconds++;
+    }
+    if (nconds > 0) {
+        Node** conds = malloc(sizeof(Node*) * nconds);
+        int i = 0;
+        for (Node* c = node->cond; c; c = c->next) {
+            conds[i++] = c;
+        }
+        for (int j = nconds - 1; j >= 0; j--) {
+            Node* if_node = create_node(ND_IF);
+            if_node->cond = conds[j];
+            if_node->cond->next = NULL;
+            if_node->then = stmt;
+            if_node->tok = conds[j]->tok;
+            stmt = if_node;
+        }
+        free(conds);
+    }
+
+    Node* loop_body = create_node(ND_BLOCK);
+    loop_body->body = set_var;
+    set_var->next = stmt;
+
+    Node* loop = create_node(ND_WHILE);
+    loop->cond = make_mcall(iter_slot_node(node), iklass, has_next_fn, "__has_next__", 12);
+    loop->then = loop_body;
+    loop->tok = node->tok;
+
+    Node* read_result = create_node(ND_LVAR);
+    read_result->offset = (int)node->val;
+    read_result->type = result_t;
+    read_result->tok = node->tok;
+
+    node->kind = ND_BLOCK;
+    node->body = init_result;
+    init_result->next = get_iter;
+    get_iter->next = loop;
+    loop->next = read_result;
+    return result_t;
 }
 
 // 複数代入: 値を全部評価して一時置き場へ退避し、それから対象へ1つずつ代入する
@@ -3678,7 +3853,7 @@ static Type* check_node(Node* node) {
     // 期待型は直属のラムダ・配列リテラル・構築（関数呼び出し）だけが
     // 受け取り、それ以外へは漏らさない
     Type* my_expected = NULL;
-    if (node->kind == ND_LAMBDA || node->kind == ND_ARRAY || node->kind == ND_FUNCALL || node->kind == ND_SLICE || node->kind == ND_FUNCREF) {
+    if (node->kind == ND_LAMBDA || node->kind == ND_ARRAY || node->kind == ND_FUNCALL || node->kind == ND_SLICE || node->kind == ND_FUNCREF || node->kind == ND_COMPREHENSION) {
         my_expected = expected_type;
     }
     expected_type = NULL;
@@ -3820,6 +3995,9 @@ static Type* check_node(Node* node) {
             break;
         case ND_FOR:
             result = check_for(node);
+            break;
+        case ND_COMPREHENSION:
+            result = check_comprehension(node, my_expected);
             break;
         case ND_MULTIASSIGN:
             result = check_multiassign(node);

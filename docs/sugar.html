@@ -228,6 +228,7 @@ put a</pre>
   <tr><td><code>i@n ブロック</code></td><td><code>for i in n ブロック</code>（0 から n−1）</td></tr>
   <tr><td><code>i@a..b ブロック</code></td><td><code>for i in a..b ブロック</code>（<code>..=</code> も可）</td></tr>
   <tr><td><code>x@a ブロック</code></td><td><code>for x in a ブロック</code>（反復対象の要素走査）</td></tr>
+  <tr><td><code>[式 変数@対象]</code></td><td><code>[式 for 変数 in 対象]</code>（内包表記。末尾の <code>if 条件</code> もそのまま付けられ、結果へメソッドチェーンも付けられる）</td></tr>
   <tr><td><code>@n ブロック</code></td><td><code>for _ in n ブロック</code>（回数だけの繰り返し）</td></tr>
   <tr><td><code>@{}</code> / <code>@:</code></td><td><code>while (1 == 1) { }</code>（無限ループ）</td></tr>
   <tr><td><code>@? 条件 ブロック</code></td><td><code>while 条件 ブロック</code>（<code>@ 式</code> は回数の形なので、条件の印 <code>?</code> を足して区別する。条件には <code>__bool__</code> も効く）</td></tr>
