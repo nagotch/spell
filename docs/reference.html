@@ -725,7 +725,7 @@ A ab</pre>
   <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較。<code>&lt;</code> 系の順序比較はない（エラーになる）</td></tr>
   <tr><td><code>__hash__</code></td><td>要素のハッシュの合成。配列は書き換え可能なので、辞書のキーにした後で中身を変えると、そのエントリは引けなくなる</td></tr>
   <tr><td><code>__bool__</code></td><td>空でなければ真（条件での判定）</td></tr>
-  <tr><td><code>__iter__</code></td><td>要素の走査（<code>ArrayIter</code>）。反復はイテレータが受け取った時点のスナップショットを回るため、ループ中の元配列への append は反復に増えず、ループ変数への代入の書き戻しも元の配列へは届かない（書き戻し自体はスナップショットに効く。文字列の反復では元の文字列へ届く）</td></tr>
+  <tr><td><code>__iter__</code></td><td>要素の走査（<code>ArrayIter</code>）。ただし <code>for</code> の対象が変数・フィールド・添え字で辿れる配列のときは、イテレータを介さず元の配列そのものを回る（借用）。その場合、ループ変数への代入は元の配列へ書き戻され、要素が配列なら要素経由の書き換えも届き、容量内の append は反復にも増える。対象が呼び出し結果などの一時値のときは、イテレータが受け取った時点のスナップショットを回る（書き戻しはスナップショットに効く。文字列の反復では元の文字列へ届く）</td></tr>
   <tr><td><code>rev</code></td><td>逆順にした新しい配列（元の配列は変わらない）</td></tr>
   <tr><td><code>sort()</code></td><td>昇順に並べ替える（インプレース）。安定ソートではない（等しい要素の前後関係は保たれない）。要素型に <code>__lt__</code> が必要</td></tr>
   <tr><td><code>sorted()</code></td><td>並べ替えた新しい配列（元の配列は変わらない）。要素型に <code>__lt__</code> が必要</td></tr>
@@ -904,10 +904,16 @@ for i in r.rev { put i }</pre>
   イテレータが任意メソッド <code>__set_current__(v)</code> を持つ場合、本体でのループ変数への代入は各反復の終わり（と、このループ宛の <code>break</code> / <code>continue</code> の直前）に現在の要素へ書き戻されます。
   持たない反復でのループ変数への代入は、書き戻されずに消える事故を防ぐため、コンパイルエラーになります。<code>return</code> で抜ける場合は書き戻されません。
 </p>
+<p>
+  配列については特例があります。反復対象が変数・フィールド・添え字で辿れる場所にある配列（左辺値）のとき、<code>for</code> はイテレータを介さず元の配列そのものを回ります（借用モード）。
+  ループ変数への代入は元の配列の現在位置へ書き戻され、要素の束縛も複製ではないため、要素が配列なら <code>row[0] = 9</code> のような要素経由の書き換えも元の配列へ届きます。
+  反復は開始時点の配列ブロックを見て長さを読み直すので、容量内の append は反復にも増えますが、容量を超える append で変数が新しいブロックへ付け替わると反復は追随しません。
+  対象が呼び出し結果・リテラルなどの一時値のときは、この特例は働かず、受け取った時点の複製（スナップショット）を回ります。内包表記も対象外で、要素は複製されて新しい配列に入ります。
+</p>
 <table>
   <tr><th>イテレータ</th><th>対象</th><th>備考</th></tr>
   <tr><td><code>RangeIter</code></td><td><code>int</code>、<code>Range</code></td><td><code>__set_current__</code> は無い（ループ変数への代入はエラー）</td></tr>
-  <tr><td><code>ArrayIter&lt;T&gt;</code></td><td>配列、<code>Vec</code>、<code>Deque</code></td><td>配列への反復は配列そのものを見て書き戻しも効く。<code>Vec</code> / <code>Deque</code> は開始時点のスナップショット（<code>to_array()</code>）への反復で、書き戻しもスナップショット側</td></tr>
+  <tr><td><code>ArrayIter&lt;T&gt;</code></td><td>配列、<code>Vec</code>、<code>Deque</code></td><td>左辺値の配列への <code>for</code> は借用モードで配列そのものを回り、書き戻しも効く（<code>ArrayIter</code> は一時値の配列にだけ使われる）。<code>Vec</code> / <code>Deque</code> は開始時点のスナップショット（<code>to_array()</code>）への反復で、書き戻しもスナップショット側</td></tr>
   <tr><td><code>StrIter</code></td><td><code>str</code></td><td>1文字ずつの <code>str</code> を返す。書き戻しは、代入された文字列の先頭の文字で置き換える（空文字列なら何もしない）</td></tr>
   <tr><td><code>DictIter&lt;K&gt;</code></td><td><code>Dict</code></td><td>開始時点のキー並びのスナップショット。<code>__set_current__</code> は無い</td></tr>
 </table>

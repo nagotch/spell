@@ -239,6 +239,10 @@ struct Node {
     int len;
     Node* args;
     int array_len;
+    // ND_FOR のときだけ使う（step 98）: 借用モードの添え字スロットの
+    // オフセット。parse の make_for_iter が反復子スロット（offset）と
+    // 並べて確保する。借用モードにならない for では使われない
+    int idx_offset;
     Type* type;
     Type* anno;
     Class* klass;
