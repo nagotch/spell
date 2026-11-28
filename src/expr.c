@@ -3,6 +3,8 @@
 
 static Node* array_literal();
 static bool ctor_typeargs_ahead(Token* ident);
+static bool typearg_ctor_ahead(Token* ident);
+static Token* scan_type(Token* t);
 static void expect_type_end();
 
 // 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数なしなら NULL
@@ -133,6 +135,79 @@ static int bool_literal_value(Token* tok) {
     return -1;
 }
 
+// 括弧の中（深さ1）に単独の `=` があるか。`(a, b = 1, 2)` の
+// 括弧つき複数代入は、内側の式として読む従来の形を保つ必要がある
+// ため、Pos リテラルとして読む前にトークン列だけで振り分ける。
+// 括弧・角括弧・波括弧の入れ子の中の `=` は数えない（ラムダ本体
+// などの代入を、並びの代入と誤認しないため）
+static bool paren_has_top_assign() {
+    int depth = 0;
+    for (Token* t = token; t && t->kind != TK_EOF; t = t->next) {
+        if (t->kind != TK_SYMBOL) {
+            continue;
+        }
+        if (t->len == 1 && (t->str[0] == '(' || t->str[0] == '[' || t->str[0] == '{')) {
+            depth++;
+        } else if (t->len == 1 && (t->str[0] == ')' || t->str[0] == ']' || t->str[0] == '}')) {
+            if (depth == 0) {
+                return false;
+            }
+            depth--;
+        } else if (depth == 0 && t->len == 1 && t->str[0] == '=') {
+            return true;
+        }
+    }
+    return false;
+}
+
+// 括弧で囲まれた式を読む。開き括弧は消費済み。
+// 中身がカンマ区切りの並びなら Pos リテラル（step 77）として読み、
+// 要素2つで Pos2、3つで Pos3 の構築に読み替える。要素が1つだけ
+// なら従来どおりの括弧式。`(x, y) -> 式` のラムダは assign 側で
+// 先に振り分けられるため、ここへは来ない
+static Node* paren_expr(Token* open) {
+    if (paren_has_top_assign()) {
+        expr_depth++;
+        Node* node = expr();
+        expr_depth--;
+        expect(")");
+        return node;
+    }
+    expr_depth++;
+    bool saved = suppress_multi;
+    suppress_multi = true;
+    Node* first = expr();
+    if (!consume(",")) {
+        suppress_multi = saved;
+        expr_depth--;
+        expect(")");
+        return first;
+    }
+    Node head;
+    head.next = NULL;
+    Node* cur = &head;
+    cur->next = first;
+    cur = cur->next;
+    int count = 1;
+    do {
+        cur->next = expr();
+        cur = cur->next;
+        count++;
+    } while (consume(","));
+    suppress_multi = saved;
+    expr_depth--;
+    expect(")");
+    if (count > 3) {
+        error_at(token_start(open), token_end(open), "Pos リテラルの要素は2個か3個ですが、%d個が指定されています", count);
+    }
+    Node* node = create_node(ND_FUNCALL);
+    node->name = count == 2 ? "Pos2" : "Pos3";
+    node->len = 4;
+    node->tok = open;
+    node->args = head.next;
+    return node;
+}
+
 static Node* primary() {
     Node* node;
     if (token->kind == TK_KEYWORD && token->keyword == KW_FN) {
@@ -213,6 +288,20 @@ static Node* primary() {
         expect_type_end();
         expect("(");
         node->args = parse_args();
+    } else if (ident_token && typearg_ctor_ahead(ident_token)) {
+        // 型を引数に渡す構築（step 77）: `Deque(int)` のように、引数が
+        // 型1つだけなら「要素型の指定＋ゼロ値ファクトリの自動生成」
+        // として扱う。要素型は構築時の型引数として記録し、ファクトリ
+        // 引数そのものは typecheck が合成する（ctor_type_arg）
+        node = create_node(ND_FUNCALL);
+        node->name = ident_token->str;
+        node->len = ident_token->len;
+        node->tok = ident_token;
+        consume("(");
+        node->ctor_targs[0] = parse_type();
+        node->ctor_targ_count = 1;
+        node->ctor_type_arg = true;
+        expect(")");
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
         node->name = ident_token->str;
@@ -222,10 +311,7 @@ static Node* primary() {
     } else if (ident_token) {
         node = create_ident_node(ident_token);
     } else if (consume("(")) {
-        expr_depth++;
-        node = expr();
-        expr_depth--;
-        expect(")");
+        node = paren_expr(token->prev);
     } else {
         Token* num_tok = token;
         long num = expect_number();
@@ -265,6 +351,12 @@ static Node* primary() {
             new_node->tok = postfix_tok;
             new_node->left_child = node;
             new_node->right_child = right_child;
+            // Pos 添字の糖衣（step 77）で使う一時置き場。添字の型は
+            // パース時点では分からないため、全ての添字式に1枠ずつ
+            // 確保しておき、使うかどうかは型検査が決める（複数代入の
+            // 一時置き場と同じ方式）
+            register_any();
+            new_node->offset = locals->offset;
             node = new_node;
             continue;
         }
@@ -569,6 +661,40 @@ static bool ctor_typeargs_ahead(Token* ident) {
         }
     }
     return false;
+}
+
+// 型を引数に渡す構築 `Vec(型)` / `Deque(型)` が続くかの先読み
+// （step 77）。トークン列だけを見て判定し、消費はしない。対象は
+// prelude の Vec / Deque だけで、変数に隠れている名前は値として
+// 扱う。引数がちょうど1つの型として読み飛ばせて、直後が `)` の
+// 場合だけ確定する。ただし、その型が単独の識別子で、変数として
+// 解決される場合は式として扱う（ファクトリを収めた変数を渡す形を
+// 壊さないため。型と変数の優先順位は create_ident_node と同じく
+// 変数が勝つ）
+static bool typearg_ctor_ahead(Token* ident) {
+    if (!find_class(ident->str, ident->len)) {
+        return false;
+    }
+    bool is_vec = ident->len == 3 && !memcmp(ident->str, "Vec", 3);
+    bool is_deque = ident->len == 5 && !memcmp(ident->str, "Deque", 5);
+    if (!is_vec && !is_deque) {
+        return false;
+    }
+    if (ident_is_value_call(ident)) {
+        return false;
+    }
+    if (!sym_is(token, "(")) {
+        return false;
+    }
+    Token* arg = token->next;
+    Token* after = scan_type(arg);
+    if (!after || !sym_is(after, ")")) {
+        return false;
+    }
+    if (arg->kind == TK_IDENT && after == arg->next && ident_is_value_call(arg)) {
+        return false;
+    }
+    return true;
 }
 
 // 型の名前としてあり得るか（注釈かどうかの見分け専用。意味の検証は

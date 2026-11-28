@@ -923,6 +923,84 @@ def t070() {
     return r;
 }
 
+def t071() {
+    // step 77: Pos2 リテラルとフィールド・添字読み
+    p = (3, 4);
+    return p.x * 1000 + p.y * 100 + p[0] * 10 + p[1];
+}
+
+def t072() {
+    // step 77: Pos2 の要素ごとの演算（+ / - / スカラー倍）
+    a = (1, 2) + (10, 20);
+    b = a - (1, 2);
+    c = (1, 2) * 3;
+    return (a.x + a.y) * 100 + (b.x + b.y) * 10 + (c.x + c.y);
+}
+
+def t073() {
+    // step 77: Pos2 の等価性と Dict のキーとしての読み書き
+    d: Dict<Pos2, int> = Dict(zero_int);
+    d[(1, 2)] = 5;
+    d[(1, 2)] = d[(1, 2)] + 3;
+    r = d[(1, 2)] * 10;
+    if (d.has((2, 1))) { r = r + 100; }
+    if ((1, 2) == (1, 2) && (1, 2) != (2, 1)) { r = r + 1; }
+    return r;
+}
+
+def t074() {
+    // step 77: Pos2 の __str__ は空白区切り
+    if ((3, 5).__str__() == "3 5") { return 1; }
+    return 0;
+}
+
+def t075() {
+    // step 77: Pos3 のリテラル・演算・添字
+    q = (1, 2, 3) + (10, 20, 30);
+    return q.x * 1000 + q.y * 100 + q.z * 10 + q[2];
+}
+
+def t076() {
+    // step 77: Pos3 の等価性と __str__
+    r = 0;
+    if ((1, 2, 3) == (1, 2, 3) && (1, 2, 3) != (1, 2, 4)) { r = r + 1; }
+    if ((1, 2, 3).__str__() == "1 2 3") { r = r + 10; }
+    return r;
+}
+
+def t077() {
+    // step 77: a[p] の読み（二次元配列への Pos 添字）
+    a = [[1, 2], [3, 4]];
+    return a[(0, 1)] + a[(1, 0)] * 10;
+}
+
+def t078() {
+    // step 77: a[p] の代入（リテラルと変数の両方）
+    a = [[1, 2], [3, 4]];
+    a[(1, 1)] = 99;
+    p = (0, 1);
+    a[p] = 7;
+    return a[1][1] * 100 + a[0][1];
+}
+
+def t079() {
+    // step 77: a[p] の三次元版（読みと代入）
+    b = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]];
+    r = b[(1, 0, 1)];
+    b[(0, 1, 0)] = 30;
+    return r * 100 + b[0][1][0];
+}
+
+def t080() {
+    // step 77: Pos リテラルを要素とする配列と、加算での隣接セル列挙
+    // （BFS の dirs イディオムの形）
+    dirs = [(1, 0), (0, 1), (-1, 0), (0, -1)];
+    p = (5, 5);
+    n1 = p + dirs[0];
+    n2 = p + dirs[2];
+    return n1.x * 1000 + n1.y * 100 + n2.x * 10 + n2.y;
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -1000,6 +1078,16 @@ def main() {
     mark(68); fails=fails+check(t068(), 1122);
     mark(69); fails=fails+check(t069(), 492401);
     mark(70); fails=fails+check(t070(), 42);
+    mark(71); fails=fails+check(t071(), 3434);
+    mark(72); fails=fails+check(t072(), 3609);
+    mark(73); fails=fails+check(t073(), 81);
+    mark(74); fails=fails+check(t074(), 1);
+    mark(75); fails=fails+check(t075(), 13563);
+    mark(76); fails=fails+check(t076(), 11);
+    mark(77); fails=fails+check(t077(), 32);
+    mark(78); fails=fails+check(t078(), 9907);
+    mark(79); fails=fails+check(t079(), 630);
+    mark(80); fails=fails+check(t080(), 6545);
 
     print_str("done"); putchar(10);
     return fails > 0;

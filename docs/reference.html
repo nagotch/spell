@@ -759,8 +759,11 @@ a</pre>
 <p>
   構築は、引数なしの <code>v = Vec()</code>（要素型は <code>int</code>）、型引数つきの <code>v = Vec&lt;str&gt;()</code>、
   注釈つきの <code>v: Vec&lt;str&gt; = Vec()</code>、既定値ファクトリを渡す <code>v: Vec&lt;int&gt; = Vec(zero_int)</code> の各形で書けます。
-  引数なしの場合、バッファの埋め草は要素型の既定値（<code>int</code> は 0、<code>bool</code> は偽、<code>str</code> は空文字列）で補われます。
+  引数なしの場合、バッファの埋め草は要素型の既定値（<code>int</code> は 0、<code>bool</code> は偽、<code>str</code> は空文字列、<code>Pos2</code> / <code>Pos3</code> は原点）で補われます。
   要素型がクラス・配列・関数型の場合は自動で補えないため、ファクトリを渡してください。
+  また、型を引数として渡す <code>v = Vec(str)</code> の形も書けます（<code>Deque</code> も同じ）。これは「要素型の指定＋ゼロ値ファクトリの自動生成」で、
+  ゼロ値は再帰的に合成されます（<code>int</code> は 0、<code>[T]</code> は新しい空配列、ユーザークラスは <code>__init__</code> の引数をすべてゼロで埋めた構築）。
+  関数型などゼロ値を自動で作れない要素型の場合は、ファクトリを渡すよう促すエラーになります。
   末尾への追加は容量の倍増で均し定数時間です。
 </p>
 <table>
@@ -776,6 +779,7 @@ a</pre>
 <p>
   Queue としても Stack としても使える両端キューです。構築は <code>Vec</code> と同じく、引数なしの <code>q = Deque()</code>（要素型は <code>int</code>）、
   型引数つきの <code>q = Deque&lt;str&gt;()</code>、注釈つきの <code>q: Deque&lt;str&gt; = Deque()</code>、ファクトリを渡す <code>q: Deque&lt;int&gt; = Deque(zero_int)</code> の各形で書けます。
+  型を引数として渡す <code>q = Deque(Pos2)</code> や <code>q = Deque([int])</code> の形もあり、要素型とゼロ値ファクトリが自動で決まります（詳しくは <code>Vec</code> の項）。
   引数なしの場合の埋め草の扱いも <code>Vec</code> と同じです。
   出し入れの実体はダンダー <code>__push_back__</code> / <code>__push_front__</code> / <code>__pop_back__</code> / <code>__pop_front__</code> で、
   公開メソッドはその薄いラッパーです。矢印演算子（§02）でも出し入れできます。
@@ -819,6 +823,32 @@ put y, q.to_array()</pre>
   <tr><td><code>ok: bool</code></td><td>開けて最後まで読めたときだけ真。空のファイルは真で <code>text</code> は空</td></tr>
   <tr><td><code>text: str</code></td><td>ファイル全体の内容。読めなかったときは空</td></tr>
 </table>
+
+<h3>Pos2 / Pos3 — 座標</h3>
+<p>
+  グリッド上の座標を表すクラスです。<code>Pos2</code> はフィールド <code>x: int</code>、<code>y: int</code>、<code>Pos3</code> はそれに <code>z: int</code> を加えたものを持ちます。
+  式の位置で <code>(1, 2)</code> と書くと <code>Pos2</code>、<code>(1, 2, 3)</code> と書くと <code>Pos3</code> のリテラルになります（糖衣集の「式の糖衣」参照）。
+  要素ごとの <code>+</code> / <code>-</code>、<code>int</code> とのスカラー倍 <code>*</code>、等価性 <code>==</code> / <code>!=</code>、添字 <code>p[0]</code>（x が 0）を備え、
+  <code>__hash__</code> があるため <code>Dict</code> のキーにできます。文字列化は空白区切り（<code>"1 2"</code> / <code>"1 2 3"</code>）です。
+  入れ子配列への添字としても使えます（<code>a[p]</code> は <code>a[p[0]][p[1]]</code> と同じ。糖衣集の「式の糖衣」参照）。
+  ゼロ値は <code>zero_pos2()</code> / <code>zero_pos3()</code> で、<code>Deque&lt;Pos2&gt;()</code> のような引数なし構築の埋め草にも自動で使われます。
+</p>
+<figure class="code">
+  <figcaption>例 — 座標の演算と辞書のキー</figcaption>
+<pre>p = (1, 2)
+q = p + (0, 1)
+put q
+put q * 2
+d: Dict&lt;Pos2, int&gt; = Dict(zero_int)
+d[p] = 7
+put d[(1, 2)], d[(3, 3)]</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1 3
+2 6
+7 0</pre>
+</figure>
 
 <h2 id="s12"><span class="no">12</span>ダンダープロトコル一覧</h2>
 <p>
@@ -1049,6 +1079,8 @@ false 0</pre>
   <tr><td><code>Vec&lt;T&gt;</code></td><td>可変長配列</td><td><a href="#s11">§11</a></td></tr>
   <tr><td><code>Deque&lt;T&gt;</code></td><td>両端キュー</td><td><a href="#s11">§11</a></td></tr>
   <tr><td><code>FileData</code></td><td><code>read_file</code> の結果（<code>ok</code> と <code>text</code>）</td><td><a href="#s11">§11</a></td></tr>
+  <tr><td><code>Pos2</code></td><td>二次元座標（<code>x</code>、<code>y</code>）</td><td><a href="#s11">§11</a></td></tr>
+  <tr><td><code>Pos3</code></td><td>三次元座標（<code>x</code>、<code>y</code>、<code>z</code>）</td><td><a href="#s11">§11</a></td></tr>
 </table>
 
 <h3>関数</h3>
@@ -1057,6 +1089,8 @@ false 0</pre>
   <tr><td><code>zero_int() -&gt; int</code></td><td>初期値ファクトリ（0 を返す）。<code>Dict</code> / <code>Vec</code> / <code>Deque</code> の構築に渡す</td><td><a href="#s11">§11</a></td></tr>
   <tr><td><code>zero_bool() -&gt; bool</code></td><td>初期値ファクトリ（偽を返す）</td><td><a href="#s11">§11</a></td></tr>
   <tr><td><code>zero_str() -&gt; str</code></td><td>初期値ファクトリ（空文字列を返す）</td><td><a href="#s11">§11</a></td></tr>
+  <tr><td><code>zero_pos2() -&gt; Pos2</code></td><td>初期値ファクトリ（原点 <code>(0, 0)</code> を返す）</td><td><a href="#s11">§11</a></td></tr>
+  <tr><td><code>zero_pos3() -&gt; Pos3</code></td><td>初期値ファクトリ（原点 <code>(0, 0, 0)</code> を返す）</td><td><a href="#s11">§11</a></td></tr>
   <tr><td><code>args() -&gt; [str]</code></td><td>コマンドライン引数全体</td><td><a href="#s13">§13</a></td></tr>
   <tr><td><code>read_file(path: str) -&gt; FileData</code></td><td>ファイル全体を読む</td><td><a href="#s13">§13</a></td></tr>
   <tr><td><code>write_file(path: str, text: str) -&gt; bool</code></td><td>ファイルへ書き出す</td><td><a href="#s13">§13</a></td></tr>
@@ -1079,6 +1113,7 @@ false 0</pre>
   <tr><td><code>__println(s: str)</code></td><td><code>print</code> の実体</td></tr>
   <tr><td><code>__eprintln(s: str)</code></td><td><code>eprint</code> の実体</td></tr>
   <tr><td><code>__count_range(n: int) -&gt; Range</code></td><td><code>@n</code> リピートの実体</td></tr>
+  <tr><td><code>zero_array()</code></td><td>型を引数に渡す構築のゼロ値合成が使う、空配列を返す補助</td></tr>
   <tr><td><code>__dict_is_prime</code> / <code>__dict_next_cap</code></td><td><code>Dict</code> の内部用</td></tr>
 </table>
 <p>

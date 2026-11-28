@@ -166,6 +166,13 @@ def main():
     "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { q = Deque<P>(); return 0; }|要素型がクラスの場合はファクトリを渡してください"
     # step 76: 要素型が配列の引数なし構築も、既定値を自動で作れない
     "def main() { v = Vec<[int]>(); return 0; }|既定値は自動で作れないため、ファクトリを渡してください"
+    # step 77: Pos リテラルの要素は2個か3個だけ
+    "def main() { x = (1, 2, 3, 4); return 0; }|Pos リテラルの要素は2個か3個ですが"
+    # step 77: a[p] の次元は配列の入れ子の深さと一致しなければならない
+    "def main() { a = [[1, 2], [3, 4]]; print(a[(1, 0, 1)]); return 0; }|は3次元ですが、配列の入れ子は2段です"
+    "def main() { a = [1, 2]; print(a[(0, 1)]); return 0; }|は2次元ですが、配列の入れ子は1段です"
+    # step 77: ゼロ化できない要素型への型渡しは、ファクトリを促すエラー
+    "class Wrap { f: fn() -> int; def __init__(self, f: fn() -> int) { self.f = f; } } def main() { q = Deque(Wrap); return 0; }|ゼロ値は自動で作れないため、ファクトリを渡してください"
 )
 
 cc -c -o funcs.o funcs.c
@@ -844,6 +851,102 @@ one_io_test "def main() {
     print(q.pop_front() + q.pop_front());
     return 0;
 }" "" "7\n"
+# step 77: Pos リテラルの表示（__str__ は空白区切り）と演算
+one_io_test "def main() {
+    print((1, 2) + (2, 3));
+    print((1, 2, 3) * 2);
+    print((5, 5) - (1, 2));
+    return 0;
+}" "" "3 5\n2 4 6\n4 3\n"
+# step 77: a[p] の添字は一度だけ評価される（副作用の回数で固定する）
+one_io_test "calls = 0;
+def mk() -> Pos2 { calls = calls + 1; return (1, 0); }
+def main() {
+    a = [[1, 2], [3, 4]];
+    print(a[mk()]);
+    print(calls);
+    a[mk()] = 99;
+    print(calls);
+    print(a[1][0]);
+    return 0;
+}
+" "" "3\n1\n2\n99\n"
+# step 77: 型を引数に渡す構築（int / str / Pos2、Vec も）
+one_io_test "def main() {
+    q = Deque(int);
+    q <- 10;
+    q <- 20;
+    print(q.pop_front());
+    s = Deque(str);
+    s <- \"hi\";
+    print(s.pop_back());
+    v = Vec(int);
+    v.append(7);
+    print(v[0]);
+    pq = Deque(Pos2);
+    pq <- (1, 2);
+    pq <- (3, 4);
+    print(pq.pop_front());
+    print(pq.pop_back());
+    z: Deque<Pos2> = Deque();
+    z <- (8, 9);
+    print(z.pop_front());
+    return 0;
+}" "" "10\nhi\n7\n1 2\n3 4\n8 9\n"
+# step 77: Deque([int]) の要素配列は互いに独立（片方への append が
+# 他方へ漏れない）
+one_io_test "def main() {
+    q = Deque([int]);
+    q <- [0, 0];
+    q <- [1, 1];
+    row = q.pop_front();
+    row.append(5);
+    print(row);
+    print(q.pop_front());
+    return 0;
+}" "" "0 0 5\n1 1\n"
+# step 77: ゼロ化できるユーザークラスへの型渡し（__init__ の引数を
+# ゼロで埋めた構築がファクトリになる）
+one_io_test "class Cell {
+    v: int;
+    def __init__(self, v: int) { self.v = v; }
+}
+def main() {
+    q = Deque(Cell);
+    q <- Cell(5);
+    c = q.pop_front();
+    print(c.v);
+    n = Deque([[int]]);
+    n <- [[1, 2]];
+    print(n.pop_front());
+    return 0;
+}" "" "5\n1 2\n"
+# step 77: BFS の実例。グリッドを >> / >>> で読み、dirs の Pos リテラル
+# 配列と p + d の加算で隣接セルを列挙し、Deque(Pos2) と
+# Dict<Pos2, int> で最短路を出す（利用者の想定イディオムを固定する）
+one_io_test "def main() {
+    >> h, w
+    >>> s[h]
+    dirs = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+    dist: Dict<Pos2, int> = Dict(zero_int)
+    q = Deque(Pos2)
+    start = (0, 0)
+    goal = (w - 1, h - 1)
+    dist[start] = 0
+    q <- start
+    while q.len > 0:
+        p = q.pop_front()
+        for d in dirs:
+            np = p + d
+            if np.x < 0 || np.x >= w || np.y < 0 || np.y >= h: continue
+            if s[np.y][np.x] == 35: continue
+            if dist.has(np): continue
+            dist[np] = dist[p] + 1
+            q <- np
+    print(dist[goal])
+    return 0;
+}
+" "5 5\n.....\n.###.\n.#...\n.###.\n.....\n" "8\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

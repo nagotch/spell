@@ -384,6 +384,38 @@ if len(diags) == 1:
           r["start"] == {"line": 2, "character": 8} and r["end"] == {"line": 2, "character": 13},
           json.dumps(r))
 
+# 5.15 Pos と型を引数に渡す構築（step 77）: リテラル・a[p]・型渡しは
+# 診断ゼロ、次元の合わない a[p] は添字の位置に診断が出る
+POS_OK_PROGRAM = (
+    "def main() {\n"
+    "    a = [[1, 2], [3, 4]];\n"
+    "    p = (0, 1);\n"
+    "    q = Deque(Pos2);\n"
+    "    q <- p;\n"
+    "    return a[p] + q.len;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 18},
+                 "contentChanges": [{"text": POS_OK_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（Pos リテラル・a[p]・型渡し構築）: 診断ゼロ", diags == [], json.dumps(diags, ensure_ascii=False))
+
+POS_ERR_PROGRAM = (
+    "def main() {\n"
+    "    a = [[1, 2], [3, 4]];\n"
+    "    return a[(1, 0, 1)];\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 19},
+                 "contentChanges": [{"text": POS_ERR_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（a[p] の次元不一致）: 診断1件", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 1:
+    check("a[p] の次元不一致: メッセージに「3次元ですが」",
+          "3次元ですが" in diags[0]["message"], diags[0]["message"])
+
 # 6. didClose: 空の診断が送られて消える
 send({"jsonrpc": "2.0", "method": "textDocument/didClose",
       "params": {"textDocument": {"uri": URI}}})

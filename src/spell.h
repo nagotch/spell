@@ -210,6 +210,11 @@ struct Node {
     // `名前<型, ...>` と書く形は無い
     Type* ctor_targs[MAX_TPARAMS];
     int ctor_targ_count;
+    // 型を引数に渡す構築（step 77）。`Deque(int)` のように構築の引数が
+    // 型1つだけの場合に parse が立てる。要素型は ctor_targs[0] に入り、
+    // 引数そのものは作らない（nargs は 0）。typecheck が要素型の
+    // ゼロ値ファクトリを合成して引数へ差し込む
+    bool ctor_type_arg;
 };
 
 struct Function {
