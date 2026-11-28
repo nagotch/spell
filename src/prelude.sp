@@ -192,6 +192,118 @@ class str {
         }
         return sign * n;
     }
+
+    // old の重ならない出現を、左から全部 new に置き換えた新しい
+    // 文字列。old が空文字列の場合は Python と同じく、各文字の間と
+    // 両端に new を挟む
+    def replace(self, old: str, new: str) -> str {
+        n = self.len;
+        m = old.len;
+        if (m == 0) {
+            out = [0; n + (n + 1) * new.len];
+            k = 0;
+            i = 0;
+            while (i < n) {
+                j = 0;
+                while (j < new.len) { out[k] = new.chars[j]; k = k + 1; j = j + 1; }
+                out[k] = self.chars[i];
+                k = k + 1;
+                i = i + 1;
+            }
+            j = 0;
+            while (j < new.len) { out[k] = new.chars[j]; k = k + 1; j = j + 1; }
+            return str(out);
+        }
+        cnt = 0;
+        i = 0;
+        while (i + m <= n) {
+            if (self.__slice__(i, i + m) == old) {
+                cnt = cnt + 1;
+                i = i + m;
+            } else {
+                i = i + 1;
+            }
+        }
+        out = [0; n + cnt * (new.len - m)];
+        k = 0;
+        i = 0;
+        while (i + m <= n) {
+            if (self.__slice__(i, i + m) == old) {
+                j = 0;
+                while (j < new.len) { out[k] = new.chars[j]; k = k + 1; j = j + 1; }
+                i = i + m;
+            } else {
+                out[k] = self.chars[i];
+                k = k + 1;
+                i = i + 1;
+            }
+        }
+        while (i < n) {
+            out[k] = self.chars[i];
+            k = k + 1;
+            i = i + 1;
+        }
+        return str(out);
+    }
+
+    // sub の重ならない出現回数。空の sub は Python と同じく
+    // 長さ + 1 を返す
+    def count(self, sub: str) -> int {
+        if (sub.len == 0) { return self.len + 1; }
+        c = 0;
+        i = 0;
+        while (i + sub.len <= self.len) {
+            if (self.__slice__(i, i + sub.len) == sub) {
+                c = c + 1;
+                i = i + sub.len;
+            } else {
+                i = i + 1;
+            }
+        }
+        return c;
+    }
+
+    // 前後の空白（スペース・タブ・改行・CR など、コード 32 と
+    // 9〜13）を取り除いた新しい文字列
+    def strip(self) -> str {
+        lo = 0;
+        while (lo < self.len && (self.chars[lo] == 32 || (self.chars[lo] >= 9 && self.chars[lo] <= 13))) {
+            lo = lo + 1;
+        }
+        hi = self.len;
+        while (hi > lo && (self.chars[hi - 1] == 32 || (self.chars[hi - 1] >= 9 && self.chars[hi - 1] <= 13))) {
+            hi = hi - 1;
+        }
+        return self.__slice__(lo, hi);
+    }
+
+    // ASCII の小文字（a-z）だけを大文字に変えた新しい文字列。
+    // それ以外の文字コードはそのまま
+    def upper(self) -> str {
+        out = [0; self.len];
+        i = 0;
+        while (i < self.len) {
+            c = self.chars[i];
+            if (c >= 97 && c <= 122) { c = c - 32; }
+            out[i] = c;
+            i = i + 1;
+        }
+        return str(out);
+    }
+
+    // ASCII の大文字（A-Z）だけを小文字に変えた新しい文字列。
+    // それ以外の文字コードはそのまま
+    def lower(self) -> str {
+        out = [0; self.len];
+        i = 0;
+        while (i < self.len) {
+            c = self.chars[i];
+            if (c >= 65 && c <= 90) { c = c + 32; }
+            out[i] = c;
+            i = i + 1;
+        }
+        return str(out);
+    }
 }
 
 class StrIter {
@@ -866,6 +978,12 @@ def zero_pos3() -> Pos3 { return Pos3(0, 0, 0); }
 // 配列型のゼロ値（新しい空配列）。要素型は呼び出し側の文脈で決まるため、
 // 戻り値の注釈は付けず、空リテラルから推論される「要素型不明」のままにする
 def zero_array() { return []; }
+
+// 文字コード n から、長さ1の文字列を作る（`s.chars[i]` の逆）。
+// 出力時はコードの下位バイトが書かれるため、実用範囲は 0〜255
+// （文字としては ASCII の 0〜127）。範囲外の扱いは未定義だが、
+// 値自体はそのまま保持され、落ちることはない
+def chr(n: int) -> str { return str([n]); }
 
 // 伸びる配列。末尾への追加が容量の倍増で均し定数時間になる。生成は
 // Dict と同じく既定値ファクトリを受け取る（広げた領域の埋め草に使う）。
