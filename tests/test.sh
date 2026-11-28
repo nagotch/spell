@@ -42,6 +42,9 @@ tests=(
     "sp = 1; bp = 2; ax = 3; def main() { return sp + bp + ax + 36; }|42"
     "def si() -> int { return 42; } def main() { return si(); }|42"
     "def r8() -> int { return 40; } def main() { f = r8; return f() + 2; }|42"
+    # step 83: 呼ばれない実体化メソッドの本体エラーは報告されない
+    # （実体化メソッドの遅延検査）
+    "class Wrap<T> { v: T; def __init__(self, v: T) { self.v = v; } def broken(self) -> int { return self.v + \"x\"; } def get(self) -> T { return self.v; } } def main() { w = Wrap<int>(3); return w.get(); }|3"
     # step 79: 後方で定義されるグローバルを関数から読む（前方参照）
     "def f() -> int { return g; } g = 42; def main() { return f(); }|42"
     "def f() -> int { return g + 1; } def main() { return f(); } g = 41;|42"
@@ -207,6 +210,13 @@ def main():
     "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { p = P(1); if (p) { return 1; } return 0; }|条件に使えません"
     "def main() { p = (1, 2); if (p) { return 1; } return 0; }|条件に使えません"
     "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { p = P(1); if (!p) { return 1; } return 0; }|条件に使えません"
+    # step 83: 要素型に __lt__ が無い配列の sort は実体化時の型エラー
+    "class NoLt { v: int; def __init__(self, v: int) { self.v = v; } def __add__(self, o: NoLt) -> NoLt { return NoLt(self.v + o.v); } def __eq__(self, o: NoLt) -> bool { return self.v == o.v; } def __ne__(self, o: NoLt) -> bool { return !(self == o); } def __hash__(self) -> int { return self.v; } def __str__(self) -> str { return self.v.__str__(); } } def main() { a = [NoLt(2), NoLt(1)]; a.sort(); return 0; }|クラス\`NoLt\`に演算子\`<\`は定義されていません"
+    # step 83: 構築された実体化クラスの __init__ 本体は検査される
+    # （遅延検査でも構築経由の呼び出しは拾う）
+    "class Box<T> { v: T; def __init__(self, v: T) { self.v = v + \"x\"; } } def main() { b = Box<int>(3); return 0; }|演算子\`+\`は使えません"
+    # step 83: 要素型に __add__ が無い配列の sum は実体化時の型エラー
+    "class NoAdd { v: int; def __init__(self, v: int) { self.v = v; } def __lt__(self, o: NoAdd) -> bool { return self.v < o.v; } def __le__(self, o: NoAdd) -> bool { return self.v <= o.v; } def __eq__(self, o: NoAdd) -> bool { return self.v == o.v; } def __ne__(self, o: NoAdd) -> bool { return !(self == o); } def __hash__(self) -> int { return self.v; } def __str__(self) -> str { return self.v.__str__(); } } def main() { a = [NoAdd(2), NoAdd(1)]; print(a.sum()); return 0; }|クラス\`NoAdd\`に演算子\`+\`は定義されていません"
 )
 
 cc -c -o funcs.o funcs.c

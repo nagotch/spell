@@ -30,6 +30,25 @@ class str {
         return !(self == o);
     }
 
+    // 辞書順（文字コードの列としての大小）。共通部分が等しければ
+    // 短い方が小さい
+    def __lt__(self, o: str) -> bool {
+        n = self.chars.len;
+        if (o.chars.len < n) { n = o.chars.len; }
+        i = 0;
+        while (i < n) {
+            a = self.chars[i];
+            b = o.chars[i];
+            if (a != b) { return a < b; }
+            i = i + 1;
+        }
+        return self.chars.len < o.chars.len;
+    }
+
+    def __le__(self, o: str) -> bool {
+        return !(o < self);
+    }
+
     def __hash__(self) -> int {
         h = 5381;
         i = 0;
@@ -230,6 +249,126 @@ class array<T> {
             i = i + 1;
         }
         return r;
+    }
+
+    // 昇順に並べ替える（インプレース）。要素型に `__lt__` が必要。
+    // 安定ソートではない（等しい要素の前後関係は保たれない）
+    def sort(self) {
+        self.sort_range(0, self.len);
+    }
+
+    // [lo, hi) を並べ替える（sort の実体）。median-of-three のピボットを
+    // 持つクイックソート（Hoare 分割）で、分割後は小さい方へだけ再帰し
+    // 大きい方はループで続けるため、スタックの深さは log n 程度に収まる。
+    // 区間が小さい間は挿入ソートに切り替える
+    def sort_range(self, lo: int, hi: int) {
+        while (hi - lo > 12) {
+            mid = lo + (hi - lo) / 2;
+            // lo, mid, hi - 1 の中央値が self[mid] に来るよう並べ替える
+            if (self[mid] < self[lo]) { t = self[lo]; self[lo] = self[mid]; self[mid] = t; }
+            if (self[hi - 1] < self[lo]) { t = self[lo]; self[lo] = self[hi - 1]; self[hi - 1] = t; }
+            if (self[hi - 1] < self[mid]) { t = self[mid]; self[mid] = self[hi - 1]; self[hi - 1] = t; }
+            pivot = self[mid];
+            // Hoare 分割。ピボットの値は区間内に実在する要素なので、
+            // 両側の走査は区間の外に出ない
+            i = lo;
+            j = hi - 1;
+            while (1 == 1) {
+                while (self[i] < pivot) { i = i + 1; }
+                while (pivot < self[j]) { j = j - 1; }
+                if (i >= j) { break; }
+                t = self[i]; self[i] = self[j]; self[j] = t;
+                i = i + 1;
+                j = j - 1;
+            }
+            // 分割点は j。[lo, j + 1) の各要素は [j + 1, hi) の各要素以下
+            if (j + 1 - lo < hi - j - 1) {
+                self.sort_range(lo, j + 1);
+                lo = j + 1;
+            } else {
+                self.sort_range(j + 1, hi);
+                hi = j + 1;
+            }
+        }
+        // 挿入ソート
+        i = lo + 1;
+        while (i < hi) {
+            v = self[i];
+            j = i - 1;
+            while (j >= lo && v < self[j]) {
+                self[j + 1] = self[j];
+                j = j - 1;
+            }
+            self[j + 1] = v;
+            i = i + 1;
+        }
+    }
+
+    // ソート済みの新しい配列を返す（元の配列は変更しない）。要素型に
+    // `__lt__` が必要。中身のコピーを作って sort するので、中核の処理は
+    // sort と共有する
+    def sorted(self) -> [T] {
+        if (self.len == 0) { return []; }
+        r = [self[0]; self.len];
+        i = 0;
+        n = self.len;
+        while (i < n) {
+            r[i] = self[i];
+            i = i + 1;
+        }
+        r.sort();
+        return r;
+    }
+
+    // 全要素を先頭から `+` で畳み込んだ値。要素型に `__add__` が必要で、
+    // 戻り値は要素型そのもの（[str] なら連結、座標型なら成分ごとの和）。
+    // 積算は最初の要素から始めるため、空の配列では結果は不定
+    def sum(self) -> T {
+        r = self[0];
+        i = 1;
+        n = self.len;
+        while (i < n) {
+            r = r + self[i];
+            i = i + 1;
+        }
+        return r;
+    }
+
+    // 最小の要素。要素型に `__lt__` が必要。空の配列では結果は不定
+    def min(self) -> T {
+        r = self[0];
+        i = 1;
+        n = self.len;
+        while (i < n) {
+            if (self[i] < r) { r = self[i]; }
+            i = i + 1;
+        }
+        return r;
+    }
+
+    // 最大の要素。要素型に `__lt__` が必要。空の配列では結果は不定
+    def max(self) -> T {
+        r = self[0];
+        i = 1;
+        n = self.len;
+        while (i < n) {
+            if (r < self[i]) { r = self[i]; }
+            i = i + 1;
+        }
+        return r;
+    }
+
+    // v と等しい要素の個数。等しさは要素型の `==`（`__eq__` があれば
+    // それ、無ければ同一性）で判定する
+    def count(self, v: T) -> int {
+        c = 0;
+        i = 0;
+        n = self.len;
+        while (i < n) {
+            if (self[i] == v) { c = c + 1; }
+            i = i + 1;
+        }
+        return c;
     }
 
     def __str__(self) -> str {
@@ -810,6 +949,16 @@ class Pos2 {
         return !(self == o);
     }
 
+    // 辞書順（x、次に y）。座標のソートや min / max で使う
+    def __lt__(self, o: Pos2) -> bool {
+        if (self.x != o.x) { return self.x < o.x; }
+        return self.y < o.y;
+    }
+
+    def __le__(self, o: Pos2) -> bool {
+        return !(o < self);
+    }
+
     def __hash__(self) -> int {
         h = 5381;
         h = h * 33 + self.x;
@@ -857,6 +1006,17 @@ class Pos3 {
 
     def __ne__(self, o: Pos3) -> bool {
         return !(self == o);
+    }
+
+    // 辞書順（x、次に y、次に z）。Pos2 と同じ線引き
+    def __lt__(self, o: Pos3) -> bool {
+        if (self.x != o.x) { return self.x < o.x; }
+        if (self.y != o.y) { return self.y < o.y; }
+        return self.z < o.z;
+    }
+
+    def __le__(self, o: Pos3) -> bool {
+        return !(o < self);
     }
 
     def __hash__(self) -> int {
