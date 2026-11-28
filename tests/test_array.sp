@@ -194,6 +194,8 @@ def t135() { return "aXbXc".count("X") * 10000 + "aaaa".count("aa") * 1000 + "ab
 def t136() { r = 0; if ("  hi  ".strip() == "hi") { r = r + 1; } if (("\t\n hi " + chr(13) + "\n").strip() == "hi") { r = r + 2; } if ("   ".strip() == "") { r = r + 4; } if ("".strip() == "") { r = r + 8; } if ("hi".strip() == "hi") { r = r + 16; } if (" a b ".strip() == "a b") { r = r + 32; } return r; }
 def t137() { r = 0; if ("aBc9z".upper() == "ABC9Z") { r = r + 1; } if ("AbC9Z".lower() == "abc9z") { r = r + 2; } if ("".upper() == "" && "".lower() == "") { r = r + 4; } if ("hello".upper().lower() == "hello") { r = r + 8; } if ("!? ".upper() == "!? " && "!? ".lower() == "!? ") { r = r + 16; } return r; }
 def t138() { r = 0; if (chr(65) == "A") { r = r + 1; } if (chr(97) + chr(98) == "ab") { r = r + 2; } if (chr(10) == "\n") { r = r + 4; } if (chr("A".chars[0]) == "A") { r = r + 8; } if (chr(48 + 5) == "5") { r = r + 16; } return r; }
+def t139() { r = 0; if ("\r".chars[0] == 13) { r = r + 1; } if ("\r".len == 1) { r = r + 2; } if ('\r'.chars[0] == 13) { r = r + 4; } if ("\x41" == "A") { r = r + 8; } if ("\x61\x62" == "ab") { r = r + 16; } if ('\x41' == "A") { r = r + 32; } if ("\x4a" == "J") { r = r + 64; } if ("\n".chars[0] == 10) { r = r + 128; } if ("\t".chars[0] == 9) { r = r + 256; } if ("\\".chars[0] == 92) { r = r + 512; } if ("\"".chars[0] == 34) { r = r + 1024; } if ('\''.chars[0] == 39) { r = r + 2048; } if ("\0".chars[0] == 0) { r = r + 4096; } if ("\0".len == 1) { r = r + 8192; } return r; }
+def t140() { r = 0; if ("ab" * 3 == "ababab") { r = r + 1; } if ("ab" * 1 == "ab") { r = r + 2; } if ("ab" * 0 == "") { r = r + 4; } if ("ab" * -2 == "") { r = r + 8; } if ("" * 5 == "") { r = r + 16; } if ("a" * 5 == "aaaaa") { r = r + 32; } s = "xy"; if (s * 2 == "xyxy") { r = r + 64; } if (("ab" * 2).len == 4) { r = r + 128; } if ("ab" * 3 + "c" == "abababc") { r = r + 256; } return r; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -346,6 +348,8 @@ def main() {
     mark(136); fails=fails+check(t136(), 63);
     mark(137); fails=fails+check(t137(), 31);
     mark(138); fails=fails+check(t138(), 31);
+    mark(139); fails=fails+check(t139(), 16383);
+    mark(140); fails=fails+check(t140(), 511);
 
     print_str("done"); putchar(10);
     return fails > 0;

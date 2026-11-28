@@ -114,8 +114,8 @@ put x</pre>
 
 <h3>文字列リテラル</h3>
 <p>
-  <code>"..."</code> または <code>'...'</code> で囲みます（Python と同じで、どちらの形でも同じ <code>str</code> です）。エスケープは <code>\n</code>（改行）、<code>\t</code>（タブ）、<code>\\</code>、<code>\"</code>、<code>\'</code>、<code>\0</code> だけが特別で、
-  それ以外の <code>\x</code> は <code>x</code> そのものになります（たとえば <code>\r</code> は復帰コードではなく文字 <code>r</code> です）。
+  <code>"..."</code> または <code>'...'</code> で囲みます（Python と同じで、どちらの形でも同じ <code>str</code> です）。エスケープは <code>\n</code>（改行）、<code>\t</code>（タブ）、<code>\r</code>（復帰）、<code>\\</code>、<code>\"</code>、<code>\'</code>、<code>\0</code> と、<code>\xHH</code>（16進2桁で文字コードを直接指定）です。
+  この表に無いエスケープはコンパイルエラーになります。
   文字列は改行をまたげません。文字リテラルという別種のものはなく、<code>'a'</code> も長さ1の <code>str</code> です。
   添字 <code>s[i]</code> は1文字の <code>str</code> を返し、文字コード（<code>int</code>）が欲しい場合は <code>s.chars[i]</code> を使います。
 </p>
@@ -125,7 +125,7 @@ put x</pre>
 <pre>s = "a\tb\nc"
 put s
 put "q\"q"
-put "a\rb"</pre>
+put "a\rb".chars[1]</pre>
 </figure>
 
 <figure class="out">
@@ -133,7 +133,7 @@ put "a\rb"</pre>
 <pre>a	b
 c
 q"q
-arb</pre>
+13</pre>
 </figure>
 
 <h3>配列リテラル</h3>
@@ -568,6 +568,7 @@ a 7
   <tr><td><code>s[i]</code>（<code>__getitem__</code>）</td><td>i 番目の文字だけからなる長さ1の <code>str</code> を返す。添え字は配列と同じく回り込む（<code>s[-1]</code> は最後の文字、<code>s[s.len]</code> は先頭の文字）。空文字列への添え字は不定。文字コード（<code>int</code>）は <code>s.chars[i]</code> で取る。添字への代入はできない（<code>__setitem__</code> は無い）</td></tr>
   <tr><td><code>s?[i]</code></td><td>安全添え字（配列の節を参照）。要素は通常の <code>s[i]</code> と同じ</td></tr>
   <tr><td><code>s[i:j]</code>（スライス）</td><td>i 以上 j 未満の部分文字列（新しい <code>str</code>）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める（配列の節のスライスを参照）</td></tr>
+  <tr><td><code>s * n</code>（<code>__mul__</code>）</td><td><code>s</code> を <code>n</code> 回繰り返した新しい文字列。<code>n</code> が 0 以下なら空文字列。逆向きの <code>n * s</code> は書けない</td></tr>
   <tr><td><code>starts_with(t)</code> / <code>ends_with(t)</code></td><td><code>t</code> で始まる／終わるかどうか</td></tr>
   <tr><td><code>find(t)</code></td><td><code>t</code> が最初に現れる位置。無ければ <code>-1</code>。空の <code>t</code> は 0</td></tr>
   <tr><td><code>contains(t)</code></td><td><code>t</code> を含むかどうか</td></tr>
@@ -707,6 +708,7 @@ put a[2]</pre>
   比較（<code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>）の直接の被演算子として書くと、どこかの段で範囲外なら比較全体が <code>false</code>（<code>!=</code> でも <code>false</code>）になり、全段範囲内なら要素同士の通常の比較になります。
   対象と各添え字はちょうど1回だけ評価され、範囲チェックは浅い段から順に短絡します。対象にできるのは配列と <code>str</code> だけで、<code>Dict</code> や <code>__getitem__</code> を持つクラスには使えません。
   代入先には使えず、連鎖比較の中でも使えません（どちらもコンパイルエラー）。
+  対象の型が分からない場合（未注釈の引数など）は、範囲チェックを組み立てられないためコンパイルエラーになります（型注釈で型を明示してください）。
   添字に <code>Pos2</code> / <code>Pos3</code> を渡すこともでき、座標添字と同じ展開を安全化したものになります。要素が <code>str</code> の配列では末尾の文字列も1段と数え、安全形では文字列の長さも範囲チェックに含めます。文字列の段の要素は通常の <code>s[i]</code> と同じです（<code>__getitem__</code> の戻り型に従います）。
 </p>
 
