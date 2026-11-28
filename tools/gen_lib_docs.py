@@ -44,8 +44,63 @@ def esc(s):
 
 
 def plain(s):
-    """HTML 断片からタグを落として検索用の素テキストにする。"""
-    return re.sub(r"<[^>]+>", "", s)
+    """HTML 断片からタグを落とし、エンティティを復号して検索用の素テキストにする。"""
+    return html.unescape(re.sub(r"<[^>]+>", "", s))
+
+
+# ---------------------------------------------------------------- データ検証
+
+NAME_RE = re.compile(r"^[a-z0-9_]+$")
+BLOCK_KINDS = {"h2", "h3", "p", "note", "ul", "table", "methods", "example"}
+
+
+def validate_data():
+    """データの形を生成前にまとめて検証する。
+
+    ここで落ちる誤り（slug の重複・不正な文字、存在しない group や
+    related、メソッドアンカーの重複など）を放置すると、目次から
+    黙って消えるページや、途中まで書かれた生成物が残るため、
+    検証と生成の前に必ず通す。
+    """
+    errors = []
+    slugs = set()
+    for page in PAGES:
+        slug = page.get("slug", "")
+        if not NAME_RE.match(slug):
+            errors.append(f"slug が不正です: {slug!r}")
+        if slug in slugs:
+            errors.append(f"slug が重複しています: {slug}")
+        slugs.add(slug)
+        if page.get("group") not in GROUPS:
+            errors.append(f"[{slug}] group が GROUPS にありません: {page.get('group')!r}")
+        for key in ("name", "kind", "summary"):
+            if not page.get(key):
+                errors.append(f"[{slug}] {key} が空です")
+        anchors = set()
+        for block in page.get("sections", []):
+            if block[0] not in BLOCK_KINDS:
+                errors.append(f"[{slug}] 未知のブロック種別: {block[0]!r}")
+                continue
+            if block[0] == "methods":
+                for entry in block[1]:
+                    if len(entry) >= 3:
+                        if not NAME_RE.match(entry[2]):
+                            errors.append(f"[{slug}] メソッドアンカーが不正です: {entry[2]!r}")
+                        if entry[2] in anchors:
+                            errors.append(f"[{slug}] メソッドアンカーが重複しています: {entry[2]}")
+                        anchors.add(entry[2])
+            if block[0] == "example":
+                ex = block[1]
+                if "code" not in ex or "stdout" not in ex:
+                    errors.append(f"[{slug}] 例に code / stdout がありません: {ex.get('title')!r}")
+        for label, href in page.get("sugar", []):
+            if not href.startswith("../"):
+                errors.append(f"[{slug}] sugar の href は ../ 始まりにしてください: {href!r}")
+    for page in PAGES:
+        for rel in page.get("related", []):
+            if rel not in slugs:
+                errors.append(f"[{page['slug']}] related の参照先がありません: {rel}")
+    return errors
 
 
 # ---------------------------------------------------------------- 例の検証
@@ -83,9 +138,10 @@ def run_example(spell, funcs, ex):
         if r.stdout != ex["stdout"]:
             return False, (f"標準出力が一致しません\n"
                            f"  期待: {ex['stdout']!r}\n  実際: {r.stdout!r}")
-        if "stderr" in ex and r.stderr != ex["stderr"]:
+        want_err = ex.get("stderr", "")
+        if r.stderr != want_err:
             return False, (f"標準エラーが一致しません\n"
-                           f"  期待: {ex['stderr']!r}\n  実際: {r.stderr!r}")
+                           f"  期待: {want_err!r}\n  実際: {r.stderr!r}")
         return True, ""
 
 
@@ -175,6 +231,11 @@ def sidebar(current_slug):
     return "\n".join(parts)
 
 
+def disp(s):
+    """表示用に末尾の改行を1つだけ落とす（検証は元の文字列で完全一致を見る）。"""
+    return s[:-1] if s.endswith("\n") else s
+
+
 def render_example(ex):
     out = ['<figure class="code">']
     out.append(f'  <figcaption>例 — {esc(ex["title"])}</figcaption>')
@@ -183,7 +244,7 @@ def render_example(ex):
     if "stdin" in ex:
         out.append('<figure class="out">')
         out.append('  <figcaption>入力</figcaption>')
-        out.append(f'<pre>{esc(ex["stdin"].rstrip())}</pre>')
+        out.append(f'<pre>{esc(disp(ex["stdin"]))}</pre>')
         out.append('</figure>')
     if ex.get("argv"):
         out.append('<figure class="out">')
@@ -192,12 +253,12 @@ def render_example(ex):
         out.append('</figure>')
     out.append('<figure class="out">')
     out.append('  <figcaption>出力</figcaption>')
-    out.append(f'<pre>{esc(ex["stdout"].rstrip())}</pre>')
+    out.append(f'<pre>{esc(disp(ex["stdout"]))}</pre>')
     out.append('</figure>')
     if "stderr" in ex:
         out.append('<figure class="out">')
         out.append('  <figcaption>標準エラー出力</figcaption>')
-        out.append(f'<pre>{esc(ex["stderr"].rstrip())}</pre>')
+        out.append(f'<pre>{esc(disp(ex["stderr"]))}</pre>')
         out.append('</figure>')
     if ex.get("exit"):
         out.append(f'<p class="note">終了コードは {ex["exit"]} です。</p>')
@@ -355,11 +416,14 @@ def check_links():
     files = sorted(docs.rglob("*.html"))
     ids = {}
     for f in files:
-        ids[f.resolve()] = set(re.findall(r'id="([^"]+)"', f.read_text(encoding="utf-8")))
+        ids[f.resolve()] = set(
+            re.findall(r"""id=["']([^"']+)["']""", f.read_text(encoding="utf-8")))
     broken = []
     for f in files:
         text = f.read_text(encoding="utf-8")
-        for href in re.findall(r'href="([^"]+)"', text):
+        refs = re.findall(r"""href=["']([^"']+)["']""", text)
+        refs += re.findall(r"""src=["']([^"']+)["']""", text)
+        for href in refs:
             if href.startswith(("http://", "https://", "mailto:")):
                 continue
             target, _, frag = href.partition("#")
@@ -382,6 +446,14 @@ def main():
             return 1
         print("リンク検査: 切れはありません")
         return 0
+
+    errors = validate_data()
+    if errors:
+        print("データ検証に失敗しました:")
+        print("\n".join("  " + e for e in errors))
+        print("生成は中止しました。")
+        return 1
+    print("データ検証: 通過")
 
     total, failures = verify_examples()
     if failures:
