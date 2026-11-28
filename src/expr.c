@@ -2,6 +2,8 @@
 #include "parse_internal.h"
 
 static Node* array_literal();
+static bool ctor_typeargs_ahead(Token* ident);
+static void expect_type_end();
 
 // 「(引数, ...)」の中身を読む。開き括弧は消費済み。引数なしなら NULL
 static bool suppress_multi = false;
@@ -191,6 +193,26 @@ static Node* primary() {
         // 変数に収まった関数値の呼び出しは、名前呼び出しではなく値経由にする。
         // `(` は後置ループ側で ND_VCALL として消費する
         node = create_ident_node(ident_token);
+    } else if (ident_token && ctor_typeargs_ahead(ident_token)) {
+        // 構築時の明示的な型引数（step 76）: `名前<型, ...>(引数...)`。
+        // 型引数は構築呼び出し専用で、呼び出しなしの形は作らない。
+        // 型引数の読み取りは型注釈と同じ parse_type を使うため、入れ子
+        // （Vec<Vec<int>>）の `>>` 分割もそちらに任せられる
+        node = create_node(ND_FUNCALL);
+        node->name = ident_token->str;
+        node->len = ident_token->len;
+        node->tok = ident_token;
+        consume("<");
+        do {
+            Type* ta = parse_type();
+            if (node->ctor_targ_count < MAX_TPARAMS) {
+                node->ctor_targs[node->ctor_targ_count] = ta;
+            }
+            node->ctor_targ_count++;
+        } while (consume(","));
+        expect_type_end();
+        expect("(");
+        node->args = parse_args();
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
         node->name = ident_token->str;
@@ -507,6 +529,46 @@ static Node* range() {
 static bool sym_is(Token* t, const char* symbol) {
     int len = (int)strlen(symbol);
     return t && t->kind == TK_SYMBOL && t->len == len && !memcmp(symbol, t->str, t->len);
+}
+
+// 構築時の明示的な型引数 `名前<型, ...>(` が続くかの先読み（step 76）。
+// トークン列だけを見て判定し、消費はしない。対象はクラス名だけで、
+// 変数に隠れている名前は値として扱う（比較式 `a < b > (c)` の形を
+// 壊さないため）。角括弧の対応だけを数え、`>>` / `>>>` は複数の
+// 閉じ括弧として数える。中身が型の形かどうかは、確定後に parse_type
+// が検証する
+static bool ctor_typeargs_ahead(Token* ident) {
+    if (!find_class(ident->str, ident->len)) {
+        return false;
+    }
+    if (ident_is_value_call(ident)) {
+        return false;
+    }
+    Token* t = token;
+    if (!sym_is(t, "<")) {
+        return false;
+    }
+    int depth = 1;
+    for (t = t->next; t && t->kind != TK_EOF; t = t->next) {
+        if (sym_is(t, "<")) {
+            depth++;
+        } else if (sym_is(t, ">")) {
+            depth--;
+        } else if (sym_is(t, ">>")) {
+            depth -= 2;
+        } else if (sym_is(t, ">>>")) {
+            depth -= 3;
+        } else {
+            continue;
+        }
+        if (depth == 0) {
+            return sym_is(t->next, "(");
+        }
+        if (depth < 0) {
+            return false;
+        }
+    }
+    return false;
 }
 
 // 型の名前としてあり得るか（注釈かどうかの見分け専用。意味の検証は
