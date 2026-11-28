@@ -722,9 +722,19 @@ static Type* check_binop_rest(Node* node, Type* lt, Type* rt) {
             || ot->kind == TY_UNKNOWN || ot->kind == TY_VAR;
         if (partner_ok) {
             if (node->op.binop == OP_ADD) {
-                return ot->kind == TY_ADDR ? &ty_unknown : at;
+                if (ot->kind == TY_ADDR) {
+                    // アドレス同士の加算は意味を持たない。型不明として
+                    // 通すと `*` の検査を迂回できるため、ここで止める
+                    error_node(node, "`%s`型と`%s`型の値に演算子`%s`は使えません", type_text(lt), type_text(rt), op_text(node->op.binop));
+                    return &ty_unknown;
+                }
+                return at;
             }
             if (node->op.binop == OP_SUB) {
+                if (lt->kind != TY_ADDR) {
+                    // int − アドレスはアドレスではない（生の int の計算）
+                    return &ty_int;
+                }
                 return ot->kind == TY_ADDR ? &ty_int : at;
             }
             if (node->op.binop == OP_EQ || node->op.binop == OP_NE

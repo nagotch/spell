@@ -159,6 +159,9 @@ tests=(
     "g = 7; def get() { return &g; } def main() { p = get(); *p = 42; return g; }|42"
     "def main() { a = [1, 2, 3]; if (&a[0] < &a[1] && &a[0] == &a[0]) { return 42; } return 0; }|42"
     "class Pt { x: int; def __init__(self, x: int) { self.x = x; } } def main() { pt = Pt(1); p = &pt.x; *p = 42; return pt.x; }|42"
+    # step 97: `>` / `>=` はパース時に `<` / `<=` へ正規化されるため、
+    # アドレスの比較もそのまま効く
+    "def main() { a = [1, 2, 3]; if (&a[1] > &a[0] && &a[2] >= &a[1]) { return 42; } return 0; }|42"
 )
 
 error_tests=(
@@ -481,6 +484,10 @@ def main():
     # step 97: `&` の対象が左辺値でない式は位置つきエラー
     # （以前は codegen の内部エラーになっていた）
     "def main() { x = &(1 + 2); return 0; }|\`&\`の対象は変数・要素・フィールドでなければなりません"
+    # step 97: アドレス同士の加算はエラー（型不明として通すと `*` の
+    # 検査を迂回できてしまう）。int − アドレスはアドレスにならない
+    "def main() { x = 1; y = 2; z = &x + &y; return 0; }|\`&int\`型と\`&int\`型の値に演算子\`+\`は使えません"
+    "def main() { x = 1; p = &x; return *(3 - p); }|\`*\`にはアドレスが必要ですが、\`int\`が指定されています"
 )
 
 cc -c -o funcs.o funcs.c
