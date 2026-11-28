@@ -188,6 +188,12 @@ def t129() { a = [10, 20, 30]; a[-3] = 1; a[6] = 2; a[-4] = 3; a[7] = 4; return 
 def t130() { a = [10, 20, 30]; i = 0 - 3; r = a[i]; i = 6; r = r * 100 + a[i]; i = 0 - 4; r = r * 100 + a[i]; i = 7; r = r * 100 + a[i]; return r; }
 def t131() { s = "abc"; r = 0; if (s[-3] == "a") { r = r + 1; } if (s[6] == "a") { r = r + 2; } if (s[-4] == "c") { r = r + 4; } if (s[7] == "b") { r = r + 8; } return r; }
 def t132() { a = [10, 20, 30]; return a[5] * 100 + a[-2]; }
+def t133() { r = 0; if ("hello world".replace("o", "0") == "hell0 w0rld") { r = r + 1; } if ("aaa".replace("a", "bb") == "bbbbbb") { r = r + 2; } if ("abc".replace("z", "!") == "abc") { r = r + 4; } if ("hello".replace("hello", "bye") == "bye") { r = r + 8; } if ("a-b-c".replace("-", "") == "abc") { r = r + 16; } if ("aaa".replace("aa", "b") == "ba") { r = r + 32; } return r; }
+def t134() { r = 0; if ("abc".replace("", "-") == "-a-b-c-") { r = r + 1; } if ("".replace("", "-") == "-") { r = r + 2; } if ("".replace("a", "b") == "") { r = r + 4; } if ("ab".replace("", "") == "ab") { r = r + 8; } if ("hello".replace("l", "") == "heo") { r = r + 16; } return r; }
+def t135() { return "aXbXc".count("X") * 10000 + "aaaa".count("aa") * 1000 + "abc".count("") * 100 + "".count("") * 10 + "abc".count("z") + "aaa".count("aa"); }
+def t136() { r = 0; if ("  hi  ".strip() == "hi") { r = r + 1; } if (("\t\n hi " + chr(13) + "\n").strip() == "hi") { r = r + 2; } if ("   ".strip() == "") { r = r + 4; } if ("".strip() == "") { r = r + 8; } if ("hi".strip() == "hi") { r = r + 16; } if (" a b ".strip() == "a b") { r = r + 32; } return r; }
+def t137() { r = 0; if ("aBc9z".upper() == "ABC9Z") { r = r + 1; } if ("AbC9Z".lower() == "abc9z") { r = r + 2; } if ("".upper() == "" && "".lower() == "") { r = r + 4; } if ("hello".upper().lower() == "hello") { r = r + 8; } if ("!? ".upper() == "!? " && "!? ".lower() == "!? ") { r = r + 16; } return r; }
+def t138() { r = 0; if (chr(65) == "A") { r = r + 1; } if (chr(97) + chr(98) == "ab") { r = r + 2; } if (chr(10) == "\n") { r = r + 4; } if (chr("A".chars[0]) == "A") { r = r + 8; } if (chr(48 + 5) == "5") { r = r + 16; } return r; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -334,6 +340,12 @@ def main() {
     mark(130); fails=fails+check(t130(), 10103020);
     mark(131); fails=fails+check(t131(), 15);
     mark(132); fails=fails+check(t132(), 3020);
+    mark(133); fails=fails+check(t133(), 63);
+    mark(134); fails=fails+check(t134(), 31);
+    mark(135); fails=fails+check(t135(), 22411);
+    mark(136); fails=fails+check(t136(), 63);
+    mark(137); fails=fails+check(t137(), 31);
+    mark(138); fails=fails+check(t138(), 31);
 
     print_str("done"); putchar(10);
     return fails > 0;
