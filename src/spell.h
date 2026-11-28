@@ -219,6 +219,16 @@ typedef enum {
     // ノードで包み、codegen が __rt_spell_copy_array で構造を複製
     // する。left_child が元の式、type がその式の型（深さの決定に使う）
     ND_COPY,
+    // スカラーの min / max（step 100）。step 92 では `[引数...].min()`
+    // への書き換えだったため呼び出しごとに配列を確保していたが、
+    // 専用ノードにして codegen が一時スロット上で畳み込み、選択を
+    // cmov で行う（割り当てなし）。typecheck の check_minmax が
+    // ND_FUNCALL から書き換える。args が引数の並び（2個以上）、
+    // array_len が引数の個数、offset が一時スロット2枠の先頭
+    // （parse が min / max という名前の呼び出しに投機的に確保）、
+    // val が 1 なら min・0 なら max、type が要素型、func が要素型
+    // （クラス型のとき）の解決済み `__lt__`（ネイティブ経路は NULL）
+    ND_MINMAX,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
