@@ -1250,6 +1250,10 @@ def __count_range(n: int) -> Range {
 
 def read_int() -> int {
     char = getchar();
+    // 先行する空白は読み飛ばす（read_token と揃える。step 87。これが
+    // 無いと、空白が2つ以上続いたり入力の先頭に空白があると 0 を
+    // 返して以降の読みが全部ずれる）
+    while (char == 32 || char == 10 || char == 13 || char == 9) { char = getchar(); }
     ret=0;
     is_negative = 0;
     if (char == 45) {

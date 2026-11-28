@@ -374,6 +374,12 @@ static Node* primary() {
         bool inc = consume("++");
         if (inc || consume("--")) {
             Node* assign_node = create_node(ND_OPASSIGN);
+            // 対象の動的な部分（オブジェクト・添え字）を1回だけ評価
+            // するための一時スロットを2つ確保しておく（step 87。使うか
+            // どうかは typecheck の check_assign が対象の形で決める）
+            register_any();
+            assign_node->offset = locals->offset;
+            register_any();
             assign_node->op.binop = inc ? OP_ADD : OP_SUB;
             assign_node->tok = postfix_tok;
             assign_node->left_child = node;
@@ -1066,6 +1072,12 @@ static Node* assign() {
         node = assign_node;
     } else if (consume("+=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
+        // 対象の動的な部分（オブジェクト・添え字）を1回だけ評価する
+        // ための一時スロットを2つ確保しておく（step 87。使うかどうかは
+        // typecheck の check_assign が対象の形で決める）
+        register_any();
+        assign_node->offset = locals->offset;
+        register_any();
         assign_node->op.binop = OP_ADD;
         assign_node->tok = node->tok;
         assign_node->left_child = node;
@@ -1073,6 +1085,12 @@ static Node* assign() {
         node = assign_node;
     } else if (consume("-=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
+        // 対象の動的な部分（オブジェクト・添え字）を1回だけ評価する
+        // ための一時スロットを2つ確保しておく（step 87。使うかどうかは
+        // typecheck の check_assign が対象の形で決める）
+        register_any();
+        assign_node->offset = locals->offset;
+        register_any();
         assign_node->op.binop = OP_SUB;
         assign_node->tok = node->tok;
         assign_node->left_child = node;
@@ -1080,6 +1098,12 @@ static Node* assign() {
         node = assign_node;
     } else if (consume("*=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
+        // 対象の動的な部分（オブジェクト・添え字）を1回だけ評価する
+        // ための一時スロットを2つ確保しておく（step 87。使うかどうかは
+        // typecheck の check_assign が対象の形で決める）
+        register_any();
+        assign_node->offset = locals->offset;
+        register_any();
         assign_node->op.binop = OP_MUL;
         assign_node->tok = node->tok;
         assign_node->left_child = node;
@@ -1087,6 +1111,12 @@ static Node* assign() {
         node = assign_node;
     } else if (consume("/=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
+        // 対象の動的な部分（オブジェクト・添え字）を1回だけ評価する
+        // ための一時スロットを2つ確保しておく（step 87。使うかどうかは
+        // typecheck の check_assign が対象の形で決める）
+        register_any();
+        assign_node->offset = locals->offset;
+        register_any();
         assign_node->op.binop = OP_DIV;
         assign_node->tok = node->tok;
         assign_node->left_child = node;
@@ -1094,6 +1124,12 @@ static Node* assign() {
         node = assign_node;
     } else if (consume("%=")) {
         Node* assign_node = create_node(ND_OPASSIGN);
+        // 対象の動的な部分（オブジェクト・添え字）を1回だけ評価する
+        // ための一時スロットを2つ確保しておく（step 87。使うかどうかは
+        // typecheck の check_assign が対象の形で決める）
+        register_any();
+        assign_node->offset = locals->offset;
+        register_any();
         assign_node->op.binop = OP_MOD;
         assign_node->tok = node->tok;
         assign_node->left_child = node;

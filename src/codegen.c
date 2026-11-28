@@ -271,39 +271,43 @@ static void gen_assign(Node* node) {
 }
 
 static void gen_num(Node* node) {
-    printf("  push %ld\n", node->val);
+    if (fits_imm32(node->val)) {
+        printf("  push %ld\n", node->val);
+        return;
+    }
+    // push の即値は符号付き 32 ビットまでしか受け付けない。収まらない
+    // リテラルは rax に載せてから push する（step 87）
+    printf("  mov rax, %ld\n", node->val);
+    printf("  push rax\n");
 }
 
 static void gen_array(Node* node) {
-    if (node->array_len == 0) {
-        // 空のリテラルはヒープに置く。フレーム上に置くと、関数を抜けた
-        // 後まで保持される場合（フィールドへの代入など）に壊れる。
-        // ブロックは [cap][len][要素...]（step 65）。cap は要素0の
-        // 16バイト手前、len は 8バイト手前で、生成時は cap = len
-        int label = new_label();
-        printf("  mov rdi, 16\n");
-        emit_call(label, NULL, 6, "malloc");
-        printf("  mov rcx, 0\n");
-        printf("  mov [rax], rcx\n");
-        printf("  mov [rax+8], rcx\n");
-        printf("  add rax, 16\n");
-        printf("  push rax\n");
-        return;
-    }
-    // 長さと容量（= 長さ）を、要素0から見て -8 と -16 の位置へ書く
-    printf("  mov rax, %d\n", node->array_len);
-    printf("  mov [rbp-%d], rax\n", node->offset + 8 * node->array_len);
-    printf("  mov [rbp-%d], rax\n", node->offset + 8 * (node->array_len + 1));
+    // リテラルは評価のたびに新しいヒープブロックを作る。フレーム上の
+    // 固定スロットに置くと、同じリテラルを再評価したときに前に作って
+    // 保持したはずの配列まで新しい値で化け、関数から返した配列も
+    // 呼び出し側の後続の評価で壊れる（step 52 で空リテラルだけ先に
+    // ヒープ化されていたのを、step 87 で全リテラルに揃えた。step 82 の
+    // fill 複製と同じ「評価ごとに新しい配列」の原則）。
+    // ブロックは [cap][len][要素...]（step 65）。cap は要素0の
+    // 16バイト手前、len は 8バイト手前で、生成時は cap = len
+    int label = new_label();
+    printf("  mov rdi, %d\n", 8 * (node->array_len + 2));
+    emit_call(label, NULL, 6, "malloc");
+    printf("  mov rcx, %d\n", node->array_len);
+    printf("  mov [rax], rcx\n");
+    printf("  mov [rax+8], rcx\n");
+    printf("  add rax, 16\n");
+    // 要素の評価の間、先頭ポインタをスタックに退避しておく
+    printf("  push rax\n");
     Node* tail = node->body;
     for (int i = 0; tail; i++) {
         gen(tail);
         printf("  pop rax\n");
-        printf("  mov [rbp-%d], rax\n", node->offset + 8 * (node->array_len - i - 1));
+        printf("  mov rcx, [rsp]\n");
+        printf("  mov [rcx+%d], rax\n", 8 * i);
         tail = tail->next;
     }
-    printf("  mov rax, rbp\n");
-    printf("  sub rax, %d\n", node->offset + 8 * (node->array_len - 1));
-    printf("  push rax\n");
+    // 退避した先頭ポインタがそのまま結果になる
 }
 
 static void gen_index(Node* node) {
@@ -833,14 +837,8 @@ static bool fits_imm32(long val) {
 }
 
 static void gen_rax_num(Node* node) {
-    if (fits_imm32(node->val)) {
-        printf("  mov rax, %ld\n", node->val);
-        return;
-    }
-    // 即値に収まらないリテラルは従来の push 経路のままにする
-    // （`push` の大きな即値をアセンブラが受け付けない点まで含め、挙動を変えない）
-    gen_num(node);
-    printf("  pop rax\n");
+    // mov の即値は 64 ビットまで載るので、大きさによらず直接出せる
+    printf("  mov rax, %ld\n", node->val);
 }
 
 static void gen_rax_var(Node* node) {
