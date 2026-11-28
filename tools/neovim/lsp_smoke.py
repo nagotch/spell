@@ -460,6 +460,44 @@ if len(diags) == 1:
     check("__bool__ の無いクラス: メッセージに「条件に使えません」",
           "条件に使えません" in diags[0]["message"], diags[0]["message"])
 
+# 5.17 f-string（step 93）: 正常な f-string は診断ゼロ。式の中の
+# 未定義変数は、文字列の中でも元の位置に診断が出る（部分式を実
+# ソースの位置でトークン化するため、列がずれない）
+FSTRING_OK_PROGRAM = (
+    "def main() {\n"
+    "    x = 42;\n"
+    "    s = f\"v={x} and {x + 1}\";\n"
+    "    return 0;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 22},
+                 "contentChanges": [{"text": FSTRING_OK_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（f-string・正常）: 診断ゼロ", diags == [], json.dumps(diags, ensure_ascii=False))
+
+FSTRING_ERR_PROGRAM = (
+    "def main() {\n"
+    "    s = f\"ab{zzz}\";\n"
+    "    return 0;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 23},
+                 "contentChanges": [{"text": FSTRING_ERR_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（f-string・未定義変数）: 診断2件（未定義＋埋め込み不可）",
+      len(diags) == 2, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 2:
+    check("f-string・未定義変数: 1件目に「変数`zzz`は定義されていません」",
+          "変数`zzz`は定義されていません" in diags[0]["message"], diags[0]["message"])
+    r = diags[0]["range"]
+    check("f-string・未定義変数: 範囲は zzz の位置（line=1, char=13-16）",
+          r["start"] == {"line": 1, "character": 13} and r["end"] == {"line": 1, "character": 16},
+          json.dumps(r))
+    check("f-string・未定義変数: 2件目に「f-string に埋め込めません」",
+          "f-string に埋め込めません" in diags[1]["message"], diags[1]["message"])
+
 # 6. didClose: 空の診断が送られて消える
 send({"jsonrpc": "2.0", "method": "textDocument/didClose",
       "params": {"textDocument": {"uri": URI}}})

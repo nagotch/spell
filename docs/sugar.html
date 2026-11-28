@@ -634,6 +634,34 @@ he
 0</pre>
 </figure>
 
+<h3 id="sugar-fstring">f-string <code>f"...{式}..."</code></h3>
+<table>
+  <tr><th>記号形</th><th>意味</th></tr>
+  <tr><td><code>f"...{式}..."</code></td><td>式の値を文字列化して埋め込んだ文字列</td></tr>
+  <tr><td><code>f'...{式}...'</code></td><td>単一引用符の形（意味は同じ）</td></tr>
+  <tr><td><code>{{</code> / <code>}}</code></td><td>波括弧そのもの（<code>{</code> / <code>}</code>）</td></tr>
+</table>
+<p>
+  正規形は、リテラル部と式部品の文字列連結です。各式部品は <code>print</code> と同じ <code>__str__</code> 変換で文字列化され、<code>str</code> の <code>+</code> でつながります。
+  <code>__str__</code> の無い型の値と、型の分からない値は埋め込めません（コンパイルエラー）。
+  書式指定（<code>{x:03d}</code> の <code>:</code> 以降）と、式の中のブロック（ラムダ本体など）とコメントは未対応で、どれもコンパイルエラーになります。
+  式の中に文字列リテラルや入れ子の f-string を書くことはできます。
+</p>
+
+<figure class="code">
+  <figcaption>例 — f-string</figcaption>
+<pre>x = 42
+s = f"value={x}, next={x + 1}"
+put s
+put f"{{x}} は {x}"</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>value=42, next=43
+{x} は 42</pre>
+</figure>
+
 <h2 id="s05"><span class="no">05</span>文とブロックの糖衣</h2>
 
 <h3>セミコロンの省略</h3>

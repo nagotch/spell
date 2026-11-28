@@ -39,6 +39,10 @@ typedef enum {
     TK_IDENT,
     TK_KEYWORD,
     TK_STR,
+    // f-string リテラル（step 93）。TK_STR と違い、str はソース内の
+    // `f` の位置を指し、len はリテラル全体（`f` と引用符を含む）の
+    // 長さ。内側の分割とデコードはパーサが行う
+    TK_FSTR,
 } TokenKind;
 typedef struct Token Token;
 struct Token {
@@ -189,6 +193,11 @@ typedef enum {
     // `__slice__(lo, hi)` 呼び出しへ書き換えるため、codegen には
     // 残らない
     ND_SLICE,
+    // f-string（step 93）。`f"....{式}...."` をパーサがこの種別で
+    // 運ぶ。args が部品（文字列リテラルのノードと式ノード）の並び。
+    // typecheck が各式部品を print と同じ `__str__` 変換で包み、
+    // str の `+` の連鎖へ書き換えるため、codegen には残らない
+    ND_FSTR,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
@@ -362,6 +371,15 @@ Function* load_program_text(char* text, char* name);
 void spell_prelude_path(char* buf, long size);
 
 Token* tokenize(char* s);
+// f-string のリテラル部分 [start, end) をデコードして malloc した
+// バッファを返す（step 93）。`{{` は `{`、`}}` は `}` になり、
+// バックスラッシュエスケープは通常の文字列と同じ対応表で解釈する。
+// first は f-string の `f` の位置、quote は引用符（エラー表示用）
+char* decode_fstr_literal(char* start, char* end, int* out_len, char* first, char quote);
+// リテラル1つ分（通常の文字列、または `f` の位置から始まる
+// f-string）を読み飛ばし、閉じ引用符の直後を返す（step 93）。
+// 構造検査済みの前提で、字句解析と同じ境界で読み飛ばす
+char* fstr_skip_literal(char* p);
 Function* program();
 Function* ensure_entry_point(Function* prog);
 void desugar(Function* prog);
