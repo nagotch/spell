@@ -247,6 +247,174 @@ static Node* paren_expr(Token* open) {
     return node;
 }
 
+// デコード済みの文字列データから、通常の文字列リテラルと全く同じ
+// ノード（文字コード配列を `str(...)` で包んだ形）を作る。char_array
+// が現在のトークンを読むため、偽の TK_STR トークンを一時的に差し
+// 込む（parse.c の make_input_fill と同じ方式）
+static Node* make_str_literal(char* decoded, int len, Token* tok) {
+    Token* fake = calloc(1, sizeof(Token));
+    fake->kind = TK_STR;
+    fake->str = decoded;
+    fake->len = len;
+    fake->line = tok->line;
+    fake->next = token;
+    token = fake;
+    Node* chars = char_array();
+    chars->tok = tok;
+    Node* node = create_node(ND_FUNCALL);
+    node->name = "str";
+    node->len = 3;
+    node->tok = tok;
+    node->args = chars;
+    return node;
+}
+
+// 式部の中の位置 p がリテラルの開始かどうか。引用符そのものか、
+// 識別子の境界にある `f` + 引用符（入れ子の f-string）なら開始。
+// start は式部の先頭で、そこでは直前が `{` なので常に境界になる。
+// 識別子の途中の `f`（例: `xf"..."` の `f`）は開始ではない
+static bool fstr_at_literal(char* p, char* start) {
+    if (*p == '"' || *p == '\'') {
+        return true;
+    }
+    if (*p == 'f' && (p[1] == '"' || p[1] == '\'')) {
+        if (p == start) {
+            return true;
+        }
+        char c = p[-1];
+        return !(('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_' || ('0' <= c && c <= '9'));
+    }
+    return false;
+}
+
+// f-string の式部 [es, q) を、その場でトークン化して式として読む。
+// q は対応する `}` の位置で、一時的に '\0' を置くことで部分文字列
+// だけを tokenize できる。トークンは実ソースを指すため、式の中の
+// エラー位置は正確になる。この間は文単位のエラー回復を切り、式部
+// のエラーを字句解析エラーと同じ「チェック全体の打ち切り」にす
+// る（longjmp で復元処理が飛ばされても、検査自体が終わるため
+// 大域状態の不整合が残らない）
+static Node* parse_fstr_expr(char* es, char* q, Token* ftok) {
+    // コメントは式部の終端判定（文字列の読み飛ばし）と相性が悪く、
+    // 部分トークン化では行末まで読み飛ばされて式が黙って欠ける
+    // ため、文字列の外にあれば明示的にエラーにする
+    for (char* p = es; p < q;) {
+        if (fstr_at_literal(p, es)) {
+            p = fstr_skip_literal(p);
+            continue;
+        }
+        if (p[0] == '/' && p + 1 < q && (p[1] == '/' || p[1] == '*')) {
+            error_at(p - src, p - src + 2, "f-string の式の中ではコメントは書けません");
+        }
+        p++;
+    }
+    char saved = *q;
+    *q = '\0';
+    Token* saved_token = token;
+    jmp_buf* saved_recover = error_capture_set_recover(NULL);
+    bool saved_anno = suppress_anno;
+    bool saved_multi = suppress_multi;
+    suppress_anno = true;
+    suppress_multi = true;
+    token = tokenize(es);
+    Node* e = expr();
+    suppress_anno = saved_anno;
+    suppress_multi = saved_multi;
+    error_capture_set_recover(saved_recover);
+    Token* after = token;
+    token = saved_token;
+    *q = saved;
+    if (after->kind == TK_SYMBOL && after->len == 1 && after->str[0] == ':') {
+        // 式として読めた後に残る深さ0の `:` は書式指定（スライスや
+        // 型注釈の `:` は式の内側で消費される）
+        error_at(token_start(after), token_end(after), "f-string の書式指定（`:`以降）は未対応です");
+    }
+    if (after->kind != TK_EOF) {
+        error_at(token_start(after), token_end(after), "f-string の式の後に %s は書けません", token_text(after));
+    }
+    if (e->kind == ND_ASSIGN && e->anno) {
+        error_at(token_start(e->tok), token_end(e->tok), "f-string の式に型注釈つき代入は書けません");
+    }
+    (void)ftok;
+    return e;
+}
+
+// f-string リテラル（step 93）。現在のトークンが TK_FSTR の状態で
+// 呼ぶ。生の内側テキストをリテラル部と式部に分割し、リテラル部は
+// 通常の文字列リテラルと同じノードに、全体は ND_FSTR（args が
+// 部品の並び）にする。補間が1つも無ければ、通常の文字列リテラル
+// のノードをそのまま返す
+static Node* parse_fstring(Token* ftok) {
+    char* raw = ftok->str;
+    char quote = raw[1];
+    char* inner = raw + 2;
+    char* inner_end = raw + ftok->len - 1;
+    token = token->next;
+    Node* head = NULL;
+    Node** tail = &head;
+    bool has_expr = false;
+    char* p = inner;
+    char* lit = inner;
+    while (p < inner_end) {
+        if (p[0] == '{' && p + 1 < inner_end && p[1] == '{') {
+            p += 2;
+            continue;
+        }
+        if (p[0] == '}' && p + 1 < inner_end && p[1] == '}') {
+            p += 2;
+            continue;
+        }
+        if (p[0] == '\\') {
+            p += 2;
+            continue;
+        }
+        if (p[0] == '{') {
+            if (p > lit) {
+                int dlen;
+                char* decoded = decode_fstr_literal(lit, p, &dlen, raw, quote);
+                *tail = make_str_literal(decoded, dlen, ftok);
+                tail = &(*tail)->next;
+            }
+            char* es = p + 1;
+            char* q = es;
+            while (true) {
+                if (fstr_at_literal(q, es)) {
+                    q = fstr_skip_literal(q);
+                    continue;
+                }
+                if (*q == '}') {
+                    break;
+                }
+                q++;
+            }
+            *tail = parse_fstr_expr(es, q, ftok);
+            tail = &(*tail)->next;
+            has_expr = true;
+            p = q + 1;
+            lit = p;
+            continue;
+        }
+        p++;
+    }
+    if (inner_end > lit) {
+        int dlen;
+        char* decoded = decode_fstr_literal(lit, inner_end, &dlen, raw, quote);
+        *tail = make_str_literal(decoded, dlen, ftok);
+        tail = &(*tail)->next;
+    }
+    if (!has_expr) {
+        if (!head) {
+            // f"" : 空の文字列リテラル
+            return make_str_literal("", 0, ftok);
+        }
+        return head;
+    }
+    Node* node = create_node(ND_FSTR);
+    node->tok = ftok;
+    node->args = head;
+    return node;
+}
+
 static Node* primary() {
     Node* node;
     if (token->kind == TK_KEYWORD && token->keyword == KW_FN) {
@@ -282,7 +450,9 @@ static Node* primary() {
         return node;
     }
     Token* ident_token = consume_ident();
-    if (token->kind == TK_STR) {
+    if (token->kind == TK_FSTR) {
+        node = parse_fstring(token);
+    } else if (token->kind == TK_STR) {
         Token* str_tok = token;
         Node* arr = char_array();
         node = create_node(ND_FUNCALL);

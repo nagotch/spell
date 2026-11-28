@@ -138,6 +138,29 @@ q"q
 13</pre>
 </figure>
 
+<h3>f-string</h3>
+<p>
+  先頭に <code>f</code> を付けると f-string になります（<code>f"..."</code> と <code>f'...'</code> の両形があり、通常の文字列と同じ <code>str</code> です）。
+  中の <code>{式}</code> が、式の値を文字列化したもので置き換わります。文字列化は <code>print</code> と同じで、<code>__str__</code> の無い型の値と、型の分からない値は埋め込めません（コンパイルエラー）。
+  波括弧そのものを書くときは <code>{{</code> と <code>}}</code> と重ねます。
+  書式指定（<code>{x:03d}</code> のような <code>:</code> 以降）は未対応で、コンパイルエラーになります。
+  式の中に文字列リテラルや入れ子の f-string を書けますが、ブロック（ラムダ本体など）とコメントは書けません。
+</p>
+
+<figure class="code">
+  <figcaption>例 — f-string</figcaption>
+<pre>x = 42
+s = f"value={x}, next={x + 1}"
+put s
+put f"{{x}} は {x}"</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>value=42, next=43
+{x} は 42</pre>
+</figure>
+
 <h3>配列リテラル</h3>
 <table>
   <tr><th>形</th><th>意味</th></tr>

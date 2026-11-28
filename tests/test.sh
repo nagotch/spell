@@ -137,6 +137,17 @@ tests=(
     "def main() { return min(3, 5) * 10 + max(3, 5) + 7; }|42"
     "def min(a: int, b: int) -> int { return a - b; } def main() { return min(45, 3); }|42"
     "def main() { return abs(0 - 42); }|42"
+    # step 93: f-string。埋め込み・連結・後置（添え字・len）が通常の
+    # str と同じに効くこと（出力の照合は io テスト側）
+    "def main() { x = 40; s = f\"{x + 2}\"; if (s == \"42\") { return 42; } return 0; }|42"
+    "def main() { s = f\"a{1}b{2}c\"; if (s.len == 5 && s[4] == \"c\") { return 42; } return 0; }|42"
+    "def main() { s = f\"{{}}\"; if (s == \"{}\") { return 42; } return 0; }|42"
+    "def main() { s = f\"{f\"{7}\"};\"; if (s == \"7;\") { return 42; } return 0; }|42"
+    # step 93: 入れ子の f-string の式部にある波括弧入りの文字列で、
+    # 外側の補間の終端を誤認しないこと
+    "def main() { s = f\"{f'{'}'}'}\"; if (s == \"}\") { return 42; } return 0; }|42"
+    "def main() { s = f\"{f\"{ '}' }\"}\"; if (s == \"}\") { return 42; } return 0; }|42"
+    "def main() { s = f\"\" + f\"x\"; t = 'q'; u = f'{t}'; if (s == \"x\" && u == \"q\") { return 42; } return 0; }|42"
 )
 
 error_tests=(
@@ -423,6 +434,21 @@ def main():
     "def main() { b = min(true, false); return 0; }|クラス\`bool\`に演算子\`<\`は定義されていません"
     # step 92: abs は int 用（prelude 関数なので通常の引数照合が効く）
     "def main() { x = abs(\"a\"); return 0; }|関数\`abs\`の引数には\`int\`が必要ですが"
+    # step 93: f-string の構造エラーは全て位置つきエラー
+    "def main() { s = f\"{}\"; return 0; }|f-string の\`{}\`には式が必要です"
+    "def main() { s = f\"a}b\"; return 0; }|対応する\`{\`がありません"
+    "def main() { x = 1; s = f'{x'; return 0; }|f-string の\`{\`を閉じる\`}\`がありません"
+    "def main() { x = 1; s = f\"{x\"; return 0; }|f-string の\`{\`を閉じる\`}\`がありません"
+    "def main() { s = f\"{fn(x: int) -> int { return x; }(3)}\"; return 0; }|式の中では\`{\`は使えません"
+    "def main() { x = 1; s = f\"{x // y}\"; return 0; }|コメントは書けません"
+    # step 93: 書式指定は未対応。式の後に残る `:` で検出する
+    "def main() { x = 1; s = f\"{x:03d}\"; return 0; }|書式指定（\`:\`以降）は未対応です"
+    "def main() { x = 1; s = f\"{x: int}\"; return 0; }|書式指定（\`:\`以降）は未対応です"
+    # step 93: 式の後に余分なものがあればエラー
+    "def main() { x = 1; y = 2; s = f\"{x y}\"; return 0; }|式の後に"
+    # step 93: 埋め込めるのは print と同じく `__str__` を持つ型だけ
+    "def g(x) { return f\"{x}\"; } def main() { return 0; }|型が分からない値は f-string に埋め込めません"
+    "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { p = P(1); s = f\"{p}\"; return 0; }|型の値は f-string に埋め込めません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -1351,6 +1377,9 @@ one_io_test "def main() { print(2147483648); print(9223372036854775807); print(-
 # step 87: read_int が先行空白（連続・先頭）を読み飛ばす
 one_io_test "def main() { a = read_ints(2); print(a[0]); print(a[1]); return 0; }" "12  34\n" "12\n34\n"
 one_io_test "def main() { print(in); print(in); return 0; }" " 12 34\n" "12\n34\n"
+# step 93: f-string の出力（埋め込み・複数箇所・波括弧エスケープ・
+# 入れ子の文字列と f-string・スライス・配列と bool の文字列化）
+one_io_test "def main() { x = 42; s = \"ab\"; print(f\"v={x}!\"); print(f\"{x + 1} and {s} and {1 < 2}\"); print(f\"{[1, 2, 3]}\"); print(f\"{{x}} {x}\"); print(f\"{ \"in\" }\"); print(f\"{f\"n{x}\"}\"); print(f'{s[0:1]}'); print(f\"\"); print(f\"end\"); return 0; }" "" "v=42!\n43 and ab and true\n1 2 3\n{x} 42\nin\nn42\na\n\nend\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

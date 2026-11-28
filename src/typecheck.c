@@ -542,6 +542,7 @@ static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index
 }
 
 static Type* check_node(Node* node);
+static Type* check_fstr(Node* node);
 static Type* check_funcref(Node* node, Type* expected);
 static Node* make_mcall(Node* receiver, Class* klass, Function* fn, const char* name, int len);
 static Node* boolify(Node* expr, Type* t);
@@ -3620,6 +3621,61 @@ static Type* check_input(Node* node) {
     return check_funcall(node, NULL);
 }
 
+// f-string（step 93）: 各部品を検査し、str でない部品は print と
+// 同じ検証で `__str__` 変換に包む。全体を str の `__add__` の連鎖へ
+// 書き換えて str 型を返す
+static Type* check_fstr(Node* node) {
+    Class* str_class = find_class("str", 3);
+    Type* str_ty = str_class ? str_class->type : &ty_unknown;
+    Node* acc = NULL;
+    for (Node* part = node->args; part;) {
+        Node* next = part->next;
+        part->next = NULL;
+        Type* pt = check_node(part);
+        Node* conv = part;
+        if (!is_str_type(pt)) {
+            if (pt->kind == TY_UNKNOWN) {
+                error_node(part, "型が分からない値は f-string に埋め込めません");
+                return &ty_unknown;
+            }
+            Class* klass = class_of(pt);
+            Function* method = klass ? find_callable_arity(klass, "__str__", 7, 1) : NULL;
+            if (!method) {
+                error_node(part, "`%s`型の値は f-string に埋め込めません", type_text(pt));
+                return &ty_unknown;
+            }
+            if (method->nparams != 1 || (method->return_type && method->return_type->kind != TY_UNKNOWN && !(method->return_type->kind == TY_CLASS && method->return_type->klass == str_class))) {
+                error_node(part, "クラス`%.*s`の`__str__`は引数を取らず、`str`を返す必要があります", klass->len, klass->name);
+                return &ty_unknown;
+            }
+            conv = make_mcall(part, klass, method, "__str__", 7);
+            conv->tok = part->tok;
+        }
+        if (!acc) {
+            acc = conv;
+        } else {
+            Function* add_method = str_class ? find_callable_arity(str_class, "__add__", 7, 2) : NULL;
+            if (!add_method) {
+                error_node(node, "クラス`str`に`__add__`は定義されていません");
+                return &ty_unknown;
+            }
+            Node* bin = create_node(ND_BINOP);
+            bin->op.binop = OP_ADD;
+            bin->tok = node->tok;
+            bin->left_child = acc;
+            bin->right_child = conv;
+            rewrite_to_mcall(bin, str_ty, str_ty, "__add__", 7, add_method);
+            acc = bin;
+        }
+        part = next;
+    }
+    Node* nxt = node->next;
+    *node = *acc;
+    node->next = nxt;
+    node->type = str_ty;
+    return str_ty;
+}
+
 // put 文: 各値を __str__ で文字列化し、空白区切りで出して改行する
 static Type* check_put(Node* node) {
     Node* head = NULL;
@@ -3781,6 +3837,11 @@ static Type* check_node(Node* node) {
             // スライスは境界を正規化した `__slice__` 呼び出しへ
             // 書き換わる（step 85）
             result = check_slice(node, my_expected);
+            break;
+        case ND_FSTR:
+            // f-string は `__str__` 変換と str の `+` の連鎖へ
+            // 書き換わる（step 93）
+            result = check_fstr(node);
             break;
         case ND_SAFEIDX: {
             // 安全添え字の単独形は「全段とも範囲内か」の bool
