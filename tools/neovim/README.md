@@ -24,6 +24,9 @@ cp src/spell-lsp src/prelude.sp ~/.local/bin/
    `vim.filetype.add` の形で `*.sp` を登録します。
 2. サーバー起動: `spell-lsp.lua` の中身を `init.lua` 等へ貼ります。
    `FileType spell` で `vim.lsp.start` により `spell-lsp` が起動します。
+3. インデント: `indent/spell.vim` を自分の `runtimepath` 配下の `indent/` へ
+   コピーします。`:` 形式・`{}` 形式のどちらのブロックでも、開いた行の
+   次行が1段下がり、`}` / `else` / `elif` / `|` の行で1段戻ります。
 
 ## 動作
 
