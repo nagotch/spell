@@ -73,6 +73,38 @@ bool input_target_is_count_form() {
     return !ident_is_bound(token);
 }
 
+// 長さ・個数として書かれた式が、リテラルだけからなる定数形か
+// どうかを判定し、定数形なら値を返す（step 85 の追加決定:
+// 負の長さのリテラルはコンパイルエラーにするための判定）。
+// 整数リテラルと、リテラル同士の + - *（単項マイナスは 0 - x の
+// 形なので二項に含まれる）を畳み込む。畳み込みは実行時の整数
+// 演算と同じラップ（符号なし演算経由）で行うため、定数形の値は
+// 実行時に得られる値と一致する。それ以外（変数・呼び出しなど）
+// は定数形ではない
+bool const_int_value(Node* node, long* out) {
+    if (!node) {
+        return false;
+    }
+    if (node->kind == ND_NUM) {
+        *out = node->val;
+        return true;
+    }
+    if (node->kind == ND_BINOP) {
+        long l;
+        long r;
+        if (!const_int_value(node->left_child, &l) || !const_int_value(node->right_child, &r)) {
+            return false;
+        }
+        switch (node->op.binop) {
+            case OP_ADD: *out = (long)((unsigned long)l + (unsigned long)r); return true;
+            case OP_SUB: *out = (long)((unsigned long)l - (unsigned long)r); return true;
+            case OP_MUL: *out = (long)((unsigned long)l * (unsigned long)r); return true;
+            default: return false;
+        }
+    }
+    return false;
+}
+
 // 個数形の対象 `名前[個数式][個数式]...` を読み、基底名トークンと、
 // 個数式の並び（next で連結）を返す（step 75: n 次元への一般化。
 // 角括弧の並びは全て個数として読む）。角括弧の継続は、空白区切りの
@@ -90,9 +122,16 @@ Node* parse_input_count(Token** name_out) {
         bool saved = suppress_multi;
         suppress_multi = true;
         expr_depth++;
+        Token* count_tok = token;
         cur->next = expr();
         expr_depth--;
         suppress_multi = saved;
+        // 個数がリテラルの負数ならコンパイルエラー（step 85 の
+        // 追加決定）。実行時に決まる負数は展開先で 0 に丸められる
+        long cv;
+        if (const_int_value(cur->next, &cv) && cv < 0) {
+            error_at(token_start(count_tok), token_end(count_tok), "個数に負の数は指定できません");
+        }
         cur = cur->next;
         expect("]");
     } while (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '['
@@ -366,9 +405,18 @@ static Node* primary() {
                     && (expr_depth > 0 || nb == 0 || token->line == token->prev->line)) {
                 consume("[");
                 expr_depth++;
+                // 角括弧の中では `:` はスライスの印なので、型注釈の
+                // 判定は先読み方式にする（条件式と同じ。step 85）
+                bool saved_anno = suppress_anno;
+                suppress_anno = true;
                 cur->next = expr();
+                suppress_anno = saved_anno;
                 expr_depth--;
                 cur = cur->next;
+                if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+                    // 安全添え字の中のスライスは対象外（step 85）
+                    error_at(token_start(token), token_end(token), "安全添え字の中ではスライスは使えません");
+                }
                 expect("]");
                 nb++;
             }
@@ -389,13 +437,58 @@ static Node* primary() {
         }
         if (consume("[")) {
             expr_depth++;
-            Node* right_child = expr();
+            // スライス（step 85）: `[下限:上限]` の形。端は省略でき、
+            // 省略した側は NULL で運ぶ。ステップ（2つ目の `:`）は無い。
+            // 角括弧の中では `:` はスライスの印なので、境界の式を
+            // 読む間は型注釈の判定を先読み方式にする（条件式と同じ）
+            bool saved_anno = suppress_anno;
+            suppress_anno = true;
+            Node* lo = NULL;
+            Node* hi = NULL;
+            bool is_slice = false;
+            if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+                is_slice = true;
+            } else {
+                lo = expr();
+                if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+                    is_slice = true;
+                }
+            }
+            if (is_slice) {
+                consume(":");
+                if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+                    error_at(token_start(token), token_end(token), "スライスにステップは指定できません");
+                }
+                if (!(token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ']')) {
+                    hi = expr();
+                    if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == ':') {
+                        error_at(token_start(token), token_end(token), "スライスにステップは指定できません");
+                    }
+                }
+            }
+            suppress_anno = saved_anno;
             expr_depth--;
             expect("]");
+            if (is_slice) {
+                Node* snode = create_node(ND_SLICE);
+                snode->tok = postfix_tok;
+                snode->left_child = node;
+                snode->right_child = lo;
+                snode->args = hi;
+                // 一時スロット: 対象・正規化前の下限・上限の退避先
+                // の3枠（使うかどうかは型検査が決める。Pos 添字の
+                // 一時置き場と同じ方式）
+                register_any();
+                snode->offset = locals->offset;
+                register_any();
+                register_any();
+                node = snode;
+                continue;
+            }
             Node* new_node = create_node(ND_INDEX);
             new_node->tok = postfix_tok;
             new_node->left_child = node;
-            new_node->right_child = right_child;
+            new_node->right_child = lo;
             // Pos 添字の糖衣（step 77）で使う一時置き場。添字の型は
             // パース時点では分からないため、全ての添字式に1枠ずつ
             // 確保しておき、使うかどうかは型検査が決める（複数代入の
@@ -1030,7 +1123,14 @@ static Node* array_literal() {
     suppress_multi = true;
     Node* first_expr = expr();
     if (consume(";")) {
+        Token* len_tok = token;
         Node* len_expr = expr();
+        // 長さがリテラルの負数ならコンパイルエラー（step 85 の
+        // 追加決定）。実行時に決まる負数は 0 に丸められる（step 82）
+        long lv;
+        if (const_int_value(len_expr, &lv) && lv < 0) {
+            error_at(token_start(len_tok), token_end(len_tok), "長さに負の数は指定できません");
+        }
         node = create_node(ND_NEWARRAY);
         node->left_child = first_expr;
         node->right_child = len_expr;

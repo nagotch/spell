@@ -74,6 +74,15 @@ tests=(
     "cnt = 0; def idx() -> int { cnt = cnt + 1; return 5; } def main() { a = [1, 2]; r = 0; if (a?[idx()] == 1) { r = 1; } return cnt * 10 + r; }|10"
     "def main() { a = [10, 20]; if (a?[1] > 15 && a?[1] >= 20) { return 42; } return 0; }|42"
     "def main() { a = [10, 20]; if (a?[5] > 1) { return 1; } if (a?[5] >= 0) { return 1; } return 42; }|42"
+    # step 85: スライス。対象と境界は1回だけ評価される
+    "cnt = 0; def lo() -> int { cnt = cnt + 1; return 1; } def hi() -> int { cnt = cnt + 10; return 4; } def tgt() -> str { cnt = cnt + 100; return \"abcdef\"; } def main() { s = tgt()[lo():hi()]; if (s == \"bcd\") { return cnt; } return 0; }|111"
+    # step 85: 入れ子ループの中のスライス（step 82 の教訓の回帰）
+    "def main() { n = 0; i = 0; while (i < 3) { j = 0; while (j < 3) { n = n + \"abcdef\"[i:j + 3].len; j = j + 1; } i = i + 1; } return n; }|27"
+    # step 85: 注釈つき引数へのスライスと、期待型で対象の型を採る形
+    "def f(s: str) -> str { return s[1:3]; } def main() { if (f(\"hello\") == \"el\") { return 42; } return 0; }|42"
+    "def f(a) -> int { r: [int] = a[1:3]; return r.len; } def main() { return f([10, 20, 30, 40]) + 40; }|42"
+    # step 85: スライスの評価順は対象→下限→上限（Luna レビューの回帰）
+    "log = \"\"; def tgt() -> str { log = log + \"T\"; return \"abcdef\"; } def lo2() -> int { log = log + \"L\"; return 1; } def hi2() -> int { log = log + \"H\"; return 4; } def main() { s = tgt()[lo2():hi2()]; if (log == \"TLH\" && s == \"bcd\") { return 42; } return 0; }|42"
 )
 
 error_tests=(
@@ -256,6 +265,32 @@ def main():
     "def main() { a = [1, 2]; @a ? print(1); return 0; }|for のヘッダの直後に\`?\`は書けません"
     # step 81: 安全添え字の反復は bool を回すことになり型エラー
     "def main() { a = [1, 2]; x@a?[0] { print(x); } return 0; }|型の値は反復できません"
+    # step 85: スライスは読み取り専用（代入・複合代入・複数代入）
+    "def main() { s = \"abc\"; s[0:2] = \"x\"; return 0; }|スライスには代入できません"
+    "def main() { a = [1, 2, 3]; a[0:2] += [9]; return 0; }|スライスには代入できません"
+    "def main() { a = [1, 2, 3]; a[0:2], x = [9], 5; return 0; }|スライスには代入できません"
+    # step 85: 安全添え字の中ではスライスは使えない
+    "def main() { a = [1, 2, 3]; if (a?[0:2]) { return 1; } return 0; }|安全添え字の中ではスライスは使えません"
+    # step 85: スライスにステップは無い
+    "def main() { a = [1, 2, 3]; b = a[0:2:1]; return 0; }|スライスにステップは指定できません"
+    # step 85: スライスの対象は配列と文字列だけ
+    "def main() { x = 5; y = x[0:1]; return 0; }|スライスは配列と文字列にだけ使えます"
+    # step 85: 対象の型が分からない場合はエラー（注釈で明示する）
+    "def f(s) { return s[0:2]; } def main() { print(f(\"abc\")); return 0; }|スライスの対象の型が分かりません"
+    # step 85: 境界は int でなければならない
+    "def main() { s = \"abc\"; t = s[\"a\":2]; return 0; }|スライスの境界には\`int\`が必要です"
+    # step 85: スライスの戻り型は要素型で具体化される（Luna レビューの回帰）
+    "def main() { a = [1, 2, 3]; b: [str] = a[0:2]; return 0; }|変数\`b\`の型は\`\\[str\\]\`ですが、\`\\[int\\]\`が代入されています"
+    # step 85（追加決定）: 長さがリテラルの負数ならコンパイルエラー。
+    # 定数式（0 - 2 の形）も含む。変数経由の負数は実行時に 0 に
+    # 丸められる（t107 が固定）
+    "def main() { a = [5; -2]; return 0; }|長さに負の数は指定できません"
+    "def main() { a = [5; 0 - 2]; return 0; }|長さに負の数は指定できません"
+    "def main() { a = [5; 9223372036854775807 + 1]; return 0; }|長さに負の数は指定できません"
+    # step 85（追加決定）: 個数形の個数がリテラルの負数でもエラー
+    "def main() { >> a[-2]; return 0; }|個数に負の数は指定できません"
+    "def main() { >> a[2][-1]; return 0; }|個数に負の数は指定できません"
+    "def main() { >>> s[-1]; return 0; }|個数に負の数は指定できません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -1164,6 +1199,8 @@ while si < 2:
             n = n + 1
 print(n)
 " "" "4\n"
+# step 85: スライスと文字列メソッド第1弾の出力
+one_io_test "def main() { s = \"hello world\"; print(s[0:5]); print(s[6:]); print(s[-5:]); print(s[3:2].len); a = [10, 20, 30, 40]; print(a[1:3]); print(a[-2:]); print(s.find(\"o\")); print(s.find(\"zz\")); print(\"a,b,,c\".split(\",\")); print(\"-\".join([\"a\", \"b\", \"c\"])); print(\"  -42abc\".to_int()); print(\"x\".starts_with(\"\")); print(\"x\".ends_with(\"y\")); return 0; }" "" "hello\nworld\nworld\n0\n20 30\n30 40\n4\n-1\na b  c\na-b-c\n-42\ntrue\nfalse\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

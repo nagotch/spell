@@ -155,7 +155,7 @@ arb</pre>
   <tr><td>代入</td><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code></td><td>代入は式で、値は代入した値。<code>a = b = 3</code> とつなげられる。複数代入 <code>a, b = b, a</code> も可</td></tr>
   <tr><td>増減</td><td><code>++</code> <code>--</code></td><td>後置のみ。<code>x++</code> は <code>x += 1</code> と同じで、式の値は代入後の値</td></tr>
   <tr><td>範囲</td><td><code>..</code> <code>..=</code></td><td><code>a..b</code> は半開、<code>a..=b</code> は終端を含む。降順も可（<a href="#s10">§10</a>）</td></tr>
-  <tr><td>添字・メンバ</td><td><code>a[i]</code> <code>a?[i]</code> <code>a.x</code> <code>a.m()</code></td><td>添字は <code>__getitem__</code> / <code>__setitem__</code> へ展開。<code>a?[i]</code> は範囲チェックつきの安全添え字（配列の節を参照）。0引数メソッドは括弧を省略できる</td></tr>
+  <tr><td>添字・メンバ</td><td><code>a[i]</code> <code>a?[i]</code> <code>a[i:j]</code> <code>a.x</code> <code>a.m()</code></td><td>添字は <code>__getitem__</code> / <code>__setitem__</code> へ展開。<code>a?[i]</code> は範囲チェックつきの安全添え字、<code>a[i:j]</code> は部分を取り出すスライス（どちらも配列の節を参照）。0引数メソッドは括弧を省略できる</td></tr>
   <tr><td>矢印</td><td><code>&lt;-</code> <code>-&gt;</code></td><td>型で解決される（下記）。連鎖はエラー</td></tr>
   <tr><td>関数値</td><td><code>x -&gt; 式</code>、<code>fn(...) { }</code></td><td>矢印形は式1つの無名関数。<code>fn</code> 形は本体がブロック（<a href="#s06">§06</a>）</td></tr>
 </table>
@@ -567,6 +567,13 @@ a 7
   <tr><td><code>len</code></td><td>文字数（バイト数ではなく文字コードの個数）</td></tr>
   <tr><td><code>s[i]</code>（<code>__getitem__</code>）</td><td>i 番目の文字だけからなる長さ1の <code>str</code> を返す。文字コード（<code>int</code>）は <code>s.chars[i]</code> で取る。添字への代入はできない（<code>__setitem__</code> は無い）</td></tr>
   <tr><td><code>s?[i]</code></td><td>安全添え字（配列の節を参照）。要素は通常の <code>s[i]</code> と同じ</td></tr>
+  <tr><td><code>s[i:j]</code>（スライス）</td><td>i 以上 j 未満の部分文字列（新しい <code>str</code>）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める（配列の節のスライスを参照）</td></tr>
+  <tr><td><code>starts_with(t)</code> / <code>ends_with(t)</code></td><td><code>t</code> で始まる／終わるかどうか</td></tr>
+  <tr><td><code>find(t)</code></td><td><code>t</code> が最初に現れる位置。無ければ <code>-1</code>。空の <code>t</code> は 0</td></tr>
+  <tr><td><code>contains(t)</code></td><td><code>t</code> を含むかどうか</td></tr>
+  <tr><td><code>split(sep)</code></td><td><code>sep</code> で分割した <code>[str]</code>。区切りが連続・端にある場合は空文字列が含まれる。<code>sep</code> が空文字列の場合は分割せず、自分だけからなる配列を返す</td></tr>
+  <tr><td><code>join(a)</code></td><td>自分の文字列を区切りにして <code>[str]</code> の要素をつないだ文字列</td></tr>
+  <tr><td><code>to_int()</code></td><td>atoi 式の変換。先頭の空白と符号を読み、数字が続く間だけ読む。数字以外で止まり、数字が無ければ 0</td></tr>
   <tr><td><code>__add__</code></td><td>連結</td></tr>
   <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較</td></tr>
   <tr><td><code>__lt__</code> / <code>__le__</code></td><td>辞書順（文字コードの列としての大小）。共通部分が等しければ短い方が小さい</td></tr>
@@ -599,12 +606,32 @@ A..A
 cba</pre>
 </figure>
 
+<figure class="code">
+  <figcaption>例 — 文字列メソッド</figcaption>
+<pre>s = "hello world"
+put s.starts_with("hello"), s.ends_with("world")
+put s.find("o"), s.find("zz")
+put "a,b,,c".split(",")
+put "-".join(["a", "b", "c"])
+put "  -42abc".to_int()</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>true true
+4 -1
+a b  c
+a-b-c
+-42</pre>
+</figure>
+
 <h3>配列 <code>[T]</code></h3>
 <table>
   <tr><th>操作</th><th>内容</th></tr>
   <tr><td><code>len</code></td><td>要素数</td></tr>
   <tr><td><code>a[i]</code></td><td>要素の読み書き。範囲外（負数を含む）は検査されず、結果は不定</td></tr>
   <tr><td><code>a?[i][j]...</code></td><td>安全添え字（下記）。全段の範囲を検査する読み取り専用の形</td></tr>
+  <tr><td><code>a[i:j]</code>（スライス）</td><td>i 以上 j 未満の部分配列（要素をコピーした新しい配列）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める（下記）</td></tr>
   <tr><td><code>__add__</code></td><td>連結した新しい配列</td></tr>
   <tr><td><code>__mul__</code></td><td><code>a * n</code> で n 回繰り返した新しい配列</td></tr>
   <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較。<code>&lt;</code> 系の順序比較はない（エラーになる）</td></tr>
@@ -651,6 +678,33 @@ put a?[5] != 20</pre>
 false
 true
 false</pre>
+</figure>
+<p>
+  <strong>スライス</strong> <code>x[i:j]</code> は、配列と <code>str</code> の部分を取り出す読み取り専用の形です（糖衣集にも記載）。
+  i 以上 j 未満の部分を、要素をコピーした新しい配列／新しい文字列として返し、元の値は変わりません。
+  端は省略でき（<code>x[i:]</code>、<code>x[:j]</code>、<code>x[:]</code>）、負の添え字は末尾から数え、範囲外の境界は端に丸められます。
+  j が i 未満なら空になります。ステップ（<code>x[i:j:k]</code>）は無く、代入先にも使えません（どちらもコンパイルエラー）。
+  安全添え字の中では使えません。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>a = [10, 20, 30, 40]
+put a[1:3]
+put a[-2:]
+s = "hello"
+put s[1:3]
+put s[:2]
+put s[3:2].len</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>20 30
+30 40
+el
+he
+0</pre>
 </figure>
 
 <figure class="code">

@@ -162,7 +162,17 @@ def t103() { a = [[[1; 2]; 3]; 4]; a[2][1][0] = 9; return a[2][1][0] * 10 + a[0]
 def t104() { a = [[1, 2]; 3]; a[1][0] = 9; return a[0][0] + a[1][0] + a[2][0]; }
 def t105() { a = [[]; 3]; a[0].append(5); return a[0].len * 10 + a[1].len; }
 def t106() { row = [-1; 2]; a = [row; 2]; a[1][0] = 7; return a[0][0]; }
-def t107() { a = [[1; 2]; 0 - 1]; b = [5; 0 - 2]; return a.len + b.len; }
+def t107() { n = 0 - 1; a = [[1; 2]; n]; m = 0 - 2; b = [5; m]; return a.len + b.len; }
+def t108() { s = "hello world"; r = 0; if (s[0:5] == "hello") { r = r + 1; } if (s[6:11] == "world") { r = r + 2; } if (s[0:5].len == 5) { r = r + 4; } return r; }
+def t109() { a = [10, 20, 30, 40, 50]; b = a[1:3]; r = b[0] * 100 + b[1]; b[0] = 99; return r * 1000 + a[1]; }
+def t110() { s = "abcdef"; r = 0; if (s[:] == s) { r = r + 1; } if (s[2:] == "cdef") { r = r + 2; } if (s[:2] == "ab") { r = r + 4; } if (s[-2:] == "ef") { r = r + 8; } if (s[:-2] == "abcd") { r = r + 16; } if (s[3:2] == "") { r = r + 32; } if (s[0:100] == s) { r = r + 64; } if (s[-100:2] == "ab") { r = r + 128; } return r; }
+def t111() { a = [1, 2, 3, 4]; r = 0; if (a[1:100].len == 3) { r = r + 1; } if (a[-100:2] == [1, 2]) { r = r + 2; } if (a[2:2].len == 0) { r = r + 4; } if (a[3:1].len == 0) { r = r + 8; } b = a[:]; b[0] = 9; if (a[0] == 1) { r = r + 16; } return r; }
+def t112() { s = "hello"; r = 0; if (s.starts_with("he")) { r = r + 1; } if (s.starts_with("")) { r = r + 2; } if (!s.starts_with("lo")) { r = r + 4; } if (!s.starts_with("hello!")) { r = r + 8; } if (s.ends_with("lo")) { r = r + 16; } if (s.ends_with("")) { r = r + 32; } if (!s.ends_with("he")) { r = r + 64; } if (!s.ends_with("xhello")) { r = r + 128; } return r; }
+def t113() { s = "hello world"; r = s.find("o") * 100 + s.find("world"); if (s.find("z") != -1) { r = r + 10000; } if (s.find("") != 0) { r = r + 10000; } if (!s.contains("lo")) { r = r + 10000; } if (s.contains("zz")) { r = r + 10000; } return r; }
+def t114() { a = "a,b,,c".split(","); r = a.len * 1000; if (a[0] == "a") { r = r + 1; } if (a[1] == "b") { r = r + 2; } if (a[2] == "") { r = r + 4; } if (a[3] == "c") { r = r + 8; } b = ",x,".split(","); if (b.len == 3 && b[0] == "" && b[2] == "") { r = r + 16; } c = "abc".split(","); if (c.len == 1 && c[0] == "abc") { r = r + 32; } d = "a--b--c".split("--"); if (d.len == 3 && d[1] == "b") { r = r + 64; } e = "ab".split(""); if (e.len == 1 && e[0] == "ab") { r = r + 128; } return r; }
+def t115() { r = 0; if (",".join(["x", "y", "z"]) == "x,y,z") { r = r + 1; } if (",".join([]) == "") { r = r + 2; } if ("-".join(["one"]) == "one") { r = r + 4; } if ("".join(["a", "b"]) == "ab") { r = r + 8; } if ("::".join(["a", "b"]) == "a::b") { r = r + 16; } return r; }
+def t116() { return "123".to_int() * 1000000 + "-42".to_int() * 1000 + "  +17x".to_int() * 10 + "abc".to_int(); }
+def t117() { s = "abcdefgh"; r = 0; if (s[1:6][1:3] == "cd") { r = r + 1; } if (s[1:3] + "!" == "bc!") { r = r + 2; } t = ""; for part in "a,b,c".split(",") { t = t + part; } if (t == "abc") { r = r + 4; } if ("hello"[1:3] == "el") { r = r + 8; } return r; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -284,6 +294,16 @@ def main() {
     mark(105); fails=fails+check(t105(), 10);
     mark(106); fails=fails+check(t106(), 7);
     mark(107); fails=fails+check(t107(), 0);
+    mark(108); fails=fails+check(t108(), 7);
+    mark(109); fails=fails+check(t109(), 2030020);
+    mark(110); fails=fails+check(t110(), 255);
+    mark(111); fails=fails+check(t111(), 31);
+    mark(112); fails=fails+check(t112(), 255);
+    mark(113); fails=fails+check(t113(), 406);
+    mark(114); fails=fails+check(t114(), 4255);
+    mark(115); fails=fails+check(t115(), 31);
+    mark(116); fails=fails+check(t116(), 122958170);
+    mark(117); fails=fails+check(t117(), 15);
 
     print_str("done"); putchar(10);
     return fails > 0;
