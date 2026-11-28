@@ -524,7 +524,7 @@ def t103() {
 }
 
 def t104() {
-    a = 0
+    a = 2
     ? not a == 1 or false:
         a = 5
     @? a < 10 and a > 0:
@@ -638,7 +638,7 @@ def main() {
     mark(101); fails=fails+check(t101(), 62);
     mark(102); fails=fails+check(t102(), 1);
     mark(103); fails=fails+check(t103(), 43);
-    mark(104); fails=fails+check(t104(), 10);
+    mark(104); fails=fails+check(t104(), 12);
 
     print_str("done"); putchar(10);
     return fails > 0;

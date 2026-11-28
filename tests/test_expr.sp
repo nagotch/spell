@@ -87,7 +87,7 @@ def t086() { not false and false; }
 def t087() { not not true; }
 def t088() { !false and not false; }
 def t089() { true && false or not false; }
-def t090() { not true == false; }
+def t090() { not 1 == 2; }
 def t091() { 0 and 10 % 0; }
 def t092() { 1 or 10 % 0; }
 
@@ -193,7 +193,7 @@ def main() {
     mark(87); fails=fails+check(t087(), 1);
     mark(88); fails=fails+check(t088(), 1);
     mark(89); fails=fails+check(t089(), 1);
-    mark(90); fails=fails+check(t090(), 1);
+    mark(90); fails=fails+check(t090(), 0);
     mark(91); fails=fails+check(t091(), 0);
     mark(92); fails=fails+check(t092(), 1);
 
