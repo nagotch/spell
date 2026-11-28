@@ -114,6 +114,9 @@ tests=(
     # 値との比較（緩く通す）
     "def main() { b = 1 == 1; if (b == 1 && 1 == b && b == true) { return 42; } return 0; }|42"
     "def g(x) { return x; } def main() { if (g(1) == 1 && g(1) != 2) { return 42; } return 0; }|42"
+    # step 88: ジェネリック本体の [T] と [int] の比較は緩く通り、
+    # 実体化された時点で具体型として判定される
+    "class Box88<T> { v: [T]; def __init__(self, v: [T]) { self.v = v; } def same(self, y: [int]) -> bool { return self.v == y; } } def main() { b = Box88<int>([1, 2]); if (b.same([1, 2])) { return 42; } return 0; }|42"
     # step 88: 定義なしで呼べる外部関数（署名表にあるもの）は従来
     # どおり呼べる
     "def main() { putchar(65); return ret3() + add(2, 3) + 34; }|42"
