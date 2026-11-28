@@ -1577,6 +1577,11 @@ static void fail_deferred_funcrefs(Node* node) {
 static Function* resolve_overloaded_call(Node* node, Class* klass, char* name, int len,
                                          Type* arg_types[6], int* nargs_out) {
     int off = klass ? 1 : 0;
+    // 固定長配列の安全について: 定義側の引数はパーサが6個までに制限
+    // しているため、呼び出しの引数が7個以上なら arity_n は必ず0に
+    // なり、配列へは check_args_expected（書き込みを6個で止める）しか
+    // 触らない。score_candidate が呼ばれるのは個数の合った候補だけ
+    // で、その場合は nargs <= 6 が保証される
     int nargs = 0;
     for (Node* a = node->args; a; a = a->next) {
         nargs++;

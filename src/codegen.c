@@ -188,7 +188,10 @@ static void print_sig_type_label(Type* t) {
             printf("var$%.*s", t->len, t->name);
             break;
         case TY_FUNC:
-            printf("fn");
+            // 引数の個数も出す。個数が無いと、例えば
+            // fn() -> fn(int) -> str と fn(fn() -> int) -> str の
+            // ように別の型が同じ表記に潰れてしまう
+            printf("fn$%d", t->func_nparams);
             for (int i = 0; i < t->func_nparams; i++) {
                 printf("$");
                 print_sig_type_label(t->func_params[i]);

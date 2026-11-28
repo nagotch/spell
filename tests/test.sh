@@ -129,6 +129,9 @@ tests=(
     "def zero_int(x: str) -> int { return 7; } def main() { return zero_int() + zero_int(\"a\"); }|7"
     # step 91: 引数なしの main が入口になり、同名の別署名は共存できる
     "def main(x: int) -> int { return 1; } def main() { return 42; }|42"
+    # step 91: 関数型を引数に取るオーバーロード同士でラベルが衝突
+    # しないこと（fn 型の表記には引数の個数も入る）
+    "def f(g: fn() -> fn(int) -> str) -> int { return 1; } def f(g: fn(fn() -> int) -> str) -> int { return 2; } def main() { a: fn() -> fn(int) -> str = fn() -> fn(int) -> str { return fn(x: int) -> str { return \"a\"; }; }; b: fn(fn() -> int) -> str = fn(g: fn() -> int) -> str { return \"b\"; }; return f(a) * 10 + f(b); }|12"
 )
 
 error_tests=(
@@ -390,6 +393,9 @@ def main():
     # step 91: ジェネリックの型引数を当てはめると同じ署名になる
     # メソッドの組は、実体化の時点でエラー（アセンブラエラーにしない）
     "class Box<T> { def store(self, v: T) -> int { return 1; } def store(self, v: int) -> int { return 2; } } def main() { b: Box<int> = Box(); return b.store(3); }|型引数を当てはめると同じ引数を持つ定義と重なります"
+    # step 91: 定義側の上限（6個）を超える引数の呼び出しは、個数の
+    # 合う候補なしとしてエラーになる（配列外アクセスをしない）
+    "def f(a: int, b: int, c: int, d: int, e: int, g: int) -> int { return 1; } def f(a: int, b: int, c: int, d: int, e: int, g: str) -> int { return 2; } def main() { return f(1, 2, 3, 4, 5, 6, 7); }|合うオーバーロードがありません"
 )
 
 cc -c -o funcs.o funcs.c
