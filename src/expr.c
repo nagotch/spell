@@ -77,8 +77,10 @@ bool input_target_is_count_form() {
 // どうかを判定し、定数形なら値を返す（step 85 の追加決定:
 // 負の長さのリテラルはコンパイルエラーにするための判定）。
 // 整数リテラルと、リテラル同士の + - *（単項マイナスは 0 - x の
-// 形なので二項に含まれる）を畳み込む。それ以外（変数・呼び出し
-// など）は定数形ではない
+// 形なので二項に含まれる）を畳み込む。畳み込みは実行時の整数
+// 演算と同じラップ（符号なし演算経由）で行うため、定数形の値は
+// 実行時に得られる値と一致する。それ以外（変数・呼び出しなど）
+// は定数形ではない
 bool const_int_value(Node* node, long* out) {
     if (!node) {
         return false;
@@ -94,9 +96,9 @@ bool const_int_value(Node* node, long* out) {
             return false;
         }
         switch (node->op.binop) {
-            case OP_ADD: return !__builtin_add_overflow(l, r, out);
-            case OP_SUB: return !__builtin_sub_overflow(l, r, out);
-            case OP_MUL: return !__builtin_mul_overflow(l, r, out);
+            case OP_ADD: *out = (long)((unsigned long)l + (unsigned long)r); return true;
+            case OP_SUB: *out = (long)((unsigned long)l - (unsigned long)r); return true;
+            case OP_MUL: *out = (long)((unsigned long)l * (unsigned long)r); return true;
             default: return false;
         }
     }
