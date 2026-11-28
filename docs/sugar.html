@@ -56,7 +56,7 @@
 
 <h2 id="s01"><span class="no">01</span>出力の糖衣</h2>
 
-<h3><code>&lt;&lt; 式</code></h3>
+<h3 id="sugar-print"><code>&lt;&lt; 式</code></h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>&lt;&lt; x</code></td><td><code>print(x)</code></td></tr>
@@ -75,7 +75,7 @@
 80</pre>
 </figure>
 
-<h3><code>put 値, 値, ...</code></h3>
+<h3 id="sugar-put"><code>put 値, 値, ...</code></h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>put a, b</code></td><td>値を空白区切りで並べて改行まで出す文（<code>print</code> の文形。引数は1つ以上）</td></tr>
@@ -91,7 +91,7 @@
 <pre>1 x true</pre>
 </figure>
 
-<h3><code>yn 式</code></h3>
+<h3 id="sugar-yn"><code>yn 式</code></h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>yn 式</code></td><td>式が真なら <code>Yes</code>、偽なら <code>No</code> を1行出す</td></tr>
@@ -111,7 +111,7 @@ No</pre>
 
 <h2 id="s02"><span class="no">02</span>入力の糖衣</h2>
 
-<h3><code>&gt;&gt; 対象, 対象, ...</code></h3>
+<h3 id="sugar-input"><code>&gt;&gt; 対象, 対象, ...</code></h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>&gt;&gt; a, b</code></td><td><code>a = in; b = in</code>（左から順に読む）</td></tr>
@@ -135,7 +135,7 @@ put a + b + c</pre>
 <pre>6</pre>
 </figure>
 
-<h3><code>&gt;&gt;&gt; 対象, 対象, ...</code></h3>
+<h3 id="sugar-input-str"><code>&gt;&gt;&gt; 対象, 対象, ...</code></h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>&gt;&gt;&gt; s, t</code></td><td><code>s = in_str; t = in_str</code>（空白区切りのトークンを左から順に読む）</td></tr>
@@ -144,7 +144,7 @@ put a + b + c</pre>
   対象は <code>&gt;&gt;</code> と同じく空白区切りでも並べられ、カンマと混在できます（空白区切りの継続は同じ行の中だけです）。
 </p>
 
-<h3><code>&gt;&gt; 名前[個数][個数]...</code>（個数形）</h3>
+<h3 id="sugar-input-count"><code>&gt;&gt; 名前[個数][個数]...</code>（個数形）</h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>&gt;&gt; a[n]</code></td><td><code>a = [0] * n</code> のあと <code>i@n { &gt;&gt; a[i]; }</code>（個数式は1回だけ評価される）</td></tr>
@@ -197,7 +197,7 @@ put a[1]</pre>
 4 5 6</pre>
 </figure>
 
-<h3><code>対象- = in[n]</code></h3>
+<h3 id="sugar-input-dec"><code>対象- = in[n]</code></h3>
 
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
@@ -222,7 +222,7 @@ put a</pre>
 
 <h2 id="s03"><span class="no">03</span>繰り返しの糖衣</h2>
 
-<h3><code>@</code> 系</h3>
+<h3 id="sugar-repeat"><code>@</code> 系</h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>i@n ブロック</code></td><td><code>for i in n ブロック</code>（0 から n−1）</td></tr>
@@ -432,7 +432,7 @@ put g(1, 2)</pre>
 3</pre>
 </figure>
 
-<h3>矢印演算子 <code>&lt;-</code> / <code>-&gt;</code></h3>
+<h3 id="sugar-arrow">矢印演算子 <code>&lt;-</code> / <code>-&gt;</code></h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>q &lt;- v</code></td><td><code>q.__push_back__(v)</code></td></tr>
@@ -505,7 +505,7 @@ put x, y</pre>
 <pre>6 7</pre>
 </figure>
 
-<h3><code>.rev</code></h3>
+<h3 id="sugar-rev"><code>.rev</code></h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>a.rev</code></td><td>逆順にしたコピー（配列・文字列は新しい値、<code>Range</code> は向きを反転した範囲）。元は変わらない</td></tr>
@@ -526,7 +526,7 @@ for i in (1..4).rev { put i }</pre>
 1</pre>
 </figure>
 
-<h3>座標リテラル <code>(1, 2)</code></h3>
+<h3 id="sugar-pos-literal">座標リテラル <code>(1, 2)</code></h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>(式, 式)</code></td><td><code>Pos2(式, 式)</code></td></tr>
@@ -538,7 +538,7 @@ for i in (1..4).rev { put i }</pre>
   配列リテラルの要素位置でも使えるため、方向ベクトルの表をそのまま書けます。
 </p>
 
-<h3>座標添字 <code>a[p]</code></h3>
+<h3 id="sugar-pos-index">座標添え字 <code>a[p]</code></h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>a[p]</code>（<code>p: Pos2</code>）</td><td><code>a[p[0]][p[1]]</code></td></tr>
@@ -567,7 +567,7 @@ put a[(1, 0)], a[0][1]</pre>
 3 9</pre>
 </figure>
 
-<h3>安全添え字 <code>a?[i][j]</code></h3>
+<h3 id="sugar-safe-index">安全添え字 <code>a?[i][j]</code></h3>
 <table>
   <tr><th>記号形</th><th>意味</th></tr>
   <tr><td><code>a?[i][j]...</code>（単独）</td><td>全段とも範囲内なら <code>true</code></td></tr>
@@ -601,7 +601,7 @@ true
 false</pre>
 </figure>
 
-<h3>スライス <code>x[i:j]</code></h3>
+<h3 id="sugar-slice">スライス <code>x[i:j]</code></h3>
 <table>
   <tr><th>記号形</th><th>意味</th></tr>
   <tr><td><code>x[i:j]</code></td><td>i 以上 j 未満の部分（新しい配列／文字列）</td></tr>
@@ -711,7 +711,7 @@ else:
 4</pre>
 </figure>
 
-<h3>0引数メソッドの括弧省略</h3>
+<h3 id="sugar-noparen">0引数メソッドの括弧省略</h3>
 <table>
   <tr><th>記号形</th><th>正規形</th></tr>
   <tr><td><code>a.len</code>、<code>q.pop_back</code></td><td><code>a.len()</code>、<code>q.pop_back()</code>（引数の無い呼び出し）</td></tr>

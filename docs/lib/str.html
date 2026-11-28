@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>str — spell ライブラリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="../index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="../index.html">概要</a>
+    <a href="../guide.html">言語ツアー</a>
+    <a href="../reference.html">リファレンス</a>
+    <a href="index.html" class="here">ライブラリ</a>
+    <a href="../sugar.html">糖衣集</a>
+    <a href="../editor.html">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+<div class="layout">
+<aside class="side">
+<div class="lib-search" data-lib-search>
+  <input type="search" placeholder="名前・メソッド・キーワードで検索" aria-label="ライブラリ内検索">
+  <ul class="lib-search-results"></ul>
+</div>
+  <p class="side-h">基本の型</p>
+  <ul class="side-list">
+    <li><a href="str.html" class="here">str</a></li>
+    <li><a href="int.html">int</a></li>
+    <li><a href="bool.html">bool</a></li>
+    <li><a href="array.html">array&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">コレクション</p>
+  <ul class="side-list">
+    <li><a href="dict.html">Dict&lt;K, V&gt;</a></li>
+    <li><a href="vec.html">Vec&lt;T&gt;</a></li>
+    <li><a href="deque.html">Deque&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">座標と範囲</p>
+  <ul class="side-list">
+    <li><a href="pos2.html">Pos2</a></li>
+    <li><a href="pos3.html">Pos3</a></li>
+    <li><a href="range.html">Range</a></li>
+  </ul>
+  <p class="side-h">組み込み</p>
+  <ul class="side-list">
+    <li><a href="print.html">print</a></li>
+    <li><a href="eprint.html">eprint</a></li>
+    <li><a href="exit.html">exit</a></li>
+  </ul>
+  <p class="side-h">入力</p>
+  <ul class="side-list">
+    <li><a href="read_int.html">read_int</a></li>
+    <li><a href="read_ints.html">read_ints</a></li>
+    <li><a href="read_ints2.html">read_ints2</a></li>
+    <li><a href="read_ints_dec.html">read_ints_dec</a></li>
+    <li><a href="read_token.html">read_token</a></li>
+    <li><a href="read_tokens.html">read_tokens</a></li>
+    <li><a href="read_line.html">read_line</a></li>
+    <li><a href="read_str.html">read_str</a></li>
+  </ul>
+  <p class="side-h">出力</p>
+  <ul class="side-list">
+    <li><a href="print_int.html">print_int</a></li>
+    <li><a href="print_str.html">print_str</a></li>
+    <li><a href="print_yn.html">print_yn</a></li>
+  </ul>
+  <p class="side-h">引数とファイル</p>
+  <ul class="side-list">
+    <li><a href="filedata.html">FileData</a></li>
+    <li><a href="args.html">args</a></li>
+    <li><a href="read_file.html">read_file</a></li>
+    <li><a href="write_file.html">write_file</a></li>
+  </ul>
+  <p class="side-h">文字</p>
+  <ul class="side-list">
+    <li><a href="chr.html">chr</a></li>
+  </ul>
+  <p class="side-h">初期値ファクトリ</p>
+  <ul class="side-list">
+    <li><a href="zero_int.html">zero_int</a></li>
+    <li><a href="zero_bool.html">zero_bool</a></li>
+    <li><a href="zero_str.html">zero_str</a></li>
+    <li><a href="zero_pos2.html">zero_pos2</a></li>
+    <li><a href="zero_pos3.html">zero_pos3</a></li>
+    <li><a href="zero_array.html">zero_array</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="../index.html">概要</a></li>
+    <li><a href="../guide.html">言語ツアー</a></li>
+    <li><a href="../reference.html">リファレンス</a></li>
+    <li><a href="../sugar.html">糖衣集</a></li>
+    <li><a href="../editor.html">エディタ連携</a></li>
+  </ul>
+</aside>
+<main class="main">
+<p class="eyebrow">ライブラリ — クラス</p>
+<h1 class="page">str</h1>
+<p class="lede">文字列。文字コードの列を包む組み込みクラス</p>
+<figure class="code">
+  <figcaption>シグネチャ</figcaption>
+<pre>class str</pre>
+</figure>
+<p>文字列リテラル（<code>"..."</code> と <code>'...'</code> の両方が使えます）を作ると、自動でこのクラスの値になります。中身は文字コードの配列で、フィールド <code>chars: [int]</code> で直接触れます。文字列は不変です。添え字への代入はできず、書き換えはメソッドが返す新しい文字列で表します。</p>
+<p>エスケープは <code>\n</code> <code>\t</code> <code>\\</code> <code>\"</code> <code>\'</code> <code>\0</code> があり、それ以外の文字をエスケープするとその文字自体になります（<code>\r</code> は改行ではなく文字 <code>r</code> です）。</p>
+<h2>フィールド</h2>
+<table>
+  <tr><th>名前</th><th>型</th><th>内容</th></tr>
+  <tr><td><code>chars</code></td><td><code>[int]</code></td><td>文字コードの列。そのまま読み書きできる（書き換えると文字列自体が変わる）</td></tr>
+</table>
+<h2>メソッドと演算</h2>
+<table>
+  <tr><th>シグネチャ</th><th>内容</th></tr>
+  <tr id="m-len"><td><code>len</code></td><td>文字数（バイト数ではなく文字コードの個数）。プロパティとして <code>s.len</code> と書く</td></tr>
+  <tr id="m-getitem"><td><code>s[i]</code></td><td>i 番目の文字だけからなる長さ1の <code>str</code>。添え字は配列と同じく回り込む（<code>s[-1]</code> は最後の文字、<code>s[s.len]</code> は先頭の文字）。空文字列への添え字は不定。文字コード（<code>int</code>）が欲しいときは <code>s.chars[i]</code>。添え字への代入はできない</td></tr>
+  <tr id="m-safeindex"><td><code>s?[i]</code></td><td>安全添え字。範囲内かどうかを返し、比較の中では範囲外が比較全体を偽にする（詳しくは <a href="array.html">array</a> の安全添え字の節）</td></tr>
+  <tr id="m-slice"><td><code>s[i:j]</code></td><td>スライス。i 以上 j 未満の部分文字列（新しい <code>str</code>）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める</td></tr>
+  <tr id="m-add"><td><code>s + t</code></td><td>連結した新しい文字列（<code>__add__</code>）</td></tr>
+  <tr id="m-eq"><td><code>s == t / s != t</code></td><td>中身の比較（<code>__eq__</code> / <code>__ne__</code>）</td></tr>
+  <tr id="m-lt"><td><code>s &lt; t / s &lt;= t</code></td><td>辞書順（文字コードの列としての大小）。共通部分が等しければ短い方が小さい（<code>__lt__</code> / <code>__le__</code>）</td></tr>
+  <tr id="m-starts_with"><td><code>starts_with(t: str) -&gt; bool</code></td><td><code>t</code> で始まるかどうか</td></tr>
+  <tr id="m-ends_with"><td><code>ends_with(t: str) -&gt; bool</code></td><td><code>t</code> で終わるかどうか</td></tr>
+  <tr id="m-find"><td><code>find(t: str) -&gt; int</code></td><td><code>t</code> が最初に現れる位置。無ければ <code>-1</code>。空の <code>t</code> は 0</td></tr>
+  <tr id="m-contains"><td><code>contains(t: str) -&gt; bool</code></td><td><code>t</code> を含むかどうか</td></tr>
+  <tr id="m-split"><td><code>split(sep: str) -&gt; [str]</code></td><td><code>sep</code> で分割した配列。区切りが連続・端にある場合は空文字列が含まれる。<code>sep</code> が空文字列の場合は分割せず、自分だけからなる配列を返す</td></tr>
+  <tr id="m-join"><td><code>join(a: [str]) -&gt; str</code></td><td>自分の文字列を区切りにして <code>[str]</code> の要素をつないだ文字列。<code>sep.join(a)</code> の形で使う</td></tr>
+  <tr id="m-to_int"><td><code>to_int() -&gt; int</code></td><td>atoi 式の変換。先頭の空白（スペース・タブ・改行など）と符号を読み、数字が続く間だけ読む。数字以外で止まり、数字が無ければ 0</td></tr>
+  <tr id="m-replace"><td><code>replace(old: str, new: str) -&gt; str</code></td><td><code>old</code> の重ならない出現を左から全部 <code>new</code> に置き換えた新しい文字列。<code>old</code> が空文字列の場合は、各文字の間と両端に <code>new</code> を挟む（Python と同じ）</td></tr>
+  <tr id="m-count"><td><code>count(sub: str) -&gt; int</code></td><td><code>sub</code> の重ならない出現回数。空の <code>sub</code> は長さ + 1（Python と同じ）</td></tr>
+  <tr id="m-strip"><td><code>strip() -&gt; str</code></td><td>前後の空白（スペース・タブ・改行・CR など）を取り除いた新しい文字列</td></tr>
+  <tr id="m-upper"><td><code>upper() -&gt; str</code></td><td>ASCII の小文字（a-z）だけを大文字に変えた新しい文字列。それ以外の文字はそのまま</td></tr>
+  <tr id="m-lower"><td><code>lower() -&gt; str</code></td><td>ASCII の大文字（A-Z）だけを小文字に変えた新しい文字列。それ以外の文字はそのまま</td></tr>
+  <tr id="m-rev"><td><code>rev</code></td><td>逆順にした新しい文字列（プロパティとして <code>s.rev</code> と書く）</td></tr>
+</table>
+<h2>条件と反復</h2>
+<p>条件（<code>if</code> / <code>while</code> の条件など）に文字列を書くと、<code>__bool__</code> により「空でなければ真」で判定されます。<code>for c in s</code> は1文字ずつの <code>str</code> を返し、ループ変数への代入は元の文字列へ書き戻されます（代入された文字列の先頭の文字で置き換わり、空文字列なら何もしません）。</p>
+<figure class="code">
+  <figcaption>例 — 基本</figcaption>
+<pre>s = "hello"
+&lt;&lt; s.len
+&lt;&lt; s[0]
+&lt;&lt; s[-1]
+&lt;&lt; s + " world"
+&lt;&lt; s == "hello"</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>5
+h
+o
+hello world
+true</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 文字コードを取り出す</figcaption>
+<pre>s = "Az"
+&lt;&lt; s.chars[0]
+&lt;&lt; s.chars[1]</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>65
+122</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 検索系のメソッド</figcaption>
+<pre>s = "hello world"
+&lt;&lt; s.starts_with("hello")
+&lt;&lt; s.ends_with("world")
+&lt;&lt; s.find("o")
+&lt;&lt; s.find("zz")
+&lt;&lt; s.contains("lo w")</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>true
+true
+4
+-1
+true</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — split / join / to_int</figcaption>
+<pre>&lt;&lt; "a,b,,c".split(",")
+&lt;&lt; "-".join(["a", "b", "c"])
+&lt;&lt; "  -42abc".to_int()</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>a b  c
+a-b-c
+-42</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 置換・整形・変換</figcaption>
+<pre>&lt;&lt; "hello world".replace("o", "0")
+&lt;&lt; "abc".replace("", "-")
+&lt;&lt; "  hi  ".strip()
+&lt;&lt; "aXbXc".count("X")
+&lt;&lt; "aBc".upper()
+&lt;&lt; "AbC".lower()</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>hell0 w0rld
+-a-b-c-
+hi
+2
+ABC
+abc</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — スライスと反復での書き換え</figcaption>
+<pre>s = "hello"
+&lt;&lt; s[1:3]
+&lt;&lt; s[:2]
+t = "ABCA"
+for c in t:
+    if c != "A":
+        c = "."
+&lt;&lt; t
+&lt;&lt; "abc".rev</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>el
+he
+A..A
+cba</pre>
+</figure>
+<h2>StrIter — 文字列の反復子</h2>
+<p><code>s.__iter__()</code> が返す反復子です。直接作るものではありません。<code>__next__()</code> は1文字の <code>str</code> を返し、<code>__set_current__(v)</code> が、現在位置の文字を <code>v</code> の先頭の文字で置き換えます（これが <code>for</code> のループ変数への代入の書き戻しの実体です）。</p>
+<h2>注意</h2>
+<ul>
+  <li>文字列に <code>__hash__</code> があるため <a href="dict.html">Dict</a> のキーにできます</li>
+  <li><code>__str__</code> は自分自身を返します</li>
+  <li>長さは文字コードの個数です。マルチバイト文字もコード列として数えるため、見た目の文字数とは一致しないことがあります</li>
+</ul>
+<h2>関係する糖衣構文</h2>
+<ul>
+  <li><a href="../sugar.html#sugar-slice">スライス x[i:j]（糖衣集 §04）</a></li>
+  <li><a href="../sugar.html#sugar-safe-index">安全添え字 a?[i][j]（糖衣集 §04）</a></li>
+  <li><a href="../sugar.html#sugar-noparen">0引数メソッドの括弧省略（糖衣集 §05）</a></li>
+</ul>
+<h2>関連項目</h2>
+<ul>
+  <li><a href="chr.html">chr</a> — 文字コードから長さ1の文字列を作る</li>
+  <li><a href="array.html">array&lt;T&gt;</a> — 配列。リテラル [1, 2, 3] が作る、要素型 T の列</li>
+  <li><a href="read_token.html">read_token</a> — 空白区切りのトークンを1つ読む。in_str の実体</li>
+  <li><a href="read_line.html">read_line</a> — 1行をそのまま読む。in_line の実体</li>
+</ul>
+</main>
+</div>
+<footer>
+  <span>spell — <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a></span>
+  <span>ドキュメントは <a href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC BY 4.0</a> で公開しています</span>
+</footer>
+<script src="search.js"></script>
+</div>
+</body>
+</html>

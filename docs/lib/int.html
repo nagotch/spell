@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>int — spell ライブラリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="../index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="../index.html">概要</a>
+    <a href="../guide.html">言語ツアー</a>
+    <a href="../reference.html">リファレンス</a>
+    <a href="index.html" class="here">ライブラリ</a>
+    <a href="../sugar.html">糖衣集</a>
+    <a href="../editor.html">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+<div class="layout">
+<aside class="side">
+<div class="lib-search" data-lib-search>
+  <input type="search" placeholder="名前・メソッド・キーワードで検索" aria-label="ライブラリ内検索">
+  <ul class="lib-search-results"></ul>
+</div>
+  <p class="side-h">基本の型</p>
+  <ul class="side-list">
+    <li><a href="str.html">str</a></li>
+    <li><a href="int.html" class="here">int</a></li>
+    <li><a href="bool.html">bool</a></li>
+    <li><a href="array.html">array&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">コレクション</p>
+  <ul class="side-list">
+    <li><a href="dict.html">Dict&lt;K, V&gt;</a></li>
+    <li><a href="vec.html">Vec&lt;T&gt;</a></li>
+    <li><a href="deque.html">Deque&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">座標と範囲</p>
+  <ul class="side-list">
+    <li><a href="pos2.html">Pos2</a></li>
+    <li><a href="pos3.html">Pos3</a></li>
+    <li><a href="range.html">Range</a></li>
+  </ul>
+  <p class="side-h">組み込み</p>
+  <ul class="side-list">
+    <li><a href="print.html">print</a></li>
+    <li><a href="eprint.html">eprint</a></li>
+    <li><a href="exit.html">exit</a></li>
+  </ul>
+  <p class="side-h">入力</p>
+  <ul class="side-list">
+    <li><a href="read_int.html">read_int</a></li>
+    <li><a href="read_ints.html">read_ints</a></li>
+    <li><a href="read_ints2.html">read_ints2</a></li>
+    <li><a href="read_ints_dec.html">read_ints_dec</a></li>
+    <li><a href="read_token.html">read_token</a></li>
+    <li><a href="read_tokens.html">read_tokens</a></li>
+    <li><a href="read_line.html">read_line</a></li>
+    <li><a href="read_str.html">read_str</a></li>
+  </ul>
+  <p class="side-h">出力</p>
+  <ul class="side-list">
+    <li><a href="print_int.html">print_int</a></li>
+    <li><a href="print_str.html">print_str</a></li>
+    <li><a href="print_yn.html">print_yn</a></li>
+  </ul>
+  <p class="side-h">引数とファイル</p>
+  <ul class="side-list">
+    <li><a href="filedata.html">FileData</a></li>
+    <li><a href="args.html">args</a></li>
+    <li><a href="read_file.html">read_file</a></li>
+    <li><a href="write_file.html">write_file</a></li>
+  </ul>
+  <p class="side-h">文字</p>
+  <ul class="side-list">
+    <li><a href="chr.html">chr</a></li>
+  </ul>
+  <p class="side-h">初期値ファクトリ</p>
+  <ul class="side-list">
+    <li><a href="zero_int.html">zero_int</a></li>
+    <li><a href="zero_bool.html">zero_bool</a></li>
+    <li><a href="zero_str.html">zero_str</a></li>
+    <li><a href="zero_pos2.html">zero_pos2</a></li>
+    <li><a href="zero_pos3.html">zero_pos3</a></li>
+    <li><a href="zero_array.html">zero_array</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="../index.html">概要</a></li>
+    <li><a href="../guide.html">言語ツアー</a></li>
+    <li><a href="../reference.html">リファレンス</a></li>
+    <li><a href="../sugar.html">糖衣集</a></li>
+    <li><a href="../editor.html">エディタ連携</a></li>
+  </ul>
+</aside>
+<main class="main">
+<p class="eyebrow">ライブラリ — クラス</p>
+<h1 class="page">int</h1>
+<p class="lede">64ビット符号つき整数</p>
+<figure class="code">
+  <figcaption>シグネチャ</figcaption>
+<pre>class int</pre>
+</figure>
+<p>整数は64ビット符号つきで、コンパイラが直接扱う生の値です（箱詰めされません）。大きなリテラルもそのまま書けます。オーバーフローは2の補数で巻き戻り、エラーにはなりません。ゼロ除算は未定義です（多くの場合クラッシュします）。</p>
+<h2>演算</h2>
+<table>
+  <tr><th>シグネチャ</th><th>内容</th></tr>
+  <tr><td><code>a + b / a - b / a * b</code></td><td>加減乗（<code>__add__</code> / <code>__sub__</code> / <code>__mul__</code>）</td></tr>
+  <tr id="m-div"><td><code>a / b</code></td><td>床除算（Python 式）。<code>-7 / 2</code> は <code>-4</code>（<code>__div__</code>）</td></tr>
+  <tr id="m-mod"><td><code>a % b</code></td><td>床除算に合わせた剰余。<code>-7 % 2</code> は <code>1</code>（<code>__mod__</code>）</td></tr>
+  <tr id="m-eq"><td><code>a == b ほか</code></td><td>比較（<code>__eq__</code> / <code>__ne__</code> / <code>__lt__</code> / <code>__le__</code>）。<code>bool</code> との比較もできます</td></tr>
+  <tr id="m-hash"><td><code>__hash__()</code></td><td>恒等（値そのもの）。<code>Dict</code> のキーに使える</td></tr>
+  <tr id="m-str"><td><code>__str__()</code></td><td>10進表記。負数もそのまま変換できる</td></tr>
+</table>
+<h2>反復</h2>
+<p><code>for i in n</code> のように整数を反復対象にすると、<code>__iter__</code> が <code>RangeIter(0, n, 1, 0)</code> を返し、<code>0</code> から <code>n - 1</code> までを返します。<code>n</code> が 0 以下なら1回も回りません。糖衣の <code>i@n</code> や <code>@n</code> も同じ実体です。</p>
+<figure class="code">
+  <figcaption>例 — 除算と剰余は Python 式</figcaption>
+<pre>&lt;&lt; 7 / 2
+&lt;&lt; -7 / 2
+&lt;&lt; -7 % 2
+&lt;&lt; 2 + 3 * 4</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3
+-4
+1
+14</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 大きなリテラル</figcaption>
+<pre>&lt;&lt; 9223372036854775807
+&lt;&lt; -9223372036854775807 - 1</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>9223372036854775807
+-9223372036854775808</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 整数の反復</figcaption>
+<pre>s = 0
+for i in 5:
+    s = s + i
+&lt;&lt; s</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>10</pre>
+</figure>
+<h2>関係する糖衣構文</h2>
+<ul>
+  <li><a href="../sugar.html#sugar-repeat">@ 系の繰り返し（糖衣集 §03）</a></li>
+</ul>
+<h2>関連項目</h2>
+<ul>
+  <li><a href="bool.html">bool</a> — 真偽値。true / false と短縮形の T / F</li>
+  <li><a href="range.html">Range</a> — 範囲。a..b / a..=b が作る</li>
+  <li><a href="read_int.html">read_int</a> — 標準入力から整数を1つ読む。in の実体</li>
+  <li><a href="chr.html">chr</a> — 文字コードから長さ1の文字列を作る</li>
+</ul>
+</main>
+</div>
+<footer>
+  <span>spell — <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a></span>
+  <span>ドキュメントは <a href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC BY 4.0</a> で公開しています</span>
+</footer>
+<script src="search.js"></script>
+</div>
+</body>
+</html>

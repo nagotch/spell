@@ -400,3 +400,78 @@ footer .fname {
   .toc a { flex-wrap: wrap; gap: 2px 14px; }
   .mast nav { margin-left: 0; }
 }
+
+/* ---------- ライブラリ検索 ---------- */
+
+.lib-search { margin: 0 0 30px; }
+
+.lib-search input {
+  width: 100%;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule-dark);
+  border-radius: 0;
+}
+
+.lib-search input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.lib-search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: none;
+}
+
+.lib-search.active .lib-search-results {
+  display: block;
+  margin-top: 10px;
+  border-top: 1px solid var(--rule-dark);
+}
+
+.lib-search-results li {
+  margin: 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.lib-search-results li::marker { content: none; }
+
+.lib-search-results a {
+  display: block;
+  padding: 8px 2px;
+  text-decoration: none;
+  line-height: 1.55;
+}
+
+.lib-search-results .rk {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+}
+
+.lib-search-results .rn {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.lib-search-results .rs {
+  display: block;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+.lib-search-results .none {
+  padding: 8px 2px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+tr[id] { scroll-margin-top: 28px; }

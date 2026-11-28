@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pos2 — spell ライブラリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="../index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="../index.html">概要</a>
+    <a href="../guide.html">言語ツアー</a>
+    <a href="../reference.html">リファレンス</a>
+    <a href="index.html" class="here">ライブラリ</a>
+    <a href="../sugar.html">糖衣集</a>
+    <a href="../editor.html">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+<div class="layout">
+<aside class="side">
+<div class="lib-search" data-lib-search>
+  <input type="search" placeholder="名前・メソッド・キーワードで検索" aria-label="ライブラリ内検索">
+  <ul class="lib-search-results"></ul>
+</div>
+  <p class="side-h">基本の型</p>
+  <ul class="side-list">
+    <li><a href="str.html">str</a></li>
+    <li><a href="int.html">int</a></li>
+    <li><a href="bool.html">bool</a></li>
+    <li><a href="array.html">array&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">コレクション</p>
+  <ul class="side-list">
+    <li><a href="dict.html">Dict&lt;K, V&gt;</a></li>
+    <li><a href="vec.html">Vec&lt;T&gt;</a></li>
+    <li><a href="deque.html">Deque&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">座標と範囲</p>
+  <ul class="side-list">
+    <li><a href="pos2.html" class="here">Pos2</a></li>
+    <li><a href="pos3.html">Pos3</a></li>
+    <li><a href="range.html">Range</a></li>
+  </ul>
+  <p class="side-h">組み込み</p>
+  <ul class="side-list">
+    <li><a href="print.html">print</a></li>
+    <li><a href="eprint.html">eprint</a></li>
+    <li><a href="exit.html">exit</a></li>
+  </ul>
+  <p class="side-h">入力</p>
+  <ul class="side-list">
+    <li><a href="read_int.html">read_int</a></li>
+    <li><a href="read_ints.html">read_ints</a></li>
+    <li><a href="read_ints2.html">read_ints2</a></li>
+    <li><a href="read_ints_dec.html">read_ints_dec</a></li>
+    <li><a href="read_token.html">read_token</a></li>
+    <li><a href="read_tokens.html">read_tokens</a></li>
+    <li><a href="read_line.html">read_line</a></li>
+    <li><a href="read_str.html">read_str</a></li>
+  </ul>
+  <p class="side-h">出力</p>
+  <ul class="side-list">
+    <li><a href="print_int.html">print_int</a></li>
+    <li><a href="print_str.html">print_str</a></li>
+    <li><a href="print_yn.html">print_yn</a></li>
+  </ul>
+  <p class="side-h">引数とファイル</p>
+  <ul class="side-list">
+    <li><a href="filedata.html">FileData</a></li>
+    <li><a href="args.html">args</a></li>
+    <li><a href="read_file.html">read_file</a></li>
+    <li><a href="write_file.html">write_file</a></li>
+  </ul>
+  <p class="side-h">文字</p>
+  <ul class="side-list">
+    <li><a href="chr.html">chr</a></li>
+  </ul>
+  <p class="side-h">初期値ファクトリ</p>
+  <ul class="side-list">
+    <li><a href="zero_int.html">zero_int</a></li>
+    <li><a href="zero_bool.html">zero_bool</a></li>
+    <li><a href="zero_str.html">zero_str</a></li>
+    <li><a href="zero_pos2.html">zero_pos2</a></li>
+    <li><a href="zero_pos3.html">zero_pos3</a></li>
+    <li><a href="zero_array.html">zero_array</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="../index.html">概要</a></li>
+    <li><a href="../guide.html">言語ツアー</a></li>
+    <li><a href="../reference.html">リファレンス</a></li>
+    <li><a href="../sugar.html">糖衣集</a></li>
+    <li><a href="../editor.html">エディタ連携</a></li>
+  </ul>
+</aside>
+<main class="main">
+<p class="eyebrow">ライブラリ — クラス</p>
+<h1 class="page">Pos2</h1>
+<p class="lede">二次元座標。リテラル (1, 2) が作る</p>
+<figure class="code">
+  <figcaption>シグネチャ</figcaption>
+<pre>class Pos2 { x: int, y: int }</pre>
+</figure>
+<p>グリッド上の座標を表すクラスです。式の位置で <code>(1, 2)</code> と書くとこの型のリテラルになります（4つ以上の要素はエラーです）。要素ごとの演算と比較を備え、<code>__hash__</code> があるため <a href="dict.html">Dict</a> のキーにできます。</p>
+<h2>フィールド</h2>
+<table>
+  <tr><th>名前</th><th>型</th><th>内容</th></tr>
+  <tr><td><code>x</code></td><td><code>int</code></td><td>第0成分</td></tr>
+  <tr><td><code>y</code></td><td><code>int</code></td><td>第1成分</td></tr>
+</table>
+<h2>メソッドと演算</h2>
+<table>
+  <tr><th>シグネチャ</th><th>内容</th></tr>
+  <tr id="m-add"><td><code>p + q / p - q</code></td><td>要素ごとの加減（<code>__add__</code> / <code>__sub__</code>）</td></tr>
+  <tr id="m-mul"><td><code>p * n</code></td><td><code>int</code> とのスカラー倍（<code>__mul__</code>）</td></tr>
+  <tr id="m-eq"><td><code>p == q / p != q</code></td><td>要素ごとの等価性</td></tr>
+  <tr id="m-lt"><td><code>p &lt; q / p &lt;= q</code></td><td>辞書順（x、次に y の順で比較）</td></tr>
+  <tr id="m-getitem"><td><code>p[i]</code></td><td>成分の読み取り。<code>p[0]</code> が x、<code>p[1]</code> が y。範囲外は検査されない</td></tr>
+  <tr id="m-hash"><td><code>__hash__()</code></td><td>成分からのハッシュ。<code>Dict</code> のキーに使える</td></tr>
+  <tr id="m-str"><td><code>__str__()</code></td><td>空白区切り（<code>"1 2"</code> の形）</td></tr>
+</table>
+<h2>座標添え字 a[p]</h2>
+<p>入れ子配列への添え字としても使えます。<code>a[p]</code> は <code>a[p[0]][p[1]]</code> と同じで、<strong>第0成分が外側（グリッドでは行）</strong>です。添え字は段ごとに回り込みます。座標はちょうど1回だけ評価され、代入先（<code>a[p] = v</code>）でも使えます。安全添え字 <code>a?[p]</code> の形もあり、その場合は座標の段も含めて範囲が検査されます。</p>
+<h2>注意</h2>
+<ul>
+  <li><code>__bool__</code> は無いため、座標を条件に書くのはコンパイルエラーです</li>
+  <li>ゼロ値は <a href="zero_pos2.html">zero_pos2()</a> で、<code>Deque&lt;Pos2&gt;()</code> のような引数なし構築の埋め草にも自動で使われます</li>
+</ul>
+<figure class="code">
+  <figcaption>例 — 演算と辞書のキー</figcaption>
+<pre>p = (1, 2)
+q = p + (0, 1)
+&lt;&lt; q
+&lt;&lt; q * 2
+&lt;&lt; p[0]
+&lt;&lt; p[1]
+&lt;&lt; p == (1, 2)
+d: Dict&lt;Pos2, int&gt; = Dict(zero_int)
+d[p] = 7
+&lt;&lt; d[(1, 2)]
+&lt;&lt; d[(3, 3)]</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1 3
+2 6
+1
+2
+true
+7
+0</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 座標添え字</figcaption>
+<pre>g = [[1, 2], [3, 4]]
+p = (1, 0)
+&lt;&lt; g[p]
+&lt;&lt; g[(0, 1)]</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3
+2</pre>
+</figure>
+<h2>関係する糖衣構文</h2>
+<ul>
+  <li><a href="../sugar.html#sugar-pos-literal">座標リテラル (1, 2)（糖衣集 §04）</a></li>
+  <li><a href="../sugar.html#sugar-pos-index">座標添え字 a[p]（糖衣集 §04）</a></li>
+  <li><a href="../sugar.html#sugar-safe-index">安全添え字 a?[i][j]（糖衣集 §04）</a></li>
+</ul>
+<h2>関連項目</h2>
+<ul>
+  <li><a href="pos3.html">Pos3</a> — 三次元座標。リテラル (1, 2, 3) が作る</li>
+  <li><a href="dict.html">Dict&lt;K, V&gt;</a> — 辞書。キーが無ければ既定値を生やす defaultdict 式</li>
+  <li><a href="deque.html">Deque&lt;T&gt;</a> — 両端キュー。Queue としても Stack としても使える</li>
+  <li><a href="zero_pos2.html">zero_pos2</a> — 原点 (0, 0) を返す初期値ファクトリ</li>
+</ul>
+</main>
+</div>
+<footer>
+  <span>spell — <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a></span>
+  <span>ドキュメントは <a href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC BY 4.0</a> で公開しています</span>
+</footer>
+<script src="search.js"></script>
+</div>
+</body>
+</html>

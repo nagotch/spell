@@ -1,0 +1,786 @@
+[
+ {
+  "t": "str",
+  "u": "str.html",
+  "k": "クラス",
+  "s": "文字列。文字コードの列を包む組み込みクラス",
+  "w": "str 文字列。文字コードの列を包む組み込みクラス 文字列 テキスト string 文字"
+ },
+ {
+  "t": "str.len",
+  "u": "str.html#m-len",
+  "k": "メソッド",
+  "s": "文字数（バイト数ではなく文字コードの個数）。プロパティとして s.len と書く",
+  "w": "len len 文字数（バイト数ではなく文字コードの個数）。プロパティとして s.len と書く str"
+ },
+ {
+  "t": "str.getitem",
+  "u": "str.html#m-getitem",
+  "k": "メソッド",
+  "s": "i 番目の文字だけからなる長さ1の str。添え字は配列と同じく回り込む（s[-1] は最後の文字、s[s.len] は先頭の文字）。空文字列への添え字は不定。文字コード（int）が欲しいときは s.chars[i]。添え字への代入はできない",
+  "w": "getitem s[i] i 番目の文字だけからなる長さ1の str。添え字は配列と同じく回り込む（s[-1] は最後の文字、s[s.len] は先頭の文字）。空文字列への添え字は不定。文字コード（int）が欲しいときは s.chars[i]。添え字への代入はできない str"
+ },
+ {
+  "t": "str.safeindex",
+  "u": "str.html#m-safeindex",
+  "k": "メソッド",
+  "s": "安全添え字。範囲内かどうかを返し、比較の中では範囲外が比較全体を偽にする（詳しくは array の安全添え字の節）",
+  "w": "safeindex s?[i] 安全添え字。範囲内かどうかを返し、比較の中では範囲外が比較全体を偽にする（詳しくは array の安全添え字の節） str"
+ },
+ {
+  "t": "str.slice",
+  "u": "str.html#m-slice",
+  "k": "メソッド",
+  "s": "スライス。i 以上 j 未満の部分文字列（新しい str）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める",
+  "w": "slice s[i:j] スライス。i 以上 j 未満の部分文字列（新しい str）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める str"
+ },
+ {
+  "t": "str.add",
+  "u": "str.html#m-add",
+  "k": "メソッド",
+  "s": "連結した新しい文字列（__add__）",
+  "w": "add s + t 連結した新しい文字列（__add__） str"
+ },
+ {
+  "t": "str.eq",
+  "u": "str.html#m-eq",
+  "k": "メソッド",
+  "s": "中身の比較（__eq__ / __ne__）",
+  "w": "eq s == t / s != t 中身の比較（__eq__ / __ne__） str"
+ },
+ {
+  "t": "str.lt",
+  "u": "str.html#m-lt",
+  "k": "メソッド",
+  "s": "辞書順（文字コードの列としての大小）。共通部分が等しければ短い方が小さい（__lt__ / __le__）",
+  "w": "lt s < t / s <= t 辞書順（文字コードの列としての大小）。共通部分が等しければ短い方が小さい（__lt__ / __le__） str"
+ },
+ {
+  "t": "str.starts_with",
+  "u": "str.html#m-starts_with",
+  "k": "メソッド",
+  "s": "t で始まるかどうか",
+  "w": "starts_with starts_with(t: str) -> bool t で始まるかどうか str"
+ },
+ {
+  "t": "str.ends_with",
+  "u": "str.html#m-ends_with",
+  "k": "メソッド",
+  "s": "t で終わるかどうか",
+  "w": "ends_with ends_with(t: str) -> bool t で終わるかどうか str"
+ },
+ {
+  "t": "str.find",
+  "u": "str.html#m-find",
+  "k": "メソッド",
+  "s": "t が最初に現れる位置。無ければ -1。空の t は 0",
+  "w": "find find(t: str) -> int t が最初に現れる位置。無ければ -1。空の t は 0 str"
+ },
+ {
+  "t": "str.contains",
+  "u": "str.html#m-contains",
+  "k": "メソッド",
+  "s": "t を含むかどうか",
+  "w": "contains contains(t: str) -> bool t を含むかどうか str"
+ },
+ {
+  "t": "str.split",
+  "u": "str.html#m-split",
+  "k": "メソッド",
+  "s": "sep で分割した配列。区切りが連続・端にある場合は空文字列が含まれる。sep が空文字列の場合は分割せず、自分だけからなる配列を返す",
+  "w": "split split(sep: str) -> [str] sep で分割した配列。区切りが連続・端にある場合は空文字列が含まれる。sep が空文字列の場合は分割せず、自分だけからなる配列を返す str"
+ },
+ {
+  "t": "str.join",
+  "u": "str.html#m-join",
+  "k": "メソッド",
+  "s": "自分の文字列を区切りにして [str] の要素をつないだ文字列。sep.join(a) の形で使う",
+  "w": "join join(a: [str]) -> str 自分の文字列を区切りにして [str] の要素をつないだ文字列。sep.join(a) の形で使う str"
+ },
+ {
+  "t": "str.to_int",
+  "u": "str.html#m-to_int",
+  "k": "メソッド",
+  "s": "atoi 式の変換。先頭の空白（スペース・タブ・改行など）と符号を読み、数字が続く間だけ読む。数字以外で止まり、数字が無ければ 0",
+  "w": "to_int to_int() -> int atoi 式の変換。先頭の空白（スペース・タブ・改行など）と符号を読み、数字が続く間だけ読む。数字以外で止まり、数字が無ければ 0 str"
+ },
+ {
+  "t": "str.replace",
+  "u": "str.html#m-replace",
+  "k": "メソッド",
+  "s": "old の重ならない出現を左から全部 new に置き換えた新しい文字列。old が空文字列の場合は、各文字の間と両端に new を挟む（Python と同じ）",
+  "w": "replace replace(old: str, new: str) -> str old の重ならない出現を左から全部 new に置き換えた新しい文字列。old が空文字列の場合は、各文字の間と両端に new を挟む（Python と同じ） str"
+ },
+ {
+  "t": "str.count",
+  "u": "str.html#m-count",
+  "k": "メソッド",
+  "s": "sub の重ならない出現回数。空の sub は長さ + 1（Python と同じ）",
+  "w": "count count(sub: str) -> int sub の重ならない出現回数。空の sub は長さ + 1（Python と同じ） str"
+ },
+ {
+  "t": "str.strip",
+  "u": "str.html#m-strip",
+  "k": "メソッド",
+  "s": "前後の空白（スペース・タブ・改行・CR など）を取り除いた新しい文字列",
+  "w": "strip strip() -> str 前後の空白（スペース・タブ・改行・CR など）を取り除いた新しい文字列 str"
+ },
+ {
+  "t": "str.upper",
+  "u": "str.html#m-upper",
+  "k": "メソッド",
+  "s": "ASCII の小文字（a-z）だけを大文字に変えた新しい文字列。それ以外の文字はそのまま",
+  "w": "upper upper() -> str ASCII の小文字（a-z）だけを大文字に変えた新しい文字列。それ以外の文字はそのまま str"
+ },
+ {
+  "t": "str.lower",
+  "u": "str.html#m-lower",
+  "k": "メソッド",
+  "s": "ASCII の大文字（A-Z）だけを小文字に変えた新しい文字列。それ以外の文字はそのまま",
+  "w": "lower lower() -> str ASCII の大文字（A-Z）だけを小文字に変えた新しい文字列。それ以外の文字はそのまま str"
+ },
+ {
+  "t": "str.rev",
+  "u": "str.html#m-rev",
+  "k": "メソッド",
+  "s": "逆順にした新しい文字列（プロパティとして s.rev と書く）",
+  "w": "rev rev 逆順にした新しい文字列（プロパティとして s.rev と書く） str"
+ },
+ {
+  "t": "int",
+  "u": "int.html",
+  "k": "クラス",
+  "s": "64ビット符号つき整数",
+  "w": "int 64ビット符号つき整数 整数 数値 integer 計算"
+ },
+ {
+  "t": "int.div",
+  "u": "int.html#m-div",
+  "k": "メソッド",
+  "s": "床除算（Python 式）。-7 / 2 は -4（__div__）",
+  "w": "div a / b 床除算（Python 式）。-7 / 2 は -4（__div__） int"
+ },
+ {
+  "t": "int.mod",
+  "u": "int.html#m-mod",
+  "k": "メソッド",
+  "s": "床除算に合わせた剰余。-7 % 2 は 1（__mod__）",
+  "w": "mod a % b 床除算に合わせた剰余。-7 % 2 は 1（__mod__） int"
+ },
+ {
+  "t": "int.eq",
+  "u": "int.html#m-eq",
+  "k": "メソッド",
+  "s": "比較（__eq__ / __ne__ / __lt__ / __le__）。bool との比較もできます",
+  "w": "eq a == b ほか 比較（__eq__ / __ne__ / __lt__ / __le__）。bool との比較もできます int"
+ },
+ {
+  "t": "int.hash",
+  "u": "int.html#m-hash",
+  "k": "メソッド",
+  "s": "恒等（値そのもの）。Dict のキーに使える",
+  "w": "hash __hash__() 恒等（値そのもの）。Dict のキーに使える int"
+ },
+ {
+  "t": "int.str",
+  "u": "int.html#m-str",
+  "k": "メソッド",
+  "s": "10進表記。負数もそのまま変換できる",
+  "w": "str __str__() 10進表記。負数もそのまま変換できる int"
+ },
+ {
+  "t": "bool",
+  "u": "bool.html",
+  "k": "クラス",
+  "s": "真偽値。true / false と短縮形の T / F",
+  "w": "bool 真偽値。true / false と短縮形の T / F 真偽値 真 偽 boolean 条件"
+ },
+ {
+  "t": "bool.hash",
+  "u": "bool.html#m-hash",
+  "k": "メソッド",
+  "s": "真は 1、偽は 0。Dict のキーに使える",
+  "w": "hash __hash__() 真は 1、偽は 0。Dict のキーに使える bool"
+ },
+ {
+  "t": "bool.str",
+  "u": "bool.html#m-str",
+  "k": "メソッド",
+  "s": "true / false",
+  "w": "str __str__() true / false bool"
+ },
+ {
+  "t": "array<T>",
+  "u": "array.html",
+  "k": "クラス",
+  "s": "配列。リテラル [1, 2, 3] が作る、要素型 T の列",
+  "w": "array<T> 配列。リテラル [1, 2, 3] が作る、要素型 T の列 配列 リスト array 列"
+ },
+ {
+  "t": "array<T>.len",
+  "u": "array.html#m-len",
+  "k": "メソッド",
+  "s": "要素数（プロパティとして a.len と書く）",
+  "w": "len len 要素数（プロパティとして a.len と書く） array<T>"
+ },
+ {
+  "t": "array<T>.getitem",
+  "u": "array.html#m-getitem",
+  "k": "メソッド",
+  "s": "要素の読み書き。添え字は回り込みます（下の「添え字の回り込み」参照）",
+  "w": "getitem a[i] 要素の読み書き。添え字は回り込みます（下の「添え字の回り込み」参照） array<T>"
+ },
+ {
+  "t": "array<T>.safeindex",
+  "u": "array.html#m-safeindex",
+  "k": "メソッド",
+  "s": "安全添え字。全段の範囲を検査する読み取り専用の形（下の「安全添え字」参照）",
+  "w": "safeindex a?[i][j]... 安全添え字。全段の範囲を検査する読み取り専用の形（下の「安全添え字」参照） array<T>"
+ },
+ {
+  "t": "array<T>.slice",
+  "u": "array.html#m-slice",
+  "k": "メソッド",
+  "s": "スライス。i 以上 j 未満の部分配列（要素をコピーした新しい配列）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める",
+  "w": "slice a[i:j] スライス。i 以上 j 未満の部分配列（要素をコピーした新しい配列）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める array<T>"
+ },
+ {
+  "t": "array<T>.append",
+  "u": "array.html#m-append",
+  "k": "メソッド",
+  "s": "末尾に要素を足し、新しい要素数を返す。コンパイラが処理する組み込み操作（下の「append と別名」参照）",
+  "w": "append append(v) -> int 末尾に要素を足し、新しい要素数を返す。コンパイラが処理する組み込み操作（下の「append と別名」参照） array<T>"
+ },
+ {
+  "t": "array<T>.add",
+  "u": "array.html#m-add",
+  "k": "メソッド",
+  "s": "連結した新しい配列（__add__）",
+  "w": "add a + b 連結した新しい配列（__add__） array<T>"
+ },
+ {
+  "t": "array<T>.mul",
+  "u": "array.html#m-mul",
+  "k": "メソッド",
+  "s": "n 回繰り返した新しい配列（__mul__）",
+  "w": "mul a * n n 回繰り返した新しい配列（__mul__） array<T>"
+ },
+ {
+  "t": "array<T>.eq",
+  "u": "array.html#m-eq",
+  "k": "メソッド",
+  "s": "中身の比較。順序比較（< / <=）は無く、エラーになる",
+  "w": "eq a == b / a != b 中身の比較。順序比較（< / <=）は無く、エラーになる array<T>"
+ },
+ {
+  "t": "array<T>.sort",
+  "u": "array.html#m-sort",
+  "k": "メソッド",
+  "s": "昇順に並べ替える（インプレース）。安定ソートではない（等しい要素の前後関係は保たれない）。要素型に __lt__ が必要",
+  "w": "sort sort() 昇順に並べ替える（インプレース）。安定ソートではない（等しい要素の前後関係は保たれない）。要素型に __lt__ が必要 array<T>"
+ },
+ {
+  "t": "array<T>.sorted",
+  "u": "array.html#m-sorted",
+  "k": "メソッド",
+  "s": "並べ替えた新しい配列（元の配列は変わらない）。要素型に __lt__ が必要",
+  "w": "sorted sorted() -> [T] 並べ替えた新しい配列（元の配列は変わらない）。要素型に __lt__ が必要 array<T>"
+ },
+ {
+  "t": "array<T>.sum",
+  "u": "array.html#m-sum",
+  "k": "メソッド",
+  "s": "全要素を先頭から + で畳み込んだ値。要素型に __add__ が必要。空の配列では結果は不定",
+  "w": "sum sum() -> T 全要素を先頭から + で畳み込んだ値。要素型に __add__ が必要。空の配列では結果は不定 array<T>"
+ },
+ {
+  "t": "array<T>.min",
+  "u": "array.html#m-min",
+  "k": "メソッド",
+  "s": "最小・最大の要素。要素型に __lt__ が必要。空の配列では結果は不定",
+  "w": "min min() -> T / max() -> T 最小・最大の要素。要素型に __lt__ が必要。空の配列では結果は不定 array<T>"
+ },
+ {
+  "t": "array<T>.count",
+  "u": "array.html#m-count",
+  "k": "メソッド",
+  "s": "v と等しい要素の個数。等しさは要素型の == で判定する",
+  "w": "count count(v: T) -> int v と等しい要素の個数。等しさは要素型の == で判定する array<T>"
+ },
+ {
+  "t": "array<T>.rev",
+  "u": "array.html#m-rev",
+  "k": "メソッド",
+  "s": "逆順にした新しい配列（元の配列は変わらない。プロパティとして a.rev と書く）",
+  "w": "rev rev 逆順にした新しい配列（元の配列は変わらない。プロパティとして a.rev と書く） array<T>"
+ },
+ {
+  "t": "Dict<K, V>",
+  "u": "dict.html",
+  "k": "クラス",
+  "s": "辞書。キーが無ければ既定値を生やす defaultdict 式",
+  "w": "Dict<K, V> 辞書。キーが無ければ既定値を生やす defaultdict 式 辞書 連想配列 マップ dictionary map ハッシュ"
+ },
+ {
+  "t": "Dict<K, V>.getitem",
+  "u": "dict.html#m-getitem",
+  "k": "メソッド",
+  "s": "読み取り。キーが無ければ既定値を生やして返す（__getitem__）",
+  "w": "getitem d[k] 読み取り。キーが無ければ既定値を生やして返す（__getitem__） Dict<K, V>"
+ },
+ {
+  "t": "Dict<K, V>.setitem",
+  "u": "dict.html#m-setitem",
+  "k": "メソッド",
+  "s": "書き込み。上書きしてもキーの挿入位置は変わらない（__setitem__）",
+  "w": "setitem d[k] = v 書き込み。上書きしてもキーの挿入位置は変わらない（__setitem__） Dict<K, V>"
+ },
+ {
+  "t": "Dict<K, V>.has",
+  "u": "dict.html#m-has",
+  "k": "メソッド",
+  "s": "キーの有無。読み取りで生えたキーも「有り」になる",
+  "w": "has has(key: K) -> bool キーの有無。読み取りで生えたキーも「有り」になる Dict<K, V>"
+ },
+ {
+  "t": "Dict<K, V>.keys",
+  "u": "dict.html#m-keys",
+  "k": "メソッド",
+  "s": "挿入順のキー配列のコピー",
+  "w": "keys keys() -> [K] 挿入順のキー配列のコピー Dict<K, V>"
+ },
+ {
+  "t": "Dict<K, V>.len",
+  "u": "dict.html#m-len",
+  "k": "メソッド",
+  "s": "エントリ数（プロパティとして d.len と書く）",
+  "w": "len len エントリ数（プロパティとして d.len と書く） Dict<K, V>"
+ },
+ {
+  "t": "Vec<T>",
+  "u": "vec.html",
+  "k": "クラス",
+  "s": "伸びる配列。末尾への追加が均し定数時間",
+  "w": "Vec<T> 伸びる配列。末尾への追加が均し定数時間 可変長配列 伸びる配列 vector リスト"
+ },
+ {
+  "t": "Vec<T>.append",
+  "u": "vec.html#m-append",
+  "k": "メソッド",
+  "s": "末尾へ追加する。戻り値はない",
+  "w": "append append(v: T) 末尾へ追加する。戻り値はない Vec<T>"
+ },
+ {
+  "t": "Vec<T>.len",
+  "u": "vec.html#m-len",
+  "k": "メソッド",
+  "s": "論理要素数（プロパティとして v.len と書く）",
+  "w": "len len 論理要素数（プロパティとして v.len と書く） Vec<T>"
+ },
+ {
+  "t": "Vec<T>.getitem",
+  "u": "vec.html#m-getitem",
+  "k": "メソッド",
+  "s": "内部バッファへの直接の読み書き（__getitem__ / __setitem__）。下の注意参照",
+  "w": "getitem v[i] 内部バッファへの直接の読み書き（__getitem__ / __setitem__）。下の注意参照 Vec<T>"
+ },
+ {
+  "t": "Vec<T>.to_array",
+  "u": "vec.html#m-to_array",
+  "k": "メソッド",
+  "s": "論理要素数分の通常配列のコピー",
+  "w": "to_array to_array() -> [T] 論理要素数分の通常配列のコピー Vec<T>"
+ },
+ {
+  "t": "Deque<T>",
+  "u": "deque.html",
+  "k": "クラス",
+  "s": "両端キュー。Queue としても Stack としても使える",
+  "w": "Deque<T> 両端キュー。Queue としても Stack としても使える 両端キュー キュー スタック queue stack BFS 幅優先探索"
+ },
+ {
+  "t": "Deque<T>.push_back",
+  "u": "deque.html#m-push_back",
+  "k": "メソッド",
+  "s": "末尾へ追加する（戻り値なし）",
+  "w": "push_back push_back(v: T) 末尾へ追加する（戻り値なし） Deque<T>"
+ },
+ {
+  "t": "Deque<T>.push_front",
+  "u": "deque.html#m-push_front",
+  "k": "メソッド",
+  "s": "先頭へ追加する（戻り値なし）",
+  "w": "push_front push_front(v: T) 先頭へ追加する（戻り値なし） Deque<T>"
+ },
+ {
+  "t": "Deque<T>.pop_back",
+  "u": "deque.html#m-pop_back",
+  "k": "メソッド",
+  "s": "末尾を取り出して返す",
+  "w": "pop_back pop_back() -> T 末尾を取り出して返す Deque<T>"
+ },
+ {
+  "t": "Deque<T>.pop_front",
+  "u": "deque.html#m-pop_front",
+  "k": "メソッド",
+  "s": "先頭を取り出して返す",
+  "w": "pop_front pop_front() -> T 先頭を取り出して返す Deque<T>"
+ },
+ {
+  "t": "Deque<T>.front",
+  "u": "deque.html#m-front",
+  "k": "メソッド",
+  "s": "先頭を覗く（取り出さない）",
+  "w": "front front() -> T 先頭を覗く（取り出さない） Deque<T>"
+ },
+ {
+  "t": "Deque<T>.back",
+  "u": "deque.html#m-back",
+  "k": "メソッド",
+  "s": "末尾を覗く（取り出さない）",
+  "w": "back back() -> T 末尾を覗く（取り出さない） Deque<T>"
+ },
+ {
+  "t": "Deque<T>.len",
+  "u": "deque.html#m-len",
+  "k": "メソッド",
+  "s": "要素数（プロパティとして q.len と書く）",
+  "w": "len len 要素数（プロパティとして q.len と書く） Deque<T>"
+ },
+ {
+  "t": "Deque<T>.getitem",
+  "u": "deque.html#m-getitem",
+  "k": "メソッド",
+  "s": "論理位置の読み取り（0 が先頭）。書き込み用の __setitem__ は無い",
+  "w": "getitem q[i] 論理位置の読み取り（0 が先頭）。書き込み用の __setitem__ は無い Deque<T>"
+ },
+ {
+  "t": "Deque<T>.to_array",
+  "u": "deque.html#m-to_array",
+  "k": "メソッド",
+  "s": "先頭から末尾の順の通常配列のコピー",
+  "w": "to_array to_array() -> [T] 先頭から末尾の順の通常配列のコピー Deque<T>"
+ },
+ {
+  "t": "Pos2",
+  "u": "pos2.html",
+  "k": "クラス",
+  "s": "二次元座標。リテラル (1, 2) が作る",
+  "w": "Pos2 二次元座標。リテラル (1, 2) が作る 座標 二次元 グリッド position ベクトル"
+ },
+ {
+  "t": "Pos2.add",
+  "u": "pos2.html#m-add",
+  "k": "メソッド",
+  "s": "要素ごとの加減（__add__ / __sub__）",
+  "w": "add p + q / p - q 要素ごとの加減（__add__ / __sub__） Pos2"
+ },
+ {
+  "t": "Pos2.mul",
+  "u": "pos2.html#m-mul",
+  "k": "メソッド",
+  "s": "int とのスカラー倍（__mul__）",
+  "w": "mul p * n int とのスカラー倍（__mul__） Pos2"
+ },
+ {
+  "t": "Pos2.eq",
+  "u": "pos2.html#m-eq",
+  "k": "メソッド",
+  "s": "要素ごとの等価性",
+  "w": "eq p == q / p != q 要素ごとの等価性 Pos2"
+ },
+ {
+  "t": "Pos2.lt",
+  "u": "pos2.html#m-lt",
+  "k": "メソッド",
+  "s": "辞書順（x、次に y の順で比較）",
+  "w": "lt p < q / p <= q 辞書順（x、次に y の順で比較） Pos2"
+ },
+ {
+  "t": "Pos2.getitem",
+  "u": "pos2.html#m-getitem",
+  "k": "メソッド",
+  "s": "成分の読み取り。p[0] が x、p[1] が y。範囲外は検査されない",
+  "w": "getitem p[i] 成分の読み取り。p[0] が x、p[1] が y。範囲外は検査されない Pos2"
+ },
+ {
+  "t": "Pos2.hash",
+  "u": "pos2.html#m-hash",
+  "k": "メソッド",
+  "s": "成分からのハッシュ。Dict のキーに使える",
+  "w": "hash __hash__() 成分からのハッシュ。Dict のキーに使える Pos2"
+ },
+ {
+  "t": "Pos2.str",
+  "u": "pos2.html#m-str",
+  "k": "メソッド",
+  "s": "空白区切り（\"1 2\" の形）",
+  "w": "str __str__() 空白区切り（\"1 2\" の形） Pos2"
+ },
+ {
+  "t": "Pos3",
+  "u": "pos3.html",
+  "k": "クラス",
+  "s": "三次元座標。リテラル (1, 2, 3) が作る",
+  "w": "Pos3 三次元座標。リテラル (1, 2, 3) が作る 座標 三次元 グリッド position ベクトル"
+ },
+ {
+  "t": "Pos3.add",
+  "u": "pos3.html#m-add",
+  "k": "メソッド",
+  "s": "要素ごとの加減（__add__ / __sub__）",
+  "w": "add p + q / p - q 要素ごとの加減（__add__ / __sub__） Pos3"
+ },
+ {
+  "t": "Pos3.mul",
+  "u": "pos3.html#m-mul",
+  "k": "メソッド",
+  "s": "int とのスカラー倍（__mul__）",
+  "w": "mul p * n int とのスカラー倍（__mul__） Pos3"
+ },
+ {
+  "t": "Pos3.eq",
+  "u": "pos3.html#m-eq",
+  "k": "メソッド",
+  "s": "要素ごとの等価性",
+  "w": "eq p == q / p != q 要素ごとの等価性 Pos3"
+ },
+ {
+  "t": "Pos3.lt",
+  "u": "pos3.html#m-lt",
+  "k": "メソッド",
+  "s": "辞書順（x、次に y、次に z の順で比較）",
+  "w": "lt p < q / p <= q 辞書順（x、次に y、次に z の順で比較） Pos3"
+ },
+ {
+  "t": "Pos3.getitem",
+  "u": "pos3.html#m-getitem",
+  "k": "メソッド",
+  "s": "成分の読み取り。p[0] が x、p[2] が z。範囲外は検査されない",
+  "w": "getitem p[i] 成分の読み取り。p[0] が x、p[2] が z。範囲外は検査されない Pos3"
+ },
+ {
+  "t": "Pos3.hash",
+  "u": "pos3.html#m-hash",
+  "k": "メソッド",
+  "s": "成分からのハッシュ。Dict のキーに使える",
+  "w": "hash __hash__() 成分からのハッシュ。Dict のキーに使える Pos3"
+ },
+ {
+  "t": "Pos3.str",
+  "u": "pos3.html#m-str",
+  "k": "メソッド",
+  "s": "空白区切り（\"1 2 3\" の形）",
+  "w": "str __str__() 空白区切り（\"1 2 3\" の形） Pos3"
+ },
+ {
+  "t": "Range",
+  "u": "range.html",
+  "k": "クラス",
+  "s": "範囲。a..b / a..=b が作る",
+  "w": "Range 範囲。a..b / a..=b が作る 範囲 区間 range 繰り返し"
+ },
+ {
+  "t": "Range.lo",
+  "u": "range.html#m-lo",
+  "k": "メソッド",
+  "s": "開始値（フィールド）",
+  "w": "lo lo 開始値（フィールド） Range"
+ },
+ {
+  "t": "Range.hi",
+  "u": "range.html#m-hi",
+  "k": "メソッド",
+  "s": "終端値（フィールド）",
+  "w": "hi hi 終端値（フィールド） Range"
+ },
+ {
+  "t": "Range.incl",
+  "u": "range.html#m-incl",
+  "k": "メソッド",
+  "s": "終端を含むなら 1、含まないなら 0（フィールド）",
+  "w": "incl incl 終端を含むなら 1、含まないなら 0（フィールド） Range"
+ },
+ {
+  "t": "Range.rev",
+  "u": "range.html#m-rev",
+  "k": "メソッド",
+  "s": "向きを反転した範囲（プロパティとして r.rev と書く）",
+  "w": "rev rev 向きを反転した範囲（プロパティとして r.rev と書く） Range"
+ },
+ {
+  "t": "FileData",
+  "u": "filedata.html",
+  "k": "クラス",
+  "s": "read_file の結果。ok と text を持つ",
+  "w": "FileData read_file の結果。ok と text を持つ ファイル 読み込み結果 file"
+ },
+ {
+  "t": "print",
+  "u": "print.html",
+  "k": "組み込み",
+  "s": "値を文字列化して改行つきで標準出力へ出す",
+  "w": "print 値を文字列化して改行つきで標準出力へ出す 出力 表示 print 標準出力"
+ },
+ {
+  "t": "eprint",
+  "u": "eprint.html",
+  "k": "組み込み",
+  "s": "print と同じ文字列化で、標準エラー出力へ出す",
+  "w": "eprint print と同じ文字列化で、標準エラー出力へ出す 出力 標準エラー stderr 警告"
+ },
+ {
+  "t": "exit",
+  "u": "exit.html",
+  "k": "組み込み",
+  "s": "その場でプログラムを終了する",
+  "w": "exit その場でプログラムを終了する 終了 終了コード exit 打ち切り"
+ },
+ {
+  "t": "chr",
+  "u": "chr.html",
+  "k": "関数",
+  "s": "文字コードから長さ1の文字列を作る",
+  "w": "chr 文字コードから長さ1の文字列を作る 文字コード 文字 character コード"
+ },
+ {
+  "t": "args",
+  "u": "args.html",
+  "k": "関数",
+  "s": "コマンドライン引数全体を [str] で返す",
+  "w": "args コマンドライン引数全体を [str] で返す コマンドライン引数 引数 argv"
+ },
+ {
+  "t": "read_file",
+  "u": "read_file.html",
+  "k": "関数",
+  "s": "ファイル全体を読んで FileData で返す",
+  "w": "read_file ファイル全体を読んで FileData で返す ファイル 読み込み file 読む"
+ },
+ {
+  "t": "write_file",
+  "u": "write_file.html",
+  "k": "関数",
+  "s": "ファイル全体を書き出す。成功したら真",
+  "w": "write_file ファイル全体を書き出す。成功したら真 ファイル 書き込み file 書く"
+ },
+ {
+  "t": "read_int",
+  "u": "read_int.html",
+  "k": "関数",
+  "s": "標準入力から整数を1つ読む。in の実体",
+  "w": "read_int 標準入力から整数を1つ読む。in の実体 入力 整数 読む 標準入力 input"
+ },
+ {
+  "t": "read_ints",
+  "u": "read_ints.html",
+  "k": "関数",
+  "s": "整数を n 個読んで [int] にする。in[n] の実体",
+  "w": "read_ints 整数を n 個読んで [int] にする。in[n] の実体 入力 整数 複数 読む 標準入力"
+ },
+ {
+  "t": "read_ints2",
+  "u": "read_ints2.html",
+  "k": "関数",
+  "s": "整数を h 行 × w 列で読んで [[int]] にする。in[h][w] の実体",
+  "w": "read_ints2 整数を h 行 × w 列で読んで [[int]] にする。in[h][w] の実体 入力 整数 二次元 グリッド 読む"
+ },
+ {
+  "t": "read_ints_dec",
+  "u": "read_ints_dec.html",
+  "k": "関数",
+  "s": "整数を n 個読み、各要素から 1 引く",
+  "w": "read_ints_dec 整数を n 個読み、各要素から 1 引く 入力 整数 1引く 0始まり 読む"
+ },
+ {
+  "t": "read_token",
+  "u": "read_token.html",
+  "k": "関数",
+  "s": "空白区切りのトークンを1つ読む。in_str の実体",
+  "w": "read_token 空白区切りのトークンを1つ読む。in_str の実体 入力 トークン 文字列 読む 標準入力"
+ },
+ {
+  "t": "read_tokens",
+  "u": "read_tokens.html",
+  "k": "関数",
+  "s": "トークンを n 個読んで [str] にする。in_str[n] の実体",
+  "w": "read_tokens トークンを n 個読んで [str] にする。in_str[n] の実体 入力 トークン 文字列 複数 読む"
+ },
+ {
+  "t": "read_line",
+  "u": "read_line.html",
+  "k": "関数",
+  "s": "1行をそのまま読む。in_line の実体",
+  "w": "read_line 1行をそのまま読む。in_line の実体 入力 1行 行 読む 標準入力"
+ },
+ {
+  "t": "read_str",
+  "u": "read_str.html",
+  "k": "関数",
+  "s": "標準入力の残りを全部読む",
+  "w": "read_str 標準入力の残りを全部読む 入力 全部 残り 読む 標準入力"
+ },
+ {
+  "t": "print_int",
+  "u": "print_int.html",
+  "k": "関数",
+  "s": "整数を標準出力へ出す（改行は付かない）",
+  "w": "print_int 整数を標準出力へ出す（改行は付かない） 出力 整数 表示 print"
+ },
+ {
+  "t": "print_str",
+  "u": "print_str.html",
+  "k": "関数",
+  "s": "文字列をそのまま標準出力へ出す（改行は付かない）",
+  "w": "print_str 文字列をそのまま標準出力へ出す（改行は付かない） 出力 文字列 表示 print"
+ },
+ {
+  "t": "print_yn",
+  "u": "print_yn.html",
+  "k": "関数",
+  "s": "真なら Yes、偽なら No を1行出す。yn の実体",
+  "w": "print_yn 真なら Yes、偽なら No を1行出す。yn の実体 出力 Yes No 真偽"
+ },
+ {
+  "t": "zero_int",
+  "u": "zero_int.html",
+  "k": "関数",
+  "s": "0 を返す初期値ファクトリ",
+  "w": "zero_int 0 を返す初期値ファクトリ 初期値 ファクトリ 0 既定値"
+ },
+ {
+  "t": "zero_bool",
+  "u": "zero_bool.html",
+  "k": "関数",
+  "s": "偽を返す初期値ファクトリ",
+  "w": "zero_bool 偽を返す初期値ファクトリ 初期値 ファクトリ 偽 false 既定値"
+ },
+ {
+  "t": "zero_str",
+  "u": "zero_str.html",
+  "k": "関数",
+  "s": "空文字列を返す初期値ファクトリ",
+  "w": "zero_str 空文字列を返す初期値ファクトリ 初期値 ファクトリ 空文字列 既定値"
+ },
+ {
+  "t": "zero_pos2",
+  "u": "zero_pos2.html",
+  "k": "関数",
+  "s": "原点 (0, 0) を返す初期値ファクトリ",
+  "w": "zero_pos2 原点 (0, 0) を返す初期値ファクトリ 初期値 ファクトリ 座標 原点 既定値"
+ },
+ {
+  "t": "zero_pos3",
+  "u": "zero_pos3.html",
+  "k": "関数",
+  "s": "原点 (0, 0, 0) を返す初期値ファクトリ",
+  "w": "zero_pos3 原点 (0, 0, 0) を返す初期値ファクトリ 初期値 ファクトリ 座標 原点 既定値"
+ },
+ {
+  "t": "zero_array",
+  "u": "zero_array.html",
+  "k": "関数",
+  "s": "空配列を返す補助関数",
+  "w": "zero_array 空配列を返す補助関数 初期値 空配列 補助 既定値"
+ }
+]

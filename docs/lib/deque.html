@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deque&lt;T&gt; — spell ライブラリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="../index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="../index.html">概要</a>
+    <a href="../guide.html">言語ツアー</a>
+    <a href="../reference.html">リファレンス</a>
+    <a href="index.html" class="here">ライブラリ</a>
+    <a href="../sugar.html">糖衣集</a>
+    <a href="../editor.html">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+<div class="layout">
+<aside class="side">
+<div class="lib-search" data-lib-search>
+  <input type="search" placeholder="名前・メソッド・キーワードで検索" aria-label="ライブラリ内検索">
+  <ul class="lib-search-results"></ul>
+</div>
+  <p class="side-h">基本の型</p>
+  <ul class="side-list">
+    <li><a href="str.html">str</a></li>
+    <li><a href="int.html">int</a></li>
+    <li><a href="bool.html">bool</a></li>
+    <li><a href="array.html">array&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">コレクション</p>
+  <ul class="side-list">
+    <li><a href="dict.html">Dict&lt;K, V&gt;</a></li>
+    <li><a href="vec.html">Vec&lt;T&gt;</a></li>
+    <li><a href="deque.html" class="here">Deque&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">座標と範囲</p>
+  <ul class="side-list">
+    <li><a href="pos2.html">Pos2</a></li>
+    <li><a href="pos3.html">Pos3</a></li>
+    <li><a href="range.html">Range</a></li>
+  </ul>
+  <p class="side-h">組み込み</p>
+  <ul class="side-list">
+    <li><a href="print.html">print</a></li>
+    <li><a href="eprint.html">eprint</a></li>
+    <li><a href="exit.html">exit</a></li>
+  </ul>
+  <p class="side-h">入力</p>
+  <ul class="side-list">
+    <li><a href="read_int.html">read_int</a></li>
+    <li><a href="read_ints.html">read_ints</a></li>
+    <li><a href="read_ints2.html">read_ints2</a></li>
+    <li><a href="read_ints_dec.html">read_ints_dec</a></li>
+    <li><a href="read_token.html">read_token</a></li>
+    <li><a href="read_tokens.html">read_tokens</a></li>
+    <li><a href="read_line.html">read_line</a></li>
+    <li><a href="read_str.html">read_str</a></li>
+  </ul>
+  <p class="side-h">出力</p>
+  <ul class="side-list">
+    <li><a href="print_int.html">print_int</a></li>
+    <li><a href="print_str.html">print_str</a></li>
+    <li><a href="print_yn.html">print_yn</a></li>
+  </ul>
+  <p class="side-h">引数とファイル</p>
+  <ul class="side-list">
+    <li><a href="filedata.html">FileData</a></li>
+    <li><a href="args.html">args</a></li>
+    <li><a href="read_file.html">read_file</a></li>
+    <li><a href="write_file.html">write_file</a></li>
+  </ul>
+  <p class="side-h">文字</p>
+  <ul class="side-list">
+    <li><a href="chr.html">chr</a></li>
+  </ul>
+  <p class="side-h">初期値ファクトリ</p>
+  <ul class="side-list">
+    <li><a href="zero_int.html">zero_int</a></li>
+    <li><a href="zero_bool.html">zero_bool</a></li>
+    <li><a href="zero_str.html">zero_str</a></li>
+    <li><a href="zero_pos2.html">zero_pos2</a></li>
+    <li><a href="zero_pos3.html">zero_pos3</a></li>
+    <li><a href="zero_array.html">zero_array</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="../index.html">概要</a></li>
+    <li><a href="../guide.html">言語ツアー</a></li>
+    <li><a href="../reference.html">リファレンス</a></li>
+    <li><a href="../sugar.html">糖衣集</a></li>
+    <li><a href="../editor.html">エディタ連携</a></li>
+  </ul>
+</aside>
+<main class="main">
+<p class="eyebrow">ライブラリ — クラス</p>
+<h1 class="page">Deque&lt;T&gt;</h1>
+<p class="lede">両端キュー。Queue としても Stack としても使える</p>
+<figure class="code">
+  <figcaption>シグネチャ</figcaption>
+<pre>class Deque&lt;T&gt;</pre>
+</figure>
+<p>円環バッファで実装された両端キューです。両端の出し入れは、容量の倍増を除いて定数時間です。構築は <code>Vec</code> と同じく、引数なしの <code>q = Deque()</code>（要素型は <code>int</code>）、型引数つきの <code>q = Deque&lt;str&gt;()</code>、注釈つきの <code>q: Deque&lt;str&gt; = Deque()</code>、ファクトリを渡す <code>q: Deque&lt;int&gt; = Deque(zero_int)</code>、型を引数として渡す <code>q = Deque(Pos2)</code> や <code>q = Deque([int])</code> の各形で書けます。</p>
+<p>出し入れの実体はダンダー <code>__push_back__</code> / <code>__push_front__</code> / <code>__pop_back__</code> / <code>__pop_front__</code> で、公開メソッドはその薄いラッパーです。矢印演算子でも出し入れできます。</p>
+<h2>メソッドと演算</h2>
+<table>
+  <tr><th>シグネチャ</th><th>内容</th></tr>
+  <tr id="m-push_back"><td><code>push_back(v: T)</code></td><td>末尾へ追加する（戻り値なし）</td></tr>
+  <tr id="m-push_front"><td><code>push_front(v: T)</code></td><td>先頭へ追加する（戻り値なし）</td></tr>
+  <tr id="m-pop_back"><td><code>pop_back() -&gt; T</code></td><td>末尾を取り出して返す</td></tr>
+  <tr id="m-pop_front"><td><code>pop_front() -&gt; T</code></td><td>先頭を取り出して返す</td></tr>
+  <tr id="m-front"><td><code>front() -&gt; T</code></td><td>先頭を覗く（取り出さない）</td></tr>
+  <tr id="m-back"><td><code>back() -&gt; T</code></td><td>末尾を覗く（取り出さない）</td></tr>
+  <tr id="m-len"><td><code>len</code></td><td>要素数（プロパティとして <code>q.len</code> と書く）</td></tr>
+  <tr id="m-getitem"><td><code>q[i]</code></td><td>論理位置の読み取り（0 が先頭）。書き込み用の <code>__setitem__</code> は無い</td></tr>
+  <tr id="m-to_array"><td><code>to_array() -&gt; [T]</code></td><td>先頭から末尾の順の通常配列のコピー</td></tr>
+</table>
+<h2>注意</h2>
+<ul>
+  <li><strong>空のときに <code>pop_front</code> / <code>pop_back</code> / <code>front</code> / <code>back</code> を呼ぶのは誤りで、結果は不定です</strong>（検査はしません）。呼ぶ前に <code>len</code> を確認してください</li>
+  <li>反復と <code>to_array()</code> は開始時点のスナップショットに対するものです</li>
+  <li>条件に書くと「空でなければ真」で判定されるため、<code>while q:</code> で空になるまで回せます</li>
+</ul>
+<figure class="code">
+  <figcaption>例 — キューとして使う（矢印演算子）</figcaption>
+<pre>q: Deque&lt;int&gt; = Deque(zero_int)
+q &lt;- 1
+q &lt;- 2
+q.push_front(0)
+&lt;&lt; q.len
+&lt;&lt; q.front()
+&lt;&lt; q.back()
+x &lt;- q
+&lt;&lt; x
+30 -&gt; q
+q -&gt; y
+&lt;&lt; y
+&lt;&lt; q.to_array()</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3
+0
+2
+0
+2
+30 1</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — スタックとして使う</figcaption>
+<pre>s = Deque()
+s.push_back(1)
+s.push_back(2)
+&lt;&lt; s.pop_back()
+&lt;&lt; s.pop_back()
+&lt;&lt; s.len</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2
+1
+0</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 空になるまで回す</figcaption>
+<pre>q = Deque()
+q.push_back(1)
+q.push_back(2)
+q.push_back(3)
+n = 0
+while q:
+    q.pop_front()
+    n = n + 1
+&lt;&lt; n</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3</pre>
+</figure>
+<h2>関係する糖衣構文</h2>
+<ul>
+  <li><a href="../sugar.html#sugar-arrow">矢印演算子 &lt;- / -&gt;（糖衣集 §04）</a></li>
+</ul>
+<h2>関連項目</h2>
+<ul>
+  <li><a href="vec.html">Vec&lt;T&gt;</a> — 伸びる配列。末尾への追加が均し定数時間</li>
+  <li><a href="array.html">array&lt;T&gt;</a> — 配列。リテラル [1, 2, 3] が作る、要素型 T の列</li>
+  <li><a href="pos2.html">Pos2</a> — 二次元座標。リテラル (1, 2) が作る</li>
+  <li><a href="zero_int.html">zero_int</a> — 0 を返す初期値ファクトリ</li>
+</ul>
+</main>
+</div>
+<footer>
+  <span>spell — <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a></span>
+  <span>ドキュメントは <a href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC BY 4.0</a> で公開しています</span>
+</footer>
+<script src="search.js"></script>
+</div>
+</body>
+</html>

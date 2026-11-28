@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>write_file — spell ライブラリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="../index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="../index.html">概要</a>
+    <a href="../guide.html">言語ツアー</a>
+    <a href="../reference.html">リファレンス</a>
+    <a href="index.html" class="here">ライブラリ</a>
+    <a href="../sugar.html">糖衣集</a>
+    <a href="../editor.html">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+<div class="layout">
+<aside class="side">
+<div class="lib-search" data-lib-search>
+  <input type="search" placeholder="名前・メソッド・キーワードで検索" aria-label="ライブラリ内検索">
+  <ul class="lib-search-results"></ul>
+</div>
+  <p class="side-h">基本の型</p>
+  <ul class="side-list">
+    <li><a href="str.html">str</a></li>
+    <li><a href="int.html">int</a></li>
+    <li><a href="bool.html">bool</a></li>
+    <li><a href="array.html">array&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">コレクション</p>
+  <ul class="side-list">
+    <li><a href="dict.html">Dict&lt;K, V&gt;</a></li>
+    <li><a href="vec.html">Vec&lt;T&gt;</a></li>
+    <li><a href="deque.html">Deque&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">座標と範囲</p>
+  <ul class="side-list">
+    <li><a href="pos2.html">Pos2</a></li>
+    <li><a href="pos3.html">Pos3</a></li>
+    <li><a href="range.html">Range</a></li>
+  </ul>
+  <p class="side-h">組み込み</p>
+  <ul class="side-list">
+    <li><a href="print.html">print</a></li>
+    <li><a href="eprint.html">eprint</a></li>
+    <li><a href="exit.html">exit</a></li>
+  </ul>
+  <p class="side-h">入力</p>
+  <ul class="side-list">
+    <li><a href="read_int.html">read_int</a></li>
+    <li><a href="read_ints.html">read_ints</a></li>
+    <li><a href="read_ints2.html">read_ints2</a></li>
+    <li><a href="read_ints_dec.html">read_ints_dec</a></li>
+    <li><a href="read_token.html">read_token</a></li>
+    <li><a href="read_tokens.html">read_tokens</a></li>
+    <li><a href="read_line.html">read_line</a></li>
+    <li><a href="read_str.html">read_str</a></li>
+  </ul>
+  <p class="side-h">出力</p>
+  <ul class="side-list">
+    <li><a href="print_int.html">print_int</a></li>
+    <li><a href="print_str.html">print_str</a></li>
+    <li><a href="print_yn.html">print_yn</a></li>
+  </ul>
+  <p class="side-h">引数とファイル</p>
+  <ul class="side-list">
+    <li><a href="filedata.html">FileData</a></li>
+    <li><a href="args.html">args</a></li>
+    <li><a href="read_file.html">read_file</a></li>
+    <li><a href="write_file.html" class="here">write_file</a></li>
+  </ul>
+  <p class="side-h">文字</p>
+  <ul class="side-list">
+    <li><a href="chr.html">chr</a></li>
+  </ul>
+  <p class="side-h">初期値ファクトリ</p>
+  <ul class="side-list">
+    <li><a href="zero_int.html">zero_int</a></li>
+    <li><a href="zero_bool.html">zero_bool</a></li>
+    <li><a href="zero_str.html">zero_str</a></li>
+    <li><a href="zero_pos2.html">zero_pos2</a></li>
+    <li><a href="zero_pos3.html">zero_pos3</a></li>
+    <li><a href="zero_array.html">zero_array</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="../index.html">概要</a></li>
+    <li><a href="../guide.html">言語ツアー</a></li>
+    <li><a href="../reference.html">リファレンス</a></li>
+    <li><a href="../sugar.html">糖衣集</a></li>
+    <li><a href="../editor.html">エディタ連携</a></li>
+  </ul>
+</aside>
+<main class="main">
+<p class="eyebrow">ライブラリ — 関数</p>
+<h1 class="page">write_file</h1>
+<p class="lede">ファイル全体を書き出す。成功したら真</p>
+<figure class="code">
+  <figcaption>シグネチャ</figcaption>
+<pre>def write_file(path: str, text: str) -&gt; bool</pre>
+</figure>
+<p>文字列をファイルへ丸ごと書き出します。既存のファイルは置き換えられます。全部書けて閉じられたら真、失敗したら偽を返します。</p>
+<figure class="code">
+  <figcaption>例 — 書いて読み戻す</figcaption>
+<pre>ok = write_file("memo.txt", "abc")
+&lt;&lt; ok
+f = read_file("memo.txt")
+&lt;&lt; f.text</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>true
+abc</pre>
+</figure>
+<h2>関連項目</h2>
+<ul>
+  <li><a href="filedata.html">FileData</a> — read_file の結果。ok と text を持つ</li>
+  <li><a href="read_file.html">read_file</a> — ファイル全体を読んで FileData で返す</li>
+</ul>
+</main>
+</div>
+<footer>
+  <span>spell — <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a></span>
+  <span>ドキュメントは <a href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC BY 4.0</a> で公開しています</span>
+</footer>
+<script src="search.js"></script>
+</div>
+</body>
+</html>
