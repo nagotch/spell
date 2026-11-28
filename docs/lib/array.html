@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>array&lt;T&gt; — spell ライブラリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="../index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="../index.html">概要</a>
+    <a href="../guide.html">言語ツアー</a>
+    <a href="../reference.html">リファレンス</a>
+    <a href="index.html" class="here">ライブラリ</a>
+    <a href="../sugar.html">糖衣集</a>
+    <a href="../editor.html">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+<div class="layout">
+<aside class="side">
+<div class="lib-search" data-lib-search>
+  <input type="search" placeholder="名前・メソッド・キーワードで検索" aria-label="ライブラリ内検索">
+  <ul class="lib-search-results"></ul>
+</div>
+  <p class="side-h">基本の型</p>
+  <ul class="side-list">
+    <li><a href="str.html">str</a></li>
+    <li><a href="int.html">int</a></li>
+    <li><a href="bool.html">bool</a></li>
+    <li><a href="array.html" class="here">array&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">コレクション</p>
+  <ul class="side-list">
+    <li><a href="dict.html">Dict&lt;K, V&gt;</a></li>
+    <li><a href="vec.html">Vec&lt;T&gt;</a></li>
+    <li><a href="deque.html">Deque&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">座標と範囲</p>
+  <ul class="side-list">
+    <li><a href="pos2.html">Pos2</a></li>
+    <li><a href="pos3.html">Pos3</a></li>
+    <li><a href="range.html">Range</a></li>
+  </ul>
+  <p class="side-h">組み込み</p>
+  <ul class="side-list">
+    <li><a href="print.html">print</a></li>
+    <li><a href="eprint.html">eprint</a></li>
+    <li><a href="exit.html">exit</a></li>
+  </ul>
+  <p class="side-h">入力</p>
+  <ul class="side-list">
+    <li><a href="read_int.html">read_int</a></li>
+    <li><a href="read_ints.html">read_ints</a></li>
+    <li><a href="read_ints2.html">read_ints2</a></li>
+    <li><a href="read_ints_dec.html">read_ints_dec</a></li>
+    <li><a href="read_token.html">read_token</a></li>
+    <li><a href="read_tokens.html">read_tokens</a></li>
+    <li><a href="read_line.html">read_line</a></li>
+    <li><a href="read_str.html">read_str</a></li>
+  </ul>
+  <p class="side-h">出力</p>
+  <ul class="side-list">
+    <li><a href="print_int.html">print_int</a></li>
+    <li><a href="print_str.html">print_str</a></li>
+    <li><a href="print_yn.html">print_yn</a></li>
+  </ul>
+  <p class="side-h">引数とファイル</p>
+  <ul class="side-list">
+    <li><a href="filedata.html">FileData</a></li>
+    <li><a href="args.html">args</a></li>
+    <li><a href="read_file.html">read_file</a></li>
+    <li><a href="write_file.html">write_file</a></li>
+  </ul>
+  <p class="side-h">文字</p>
+  <ul class="side-list">
+    <li><a href="chr.html">chr</a></li>
+  </ul>
+  <p class="side-h">初期値ファクトリ</p>
+  <ul class="side-list">
+    <li><a href="zero_int.html">zero_int</a></li>
+    <li><a href="zero_bool.html">zero_bool</a></li>
+    <li><a href="zero_str.html">zero_str</a></li>
+    <li><a href="zero_pos2.html">zero_pos2</a></li>
+    <li><a href="zero_pos3.html">zero_pos3</a></li>
+    <li><a href="zero_array.html">zero_array</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="../index.html">概要</a></li>
+    <li><a href="../guide.html">言語ツアー</a></li>
+    <li><a href="../reference.html">リファレンス</a></li>
+    <li><a href="../sugar.html">糖衣集</a></li>
+    <li><a href="../editor.html">エディタ連携</a></li>
+  </ul>
+</aside>
+<main class="main">
+<p class="eyebrow">ライブラリ — クラス</p>
+<h1 class="page">array&lt;T&gt;</h1>
+<p class="lede">配列。リテラル [1, 2, 3] が作る、要素型 T の列</p>
+<figure class="code">
+  <figcaption>シグネチャ</figcaption>
+<pre>class array&lt;T&gt;</pre>
+</figure>
+<p>配列リテラル <code>[1, 2, 3]</code>、詰め物つきの生成 <code>[fill; n]</code>、空の <code>[]</code> が作ります。リテラルは評価のたびに新しい配列が作られます（前に作った配列が上書きされることはありません）。<code>[fill; n]</code> の fill が配列リテラルのときは、スロットごとに中身までコピーされるため、行同士が共有されることはありません。fill が変数や呼び出し結果のときは、同じ値が全スロットに入ります。</p>
+<p>配列は容量を持ちます。作りたての配列は容量＝要素数です。</p>
+<h2>メソッドと演算</h2>
+<table>
+  <tr><th>シグネチャ</th><th>内容</th></tr>
+  <tr id="m-len"><td><code>len</code></td><td>要素数（プロパティとして <code>a.len</code> と書く）</td></tr>
+  <tr id="m-getitem"><td><code>a[i]</code></td><td>要素の読み書き。添え字は回り込みます（下の「添え字の回り込み」参照）</td></tr>
+  <tr id="m-safeindex"><td><code>a?[i][j]...</code></td><td>安全添え字。全段の範囲を検査する読み取り専用の形（下の「安全添え字」参照）</td></tr>
+  <tr id="m-slice"><td><code>a[i:j]</code></td><td>スライス。i 以上 j 未満の部分配列（要素をコピーした新しい配列）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める</td></tr>
+  <tr id="m-append"><td><code>append(v) -&gt; int</code></td><td>末尾に要素を足し、新しい要素数を返す。コンパイラが処理する組み込み操作（下の「append と別名」参照）</td></tr>
+  <tr id="m-add"><td><code>a + b</code></td><td>連結した新しい配列（<code>__add__</code>）</td></tr>
+  <tr id="m-mul"><td><code>a * n</code></td><td><code>n</code> 回繰り返した新しい配列（<code>__mul__</code>）</td></tr>
+  <tr id="m-eq"><td><code>a == b / a != b</code></td><td>中身の比較。順序比較（<code>&lt;</code> / <code>&lt;=</code>）は無く、エラーになる</td></tr>
+  <tr id="m-sort"><td><code>sort()</code></td><td>昇順に並べ替える（インプレース）。<strong>安定ソートではない</strong>（等しい要素の前後関係は保たれない）。要素型に <code>__lt__</code> が必要</td></tr>
+  <tr id="m-sorted"><td><code>sorted() -&gt; [T]</code></td><td>並べ替えた新しい配列（元の配列は変わらない）。要素型に <code>__lt__</code> が必要</td></tr>
+  <tr id="m-sum"><td><code>sum() -&gt; T</code></td><td>全要素を先頭から <code>+</code> で畳み込んだ値。要素型に <code>__add__</code> が必要。<strong>空の配列では結果は不定</strong></td></tr>
+  <tr id="m-min"><td><code>min() -&gt; T / max() -&gt; T</code></td><td>最小・最大の要素。要素型に <code>__lt__</code> が必要。<strong>空の配列では結果は不定</strong></td></tr>
+  <tr id="m-count"><td><code>count(v: T) -&gt; int</code></td><td><code>v</code> と等しい要素の個数。等しさは要素型の <code>==</code> で判定する</td></tr>
+  <tr id="m-rev"><td><code>rev</code></td><td>逆順にした新しい配列（元の配列は変わらない。プロパティとして <code>a.rev</code> と書く）</td></tr>
+  <tr><td><code>sort_range(lo: int, hi: int)</code></td><td><code>sort</code> / <code>sorted</code> の内部補助。通常は直接使わない</td></tr>
+</table>
+<h2>添え字の回り込み</h2>
+<p>通常の添え字 <code>a[i]</code> は、実効添え字を <code>i % a.len</code>（<code>%</code> と同じ Python 式で、負数でも 0 以上）として解釈します。そのため <code>a[-1]</code> は最後の要素、<code>a[a.len]</code> は先頭の要素を指し、読み書きのどちらでも同じです。入れ子の配列では段ごとに回り込み、座標添え字 <code>a[p]</code> も成分ごとに回り込みます。長さ 0 の配列は余りが取れないため、添え字アクセスは不定です。範囲外を厳密に判定したい場合は安全添え字を使ってください。<code>str</code> の添え字も同じく回り込みます。</p>
+<h2>安全添え字</h2>
+<p><code>a?[i][j]...</code> は範囲チェックつきの読み取りです。対象の直後に <code>?</code> を1回だけ置き、後ろに通常の添え字の連鎖を続けます。単独で書くと「連鎖の全段とも範囲内か」を表す <code>bool</code> になり、比較の直接の被演算子として書くと、どこかの段で範囲外なら比較全体が <code>false</code>（<code>!=</code> でも <code>false</code>）になります。対象と各添え字はちょうど1回だけ評価され、範囲チェックは浅い段から順に短絡します。対象にできるのは配列と <code>str</code> だけで、代入先には使えず、連鎖比較の中でも使えません（どちらもコンパイルエラー）。</p>
+<h2>append と別名</h2>
+<p><code>append</code> は prelude のメソッドではなく、コンパイラが処理する組み込み操作です（メソッドでは呼び出し元の変数を付け替えられないため）。対象にできるのは、変数・フィールド・配列の要素など、スロットを持つ場所だけです（<code>(a + b).append(x)</code> のような一時値への append はエラー）。容量に空きがある間は同じブロックが伸びて別名からも見えますが、容量を超える append では新しいブロックへコピーして対象の変数だけが付け替わります（別名や、引数として渡した先の呼び出し元には伝わりません）。</p>
+<p>条件に配列を書くと「空でなければ真」で判定されます（<code>__bool__</code>）。配列には <code>__hash__</code> がありますが、書き換え可能なため、辞書のキーにした後で中身を変えるとそのエントリは引けなくなります。</p>
+<figure class="code">
+  <figcaption>例 — 基本と回り込み</figcaption>
+<pre>a = [10, 20, 30]
+&lt;&lt; a.len
+&lt;&lt; a[-1]
+&lt;&lt; a[3]
+a[-1] = 99
+&lt;&lt; a</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3
+30
+10
+10 20 99</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 安全添え字</figcaption>
+<pre>a = [10, 20, 30]
+&lt;&lt; a?[1]
+&lt;&lt; a?[3]
+&lt;&lt; a?[1] == 20
+&lt;&lt; a?[5] != 20</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>true
+false
+true
+false</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — スライス</figcaption>
+<pre>a = [10, 20, 30, 40]
+&lt;&lt; a[1:3]
+&lt;&lt; a[-2:]
+&lt;&lt; a[3:2].len</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>20 30
+30 40
+0</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — append と別名</figcaption>
+<pre>a = [1, 2, 3]
+r = a.append(4)
+&lt;&lt; a
+&lt;&lt; r
+b = a
+a.append(5)
+&lt;&lt; a.len
+&lt;&lt; b.len
+e: [int] = []
+for i in 20:
+    e.append(i)
+&lt;&lt; e.len</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1 2 3 4
+4
+5
+5
+20</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — sort / sum / min / max / count</figcaption>
+<pre>a = [5, 2, 9, 1, 7]
+&lt;&lt; a.sum()
+&lt;&lt; a.min()
+&lt;&lt; a.max()
+&lt;&lt; a.count(2)
+a.sort()
+&lt;&lt; a
+b = [3, 1, 2]
+&lt;&lt; b.sorted()
+&lt;&lt; b</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>24
+1
+9
+1
+1 2 5 7 9
+1 2 3
+3 1 2</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 連結・繰り返し・逆順</figcaption>
+<pre>&lt;&lt; [1, 2] + [3]
+&lt;&lt; [0] * 3
+&lt;&lt; [1, 2, 3].rev</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1 2 3
+0 0 0
+3 2 1</pre>
+</figure>
+<h2>ArrayIter — 配列の反復子</h2>
+<p><code>a.__iter__()</code> が返す反復子で、<code>Vec</code> と <code>Deque</code> の反復にも使われます。配列そのものへの反復では、ループ変数への代入は要素へ書き戻されます（<code>__set_current__</code>）。反復中に <code>append</code> した場合、容量内の append は反復にも伸びが見え、容量を超えて付け替えられた後は、反復子は元のブロックの範囲をたどります。</p>
+<figure class="code">
+  <figcaption>例 — 反復での書き戻し</figcaption>
+<pre>a = [1, 2, 3]
+for x in a:
+    x = x * 10
+&lt;&lt; a</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>10 20 30</pre>
+</figure>
+<h2>関係する糖衣構文</h2>
+<ul>
+  <li><a href="../sugar.html#sugar-safe-index">安全添え字 a?[i][j]（糖衣集 §04）</a></li>
+  <li><a href="../sugar.html#sugar-slice">スライス x[i:j]（糖衣集 §04）</a></li>
+  <li><a href="../sugar.html#sugar-rev">.rev（糖衣集 §04）</a></li>
+  <li><a href="../sugar.html#sugar-noparen">0引数メソッドの括弧省略（糖衣集 §05）</a></li>
+</ul>
+<h2>関連項目</h2>
+<ul>
+  <li><a href="str.html">str</a> — 文字列。文字コードの列を包む組み込みクラス</li>
+  <li><a href="vec.html">Vec&lt;T&gt;</a> — 伸びる配列。末尾への追加が均し定数時間</li>
+  <li><a href="deque.html">Deque&lt;T&gt;</a> — 両端キュー。Queue としても Stack としても使える</li>
+  <li><a href="dict.html">Dict&lt;K, V&gt;</a> — 辞書。キーが無ければ既定値を生やす defaultdict 式</li>
+</ul>
+</main>
+</div>
+<footer>
+  <span>spell — <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a></span>
+  <span>ドキュメントは <a href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC BY 4.0</a> で公開しています</span>
+</footer>
+<script src="search.js"></script>
+</div>
+</body>
+</html>
