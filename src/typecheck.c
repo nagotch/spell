@@ -2961,12 +2961,19 @@ static Type* check_return(Node* node) {
     // が消える以上、そのまま呼び出し側へ所有を移して安全。prelude
     // の __add__ や sorted のような「ローカルに作って返す」形で
     // 無駄な複製を避けるための省略。グローバル変数とキャプチャ
-    // 変数は呼び出し後も残るので、従来どおりコピーする
+    // 変数は呼び出し後も残るので、従来どおりコピーする。
+    // 例外はメソッドの self（第0パラメータ、スロット offset 8）:
+    // self は借用で、レシーバの配列そのものは呼び出し側が持って
+    // いる。`return self` を省略するとレシーバと戻り値が同じ配列
+    // になってしまうので、self だけはコピーする（Luna 指摘）
     if (node->left_child) {
         Type* eff = current_return ? current_return : rt;
         Type* vt = rt->kind == TY_ARRAY ? rt : eff;
+        bool self_return = current_fn && current_fn->klass &&
+            node->left_child->kind == ND_LVAR &&
+            node->left_child->offset == 8;
         if (vt && vt->kind == TY_ARRAY &&
-            node->left_child->kind != ND_LVAR) {
+            (node->left_child->kind != ND_LVAR || self_return)) {
             node->left_child = bind_copy(node->left_child, vt);
         }
     }
