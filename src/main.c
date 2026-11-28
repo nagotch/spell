@@ -35,6 +35,7 @@ int main(int argc, char **argv) {
     } else {
         prog = user_prog;
     }
+    prog = ensure_entry_point(prog);
     desugar(prog);
     typecheck(prog);
 
