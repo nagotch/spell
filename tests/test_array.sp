@@ -182,6 +182,11 @@ def t123() { a = [1, 2, 3]; a[-1] += 10; a[3] += 100; return a[0] * 10000 + a[2]
 def t124() { g = [[1], [2]]; g[-1].append(5); g[2].append(7); return g[0].len * 1000 + g[1].len * 100 + g[1][1] * 10 + g[0][1]; }
 def t125() { s = "abc"; r = 0; if (s[-1] == "c") { r = r + 1; } if (s[3] == "a") { r = r + 2; } if (s[4] == "b") { r = r + 4; } if (s[-4] == "c") { r = r + 8; } return r; }
 def t126() { a = [10, 20, 30]; r = 0; if (a?[-1]) { r = r + 1; } if (a?[3] == 10) { r = r + 2; } if (a?[2] == 30) { r = r + 4; } s = "abc"; if (s?[-1]) { r = r + 8; } if (s?[3] == "a") { r = r + 16; } if (s?[2] == "c") { r = r + 32; } return r; }
+def t127() { a = [10, 20, 30]; return a[-3] * 1000000 + a[6] * 10000 + a[-4] * 100 + a[7]; }
+def t128() { b = [42]; return b[1] * 1000 + b[-1] * 100 + b[2] * 10 + b[-2]; }
+def t129() { a = [10, 20, 30]; a[-3] = 1; a[6] = 2; a[-4] = 3; a[7] = 4; return a[0] * 10000 + a[1] * 100 + a[2]; }
+def t130() { a = [10, 20, 30]; i = 0 - 3; r = a[i]; i = 6; r = r * 100 + a[i]; i = 0 - 4; r = r * 100 + a[i]; i = 7; r = r * 100 + a[i]; return r; }
+def t131() { s = "abc"; r = 0; if (s[-3] == "a") { r = r + 1; } if (s[6] == "a") { r = r + 2; } if (s[-4] == "c") { r = r + 4; } if (s[7] == "b") { r = r + 8; } return r; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -322,6 +327,11 @@ def main() {
     mark(124); fails=fails+check(t124(), 2257);
     mark(125); fails=fails+check(t125(), 15);
     mark(126); fails=fails+check(t126(), 36);
+    mark(127); fails=fails+check(t127(), 10103020);
+    mark(128); fails=fails+check(t128(), 46662);
+    mark(129); fails=fails+check(t129(), 20403);
+    mark(130); fails=fails+check(t130(), 10103020);
+    mark(131); fails=fails+check(t131(), 15);
 
     print_str("done"); putchar(10);
     return fails > 0;
