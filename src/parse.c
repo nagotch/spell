@@ -1225,7 +1225,18 @@ static int parse_params(Type* param_types[6]) {
     int nparams = 0;
     if (!consume(")")) {
         do {
-            register_lvar(consume_ident());
+            Token* ptok = consume_ident();
+            if (!ptok) {
+                // 名前の無いパラメータや、リストの途中での EOF。ここで
+                // 止めないと register_lvar が NULL を読んで落ちる（step 87）
+                char* actual = token_text(token);
+                if (actual) {
+                    error_at(token_start(token), token_end(token), "引数名が必要ですが、%sが見つかりました", actual);
+                } else {
+                    error_at(token_start(token), token_end(token), "引数名が必要ですが、ファイルの末尾に達しました");
+                }
+            }
+            register_lvar(ptok);
             if (consume(":")) {
                 Type* pt = parse_type();
                 if (nparams < 6) {
@@ -1365,7 +1376,16 @@ Node* parse_lambda(bool arrow, Token* kw) {
                 expect(")");
             }
         } else {
-            register_lvar(consume_ident());
+            Token* p = consume_ident();
+            if (!p) {
+                char* actual = token_text(token);
+                if (actual) {
+                    error_at(token_start(token), token_end(token), "引数名が必要ですが、%sが見つかりました", actual);
+                } else {
+                    error_at(token_start(token), token_end(token), "引数名が必要ですが、ファイルの末尾に達しました");
+                }
+            }
+            register_lvar(p);
             nparams = 1;
         }
         if (nparams > 6) {

@@ -409,6 +409,56 @@ static Type* check_assign(Node* node) {
     if (node->left_child->kind == ND_SLICE) {
         error_node(node->left_child, "スライスには代入できません");
     }
+    // 複合代入と ++/-- は脱糖で対象ノードが代入先と二項演算の被演算子に
+    // 共有される（右辺の左の子と代入先が同一ノード）。対象が添え字・
+    // フィールドだと、オブジェクト式と添え字が読み書きで2回評価され、
+    // 副作用があると読み書きの対象がずれる（step 87）。そこで対象の
+    // 動的な部分を一時スロットへ1回だけ評価する代入に置き換え、読み
+    // 取り側はスロット読みで組み直す。スロットは parse 時に
+    // ND_OPASSIGN が node->offset から2つ確保してある
+    {
+        Node* lhs0 = node->left_child;
+        if (node->right_child->kind == ND_BINOP && node->right_child->left_child == lhs0
+                && (lhs0->kind == ND_INDEX || lhs0->kind == ND_MEMBER)) {
+            int base_off = node->offset;
+            Node* base_slot = create_node(ND_LVAR);
+            base_slot->offset = base_off;
+            base_slot->tok = lhs0->tok;
+            Node* base_assign = create_node(ND_ASSIGN);
+            base_assign->tok = lhs0->tok;
+            base_assign->left_child = base_slot;
+            base_assign->right_child = lhs0->left_child;
+            check_node(base_assign);
+            Node* base_read = create_node(ND_LVAR);
+            base_read->offset = base_off;
+            base_read->tok = lhs0->tok;
+            Node* read = create_node(lhs0->kind);
+            read->tok = lhs0->tok;
+            read->offset = lhs0->offset;
+            read->left_child = base_read;
+            lhs0->left_child = base_assign;
+            if (lhs0->kind == ND_INDEX) {
+                int idx_off = base_off + 8;
+                Node* idx_slot = create_node(ND_LVAR);
+                idx_slot->offset = idx_off;
+                idx_slot->tok = lhs0->tok;
+                Node* idx_assign = create_node(ND_ASSIGN);
+                idx_assign->tok = lhs0->tok;
+                idx_assign->left_child = idx_slot;
+                idx_assign->right_child = lhs0->right_child;
+                check_node(idx_assign);
+                Node* idx_read = create_node(ND_LVAR);
+                idx_read->offset = idx_off;
+                idx_read->tok = lhs0->tok;
+                read->right_child = idx_read;
+                lhs0->right_child = idx_assign;
+            } else {
+                read->name = lhs0->name;
+                read->len = lhs0->len;
+            }
+            node->right_child->left_child = read;
+        }
+    }
     // 右辺への期待型: 注釈があれば注釈、なければ代入先の記録済みの型
     if (node->anno) {
         expected_type = node->anno;
@@ -1111,6 +1161,54 @@ static Type* check_member(Node* node) {
 // スロットを持つ場所（変数・捕捉変数・フィールド・配列の要素）だけに
 // 限る。計算された一時値への append は、書き戻す先が無いのでエラー。
 // 戻り値は新しい長さ（int）
+// 型の木を depth 段だけ elem へ降りた位置の部分型を new_sub に置き換えた
+// 新しい木を返す（append の要素型の確定で使う。元の木は壊さない）
+static Type* replace_type_at_depth(Type* t, int depth, Type* new_sub) {
+    if (depth == 0) {
+        return new_sub;
+    }
+    if (!t || t->kind != TY_ARRAY) {
+        return t;
+    }
+    return array_type(replace_type_at_depth(t->elem, depth - 1, new_sub));
+}
+
+// `x = []` のように要素型が unknown のまま育てる配列へ append したとき、
+// 引数の型で要素型を確定させ、受け側のルート変数の記録型へ反映する
+// （step 87）。確定しないと、戻り値型の検査をすり抜けたり、安全添え字が
+// 型不明として範囲チェック無しに落ちたり、Pos 添え字の深さ判定が
+// 育った配列を誤ったりする。ルートがローカル/グローバル変数でない
+// 受け側（フィールド・捕捉変数経由）は対象外で、従来どおり unknown の
+// まま緩く扱う
+static void refine_append_target(Node* recv, Type* arg) {
+    int depth = 0;
+    Node* root = recv;
+    while (root->kind == ND_INDEX) {
+        depth++;
+        root = root->left_child;
+    }
+    if (root->kind != ND_LVAR && root->kind != ND_GVAR) {
+        return;
+    }
+    Type* refined_recv = array_type(arg);
+    if (root->kind == ND_LVAR) {
+        Type* recorded = local_types[root->offset / 8];
+        if (!recorded || recorded->kind != TY_ARRAY) {
+            return;
+        }
+        local_types[root->offset / 8] = replace_type_at_depth(recorded, depth, refined_recv);
+        root->type = local_types[root->offset / 8];
+    } else {
+        Type* recorded = find_global_type(root);
+        if (!recorded || recorded->kind != TY_ARRAY) {
+            return;
+        }
+        record_global_type(root, replace_type_at_depth(recorded, depth, refined_recv));
+        root->type = find_global_type(root);
+    }
+    recv->type = refined_recv;
+}
+
 static Type* check_append(Node* node, Type* obj) {
     Node* recv = node->left_child;
     bool lvalue = recv->kind == ND_LVAR || recv->kind == ND_GVAR
@@ -1128,6 +1226,9 @@ static Type* check_append(Node* node, Type* obj) {
     } else if (arg_types[0]->kind != TY_UNKNOWN && obj->elem->kind != TY_UNKNOWN
             && !type_equals(obj->elem, arg_types[0])) {
         error_node(node, "`append`の引数には`%s`が必要ですが、`%s`が指定されています", type_text(obj->elem), type_text(arg_types[0]));
+    } else if (nargs == 1 && obj->elem->kind == TY_UNKNOWN && arg_types[0]->kind != TY_UNKNOWN) {
+        // 要素型がまだ決まっていない受け側は、この append で確定させる
+        refine_append_target(recv, arg_types[0]);
     }
     if (!lvalue || nargs != 1) {
         // 形が壊れた呼び出しは書き換えない。キャプチャ有効時（LSP）は
@@ -2076,10 +2177,16 @@ static void collect_defs_node(Node* node, DefName** locals) {
     } else if (node->kind == ND_FOR) {
         collect_def_target(node->left_child, locals);
     } else if (node->kind == ND_ARROW_L || node->kind == ND_ARROW_R) {
-        // 矢印は向きと型で代入先が決まる。収集の段階では判別できない
-        // ため、両辺の直接の変数を定義として拾う（安全側）
-        collect_def_target(node->left_child, locals);
-        collect_def_target(node->right_child, locals);
+        // 矢印は向きと型で代入先が決まる。収集の段階では判別できないが、
+        // 代入先になりうる側は向きで決まっている（`A <- B` なら A、
+        // `A -> B` なら B）。値として読まれる側は定義として拾わない
+        // （step 87: `q <- misspelled` のような値側の未定義変数が
+        // 定義済み扱いになって検査をすり抜けていた）
+        if (node->kind == ND_ARROW_L) {
+            collect_def_target(node->left_child, locals);
+        } else {
+            collect_def_target(node->right_child, locals);
+        }
     }
     collect_defs_node(node->left_child, locals);
     collect_defs_node(node->right_child, locals);

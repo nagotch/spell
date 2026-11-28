@@ -83,6 +83,27 @@ tests=(
     "def f(a) -> int { r: [int] = a[1:3]; return r.len; } def main() { return f([10, 20, 30, 40]) + 40; }|42"
     # step 85: スライスの評価順は対象→下限→上限（Luna レビューの回帰）
     "log = \"\"; def tgt() -> str { log = log + \"T\"; return \"abcdef\"; } def lo2() -> int { log = log + \"L\"; return 1; } def hi2() -> int { log = log + \"H\"; return 4; } def main() { s = tgt()[lo2():hi2()]; if (log == \"TLH\" && s == \"bcd\") { return 42; } return 0; }|42"
+    # step 87: 32ビットに収まらない整数リテラルがアセンブラエラーに
+    # ならず使えること（代入・比較・配列要素）
+    "def main() { x = 2147483648; if (x == 2147483648) { return 42; } return 0; }|42"
+    "def main() { if (9223372036854775807 - 9223372036854775806 == 1) { return 42; } return 0; }|42"
+    "def main() { a = [3000000000, 5]; return (a[0] + a[1] - 3000000000) + 37; }|42"
+    # step 87: 配列リテラルは評価ごとに新しい配列になる（ループ内での
+    # 再評価で前に保持した配列が化けない／関数から返しても化けない）
+    "def main() { first = [0]; i = 0; while (i < 2) { a = [i]; if (i == 0) { first = a; } i = i + 1; } return first[0] + 42; }|42"
+    "def one(x: int) -> [int] { return [x]; } def main() { a = one(11); b = one(22); return a[0] + 31; }|42"
+    # step 87: append で要素型が確定し、育てたグリッドでも安全添え字の
+    # 範囲チェックと Pos 添え字の深さ判定が効く
+    "def main() { rows = []; rows.append([7]); if (rows[0]?[5]) { return 1; } if (rows[0]?[0]) { return 42; } return 0; }|42"
+    "def main() { d = []; d.append([0, 0]); d.append([0, 0]); d[(1, 1)] = 42; return d[(1, 1)]; }|42"
+    # step 87: 複合代入・++ は代入先の添え字・オブジェクト式を1回だけ
+    # 評価する（副作用つき添え字と、呼び出し結果へのフィールド代入）
+    "cnt = 0; def idx() -> int { cnt = cnt + 1; return cnt - 1; } def main() { a = [10, 20]; a[idx()] += 5; if (a[0] == 15 && a[1] == 20 && cnt == 1) { return 42; } return 0; }|42"
+    "class B { v: int; def __init__(self, v: int) { self.v = v; } } boxes: [B] = []; def mk() -> B { b = B(10); boxes.append(b); return b; } def main() { mk().v += 32; return boxes[0].v; }|42"
+    # step 87: 矢印の pop 先（代入先になる側）は従来どおり新しい変数の
+    # 定義として扱える（値側の検査を締めても壊れないこと）
+    "def main() { q = Deque(int); q <- 42; x <- q; return x; }|42"
+    "def main() { q = Deque(int); q <- 7; w = 0; q -> w; return w + 35; }|42"
 )
 
 error_tests=(
@@ -291,6 +312,18 @@ def main():
     "def main() { >> a[-2]; return 0; }|個数に負の数は指定できません"
     "def main() { >> a[2][-1]; return 0; }|個数に負の数は指定できません"
     "def main() { >>> s[-1]; return 0; }|個数に負の数は指定できません"
+    # step 87: 名前の無いパラメータ／パラメータリスト途中の EOF は
+    # コンパイラが落ちず位置つきエラーになる
+    "def f(x: int, : str) -> bool { return true; } def main() { return 0; }|引数名が必要ですが"
+    "def main (|引数名が必要ですが"
+    "def main() { f = fn(: int) -> int { return 1; }; return f(0); }|引数名が必要ですが"
+    # step 87: append で要素型が確定するため、宣言済みの戻り値型と
+    # 違う要素を append して返すと検査で止まる。確定後の型違いの
+    # append もエラーになる
+    "def ints() -> [int] { a = []; a.append(\"wrong\"); return a; } def main() { return 0; }|戻り値は"
+    "def main() { a = []; a.append(1); a.append(\"s\"); return 0; }|append\`の引数には\`int\`が必要です"
+    # step 87: 矢印 push の値側でも未定義変数の検査が効く
+    "def main() { q = Deque(int); q <- misspelled; return 0; }|変数\`misspelled\`は定義されていません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -1201,6 +1234,11 @@ print(n)
 " "" "4\n"
 # step 85: スライスと文字列メソッド第1弾の出力
 one_io_test "def main() { s = \"hello world\"; print(s[0:5]); print(s[6:]); print(s[-5:]); print(s[3:2].len); a = [10, 20, 30, 40]; print(a[1:3]); print(a[-2:]); print(s.find(\"o\")); print(s.find(\"zz\")); print(\"a,b,,c\".split(\",\")); print(\"-\".join([\"a\", \"b\", \"c\"])); print(\"  -42abc\".to_int()); print(\"x\".starts_with(\"\")); print(\"x\".ends_with(\"y\")); return 0; }" "" "hello\nworld\nworld\n0\n20 30\n30 40\n4\n-1\na b  c\na-b-c\n-42\ntrue\nfalse\n"
+# step 87: 32ビットに収まらない整数リテラルの値そのもの
+one_io_test "def main() { print(2147483648); print(9223372036854775807); print(-2147483649); return 0; }" "" "2147483648\n9223372036854775807\n-2147483649\n"
+# step 87: read_int が先行空白（連続・先頭）を読み飛ばす
+one_io_test "def main() { a = read_ints(2); print(a[0]); print(a[1]); return 0; }" "12  34\n" "12\n34\n"
+one_io_test "def main() { print(in); print(in); return 0; }" " 12 34\n" "12\n34\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
