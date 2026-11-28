@@ -13,6 +13,7 @@ static void gen_discard(Node* node);
 static void gen_push(Node* node);
 static void gen_rax_num(Node* node);
 static bool fits_imm32(long val);
+static void emit_divmod_adjust(bool is_mod);
 static Function* find_plain_function(char* name, int len);
 
 static int max_label = 0;
@@ -190,6 +191,49 @@ static void gen_index_addr(Node* node) {
     gen(node->right_child);
     printf("  pop rdi\n");
     printf("  pop rax\n");
+    if (node->left_child->type && node->left_child->type->kind == TY_ARRAY) {
+        // 添え字の回り込み（step 86）: 配列の実効添え字は i % len
+        // （spell の `%` と同じ Python 式。負数でも 0 以上になる）。
+        // 長さは要素0の8バイト手前にある。長さ 0 のときは剰余を
+        // 取らず従来どおりにする（0 除算で落とさない。長さ 0 の
+        // 配列への添え字アクセスは従来どおり未定義）。
+        // 割り算は常用しない: 範囲内は比較だけ、1周分のはみ出しは
+        // 足し引きで直し、大きくはみ出した場合だけ idiv に落とす
+        int label_end = new_label();
+        int label_neg = new_label();
+        int label_slow = new_label();
+        printf("  mov rcx, [rax-8]\n");
+        printf("  test rcx, rcx\n");
+        printf("  je .Lwrap%d\n", label_end);
+        printf("  test rdi, rdi\n");
+        printf("  js .Lwrapneg%d\n", label_neg);
+        printf("  cmp rdi, rcx\n");
+        printf("  jl .Lwrap%d\n", label_end);
+        // len <= i: len <= i < 2*len なら i -= len、それ以外は割り算
+        printf("  lea rdx, [rcx+rcx]\n");
+        printf("  cmp rdi, rdx\n");
+        printf("  jge .Lwrapslow%d\n", label_slow);
+        printf("  sub rdi, rcx\n");
+        printf("  jmp .Lwrap%d\n", label_end);
+        printf(".Lwrapneg%d:\n", label_neg);
+        // i < 0: -len <= i なら i += len、それ以外は割り算
+        printf("  mov rdx, rcx\n");
+        printf("  neg rdx\n");
+        printf("  cmp rdi, rdx\n");
+        printf("  jl .Lwrapslow%d\n", label_slow);
+        printf("  add rdi, rcx\n");
+        printf("  jmp .Lwrap%d\n", label_end);
+        printf(".Lwrapslow%d:\n", label_slow);
+        printf("  push rax\n");
+        printf("  mov rax, rdi\n");
+        printf("  mov rdi, rcx\n");
+        printf("  cqo\n");
+        printf("  idiv rdi\n");
+        emit_divmod_adjust(true);
+        printf("  mov rdi, rdx\n");
+        printf("  pop rax\n");
+        printf(".Lwrap%d:\n", label_end);
+    }
     printf("  imul rdi, 8\n");
     printf("  add rax, rdi\n");
 }

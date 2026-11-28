@@ -565,7 +565,7 @@ a 7
 <table>
   <tr><th>操作</th><th>内容</th></tr>
   <tr><td><code>len</code></td><td>文字数（バイト数ではなく文字コードの個数）</td></tr>
-  <tr><td><code>s[i]</code>（<code>__getitem__</code>）</td><td>i 番目の文字だけからなる長さ1の <code>str</code> を返す。文字コード（<code>int</code>）は <code>s.chars[i]</code> で取る。添字への代入はできない（<code>__setitem__</code> は無い）</td></tr>
+  <tr><td><code>s[i]</code>（<code>__getitem__</code>）</td><td>i 番目の文字だけからなる長さ1の <code>str</code> を返す。添え字は配列と同じく回り込む（<code>s[-1]</code> は最後の文字、<code>s[s.len]</code> は先頭の文字）。空文字列への添え字は不定。文字コード（<code>int</code>）は <code>s.chars[i]</code> で取る。添字への代入はできない（<code>__setitem__</code> は無い）</td></tr>
   <tr><td><code>s?[i]</code></td><td>安全添え字（配列の節を参照）。要素は通常の <code>s[i]</code> と同じ</td></tr>
   <tr><td><code>s[i:j]</code>（スライス）</td><td>i 以上 j 未満の部分文字列（新しい <code>str</code>）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める（配列の節のスライスを参照）</td></tr>
   <tr><td><code>starts_with(t)</code> / <code>ends_with(t)</code></td><td><code>t</code> で始まる／終わるかどうか</td></tr>
@@ -629,7 +629,7 @@ a-b-c
 <table>
   <tr><th>操作</th><th>内容</th></tr>
   <tr><td><code>len</code></td><td>要素数</td></tr>
-  <tr><td><code>a[i]</code></td><td>要素の読み書き。範囲外（負数を含む）は検査されず、結果は不定</td></tr>
+  <tr><td><code>a[i]</code></td><td>要素の読み書き。添え字は長さで割った余りで解釈される（回り込み。下記）。長さ 0 の配列への添え字は従来どおり不定</td></tr>
   <tr><td><code>a?[i][j]...</code></td><td>安全添え字（下記）。全段の範囲を検査する読み取り専用の形</td></tr>
   <tr><td><code>a[i:j]</code>（スライス）</td><td>i 以上 j 未満の部分配列（要素をコピーした新しい配列）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める（下記）</td></tr>
   <tr><td><code>__add__</code></td><td>連結した新しい配列</td></tr>
@@ -654,6 +654,31 @@ a-b-c
   容量を超える append では新しいブロックへコピーして対象の変数だけが付け替わります（別名や、引数として渡した先の呼び出し元には伝わりません）。
   作りたての配列は容量＝要素数なので、最初の append は必ず付け替えになります。
 </p>
+<p>
+  <strong>添え字の回り込み</strong>: 通常の添え字 <code>a[i]</code> は、実効添え字を <code>i % a.len</code>（<code>%</code> と同じ Python 式で、負数でも 0 以上）として解釈します。
+  そのため <code>a[-1]</code> は最後の要素、<code>a[a.len]</code> は先頭の要素、<code>a[a.len + 1]</code> は2番目の要素を指し、読み書きのどちらでも同じです。
+  入れ子の配列では段ごとに回り込み、座標添え字 <code>a[p]</code> も成分ごとに回り込みます。
+  長さ 0 の配列は余りが取れないため、添え字アクセスは従来どおり不定です。範囲外を厳密に判定したい場合は安全添え字を使ってください。
+  <code>str</code> の添え字 <code>s[i]</code> も同じく回り込みます（文字列の節を参照）。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>a = [10, 20, 30]
+put a[-1]
+put a[3]
+put a[4]
+a[-1] = 99
+put a[2]</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>30
+10
+20
+99</pre>
+</figure>
 <p>
   <strong>安全添え字</strong> <code>a?[i][j]...</code> は、範囲チェックつきの読み取りです。対象の直後に <code>?</code> を1回だけ置き、後ろに通常の添え字の連鎖を続けます。
   単独で書くと「連鎖の全段とも範囲内（0 &lt;= 添え字 &lt; その段の長さ）か」を表す <code>bool</code> になります。
