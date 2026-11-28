@@ -1833,6 +1833,12 @@ Function* program() {
             tail = f;
         }
     }
+    bool has_main = false;
+    for (Function* fn = head.next; fn; fn = fn->next) {
+        if (!fn->klass && fn->len == 4 && !memcmp(fn->name, "main", 4)) {
+            has_main = true;
+        }
+    }
     if (!stmt_head.next) {
         return head.next;
     }
@@ -1844,12 +1850,6 @@ Function* program() {
     Function* init = calloc(1, sizeof(Function));
     init->body = block;
     init->stack_size = (top_max_offset + 15) / 16 * 16;
-    bool has_main = false;
-    for (Function* fn = head.next; fn; fn = fn->next) {
-        if (fn->len == 4 && !memcmp(fn->name, "main", 4)) {
-            has_main = true;
-        }
-    }
     if (has_main) {
         init->name = "__spell_init";
         init->len = 12;
@@ -1858,6 +1858,30 @@ Function* program() {
         init->len = 4;
     }
     init->next = head.next;
+    return init;
+}
+
+// 結合済みのプログラム全体に入口（main）が無い場合に、空の main を
+// 足して返す（step 88）。トップレベル文も `def main` も無いプログラ
+// ム（定義だけのファイルや空ファイル）は、入口が無いとリンクできな
+// いため。program() は prelude とユーザーコードで別々に呼ばれるの
+// で、合成は結合後の全体に対して呼び出し側（main.c）が1回だけ行う
+Function* ensure_entry_point(Function* prog) {
+    for (Function* fn = prog; fn; fn = fn->next) {
+        if (!fn->klass && fn->len == 4 && !memcmp(fn->name, "main", 4)) {
+            return prog;
+        }
+    }
+    Node* ret = create_node(ND_RETURN);
+    ret->left_child = create_number_node(0);
+    Node* block = create_node(ND_BLOCK);
+    block->body = ret;
+    Function* init = calloc(1, sizeof(Function));
+    init->body = block;
+    init->stack_size = 0;
+    init->name = "main";
+    init->len = 4;
+    init->next = prog;
     return init;
 }
 

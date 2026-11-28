@@ -47,6 +47,56 @@ static BuiltinInfo* find_builtin(char* name, int len) {
     return NULL;
 }
 
+// 定義なしで呼べる外部関数の署名表（step 88）。未定義の関数呼び出しは
+// 原則としてコンパイルエラーにするが、プログラムの外（libc や、リンク
+// 相手の C コード）に実体がある名前は、ここに署名つきで載せたものだけ
+// 通す。codegen はこれらの名前を外部シンボルとしてそのまま出す。
+// 載せた根拠（prelude・suite・ドキュメントの例を全数調査した結果、
+// 定義なしで呼ばれている名前はこの8件だけだった）:
+//   getchar / putchar … prelude が使う libc 関数
+//   fflush … テスト群（tests/*.sp）が使う libc 関数（fflush(0) の形）
+//   ret3 / add / sub / add6 / sub6 … tests/funcs.c が提供する C 側の
+//     テストヘルパ。test_func.sp の C ABI 連携テスト（t001〜t009）が
+//     実際に呼んでいる
+typedef struct {
+    char* name;
+    int nparams;
+    Type* params[6];
+    Type* ret;
+} ExternInfo;
+
+static ExternInfo* extern_table() {
+    static ExternInfo table[8];
+    static bool initialized = false;
+    if (!initialized) {
+        table[0] = (ExternInfo){ "getchar", 0, { NULL }, &ty_int };
+        table[1] = (ExternInfo){ "putchar", 1, { &ty_int }, &ty_int };
+        table[2] = (ExternInfo){ "fflush", 1, { &ty_int }, &ty_int };
+        table[3] = (ExternInfo){ "ret3", 0, { NULL }, &ty_int };
+        table[4] = (ExternInfo){ "add", 2, { &ty_int, &ty_int }, &ty_int };
+        table[5] = (ExternInfo){ "sub", 2, { &ty_int, &ty_int }, &ty_int };
+        table[6] = (ExternInfo){ "add6", 6, { &ty_int, &ty_int, &ty_int, &ty_int, &ty_int, &ty_int }, &ty_int };
+        table[7] = (ExternInfo){ "sub6", 6, { &ty_int, &ty_int, &ty_int, &ty_int, &ty_int, &ty_int }, &ty_int };
+        initialized = true;
+    }
+    return table;
+}
+
+static ExternInfo* find_extern(char* name, int len) {
+    ExternInfo* table = extern_table();
+    for (int i = 0; i < 8; i++) {
+        int nlen = (int)strlen(table[i].name);
+        if (nlen == len && !memcmp(table[i].name, name, len)) {
+            return &table[i];
+        }
+    }
+    return NULL;
+}
+
+// 未定義の関数呼び出しの報告（定義はファイル後方。変数の error_undef と
+// 同じ基準で typo の候補を添える）
+static void error_undef_func(Node* node);
+
 // 式に期待される型（双方向の型制約）。注釈つき代入の右辺・呼び出しの引数・
 // 戻り値など、期待が分かる場所でだけ直前にセットし、ND_LAMBDA が消費する。
 // check_node は入口でこれを取り込み、それ以外のノードでは子へ漏らさない
@@ -257,13 +307,50 @@ static Type* check_array_arith(Node* node, Type* lt, Type* rt) {
     return &ty_unknown;
 }
 
+// bool クラスかどうか（`==` の相性判定で int との組を許すために使う）
+static bool is_bool_type(Type* t) {
+    if (!t || t->kind != TY_CLASS || !t->klass) {
+        return false;
+    }
+    Class* o = t->klass->origin ? t->klass->origin : t->klass;
+    return o->len == 4 && !memcmp(o->name, "bool", 4);
+}
+
+// `==` / `!=` の両辺が、両方とも型が判明したうえで相容れない組み
+// 合わせかどうか（step 88）。unknown や型変数が絡む場合と、内側に
+// unknown を含む型（[unknown] など）は、従来どおり緩く通すため対象
+// 外。bool と int は実体が同じ（0/1 の int 値）なので相容れる
+static bool eq_mismatch(Type* lt, Type* rt) {
+    if (lt->kind == TY_UNKNOWN || rt->kind == TY_UNKNOWN) {
+        return false;
+    }
+    if (lt->kind == TY_VAR || rt->kind == TY_VAR) {
+        return false;
+    }
+    if (type_has_unknown(lt) || type_has_unknown(rt)) {
+        return false;
+    }
+    if (type_equals(lt, rt)) {
+        return false;
+    }
+    if ((is_bool_type(lt) && rt->kind == TY_INT) || (lt->kind == TY_INT && is_bool_type(rt))) {
+        return false;
+    }
+    return true;
+}
+
+static void eq_type_error(Node* node, Type* lt, Type* rt) {
+    error_node(node, "`%s`型と`%s`型の値に演算子`%s`は使えません", type_text(lt), type_text(rt), op_text(node->op.binop));
+}
+
 static Type* check_array_cmp(Node* node, Type* lt, Type* rt) {
     if (node->op.binop == OP_LT || node->op.binop == OP_LE) {
         Type* at = lt->kind == TY_ARRAY ? lt : rt;
         error_node(node, "`%s`型の値に演算子`%s`は使えません", type_text(at), op_text(node->op.binop));
     }
-    Type* ot = lt->kind == TY_ARRAY ? rt : lt;
-    if (ot->kind == TY_ARRAY || ot->kind == TY_UNKNOWN) {
+    if (lt->kind == TY_ARRAY && rt->kind == TY_ARRAY) {
+        // 配列同士は __eq__ / __ne__ へ書き換える。要素型の不一致は
+        // rewrite_to_mcall の引数照合が止める
         if (node->op.binop == OP_EQ) {
             Function* method = find_callable(class_of(lt), "__eq__", 6);
             rewrite_to_mcall(node, lt, rt, "__eq__", 6, method);
@@ -271,6 +358,26 @@ static Type* check_array_cmp(Node* node, Type* lt, Type* rt) {
             Function* method = find_callable(class_of(lt), "__ne__", 6);
             rewrite_to_mcall(node, lt, rt, "__ne__", 6, method);
         }
+        return bool_type();
+    }
+    // 配列は片方だけ。もう一方が判明していて配列でなければ異型
+    if (eq_mismatch(lt, rt)) {
+        eq_type_error(node, lt, rt);
+        return bool_type();
+    }
+    if (lt->kind != TY_ARRAY) {
+        // 左辺が配列でない（相手の型が分からないため緩く通す形）は、
+        // 書き換えずに素の比較として通す。以前はここで左辺の型から
+        // メソッドを探してコンパイラが落ちていた（step 88）
+        return bool_type();
+    }
+    // 左辺が配列で、右辺は型が分からない: 従来どおり書き換える
+    if (node->op.binop == OP_EQ) {
+        Function* method = find_callable(class_of(lt), "__eq__", 6);
+        rewrite_to_mcall(node, lt, rt, "__eq__", 6, method);
+    } else {
+        Function* method = find_callable(class_of(lt), "__ne__", 6);
+        rewrite_to_mcall(node, lt, rt, "__ne__", 6, method);
     }
     return bool_type();
 }
@@ -311,6 +418,12 @@ static Type* check_binop_rest(Node* node, Type* lt, Type* rt) {
             if (node->op.binop == OP_LT || node->op.binop == OP_LE) {
                 error_node(node, "クラス`%.*s`に演算子`%s`は定義されていません", lt->klass->len, lt->klass->name, op_text(node->op.binop));
             }
+            // `__eq__` の無いクラスの == / != は同一性比較に落ちる。
+            // 相手が相容れない型なら、無言で false になるだけなので
+            // ここで止める（step 88）
+            if (eq_mismatch(lt, rt)) {
+                eq_type_error(node, lt, rt);
+            }
             return bool_type();
         }
         if (lt->kind == TY_ARRAY || rt->kind == TY_ARRAY) {
@@ -319,6 +432,9 @@ static Type* check_binop_rest(Node* node, Type* lt, Type* rt) {
         if ((node->op.binop == OP_LT || node->op.binop == OP_LE)
                 && lt->kind != TY_UNKNOWN && rt->kind != TY_UNKNOWN && lt->kind != rt->kind) {
             error_node(node, "`%s`型と`%s`型の値に演算子`%s`は使えません", type_text(lt), type_text(rt), op_text(node->op.binop));
+        }
+        if ((node->op.binop == OP_EQ || node->op.binop == OP_NE) && eq_mismatch(lt, rt)) {
+            eq_type_error(node, lt, rt);
         }
         return scalar_cmp_result(cdunder);
     }
@@ -1095,9 +1211,22 @@ static Type* check_funcall(Node* node, Type* expected) {
             }
             return builtin->ret;
         }
-        if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
-            return &ty_int;
+        ExternInfo* ext = find_extern(node->name, node->len);
+        if (ext) {
+            if (nargs != ext->nparams) {
+                error_node(node, "関数`%.*s`の引数は%d個ですが、%d個が指定されています", node->len, node->name, ext->nparams, nargs);
+            }
+            for (int i = 0; i < nargs && i < ext->nparams; i++) {
+                Type* pt = ext->params[i];
+                if (pt && arg_types[i]->kind != TY_UNKNOWN && !type_equals(pt, arg_types[i])) {
+                    error_node(node, "関数`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", node->len, node->name, type_text(pt), type_text(arg_types[i]));
+                }
+            }
+            return ext->ret;
         }
+        // 定義も外部関数の表にも無い名前の呼び出しは、リンクエラーへ
+        // 漏らさずここで止める（step 88）
+        error_undef_func(node);
         return &ty_unknown;
     }
     if (nargs != callee->nparams) {
@@ -1120,6 +1249,10 @@ static Type* check_member(Node* node) {
             node->kind = ND_LEN;
             return &ty_int;
         }
+        // 型が分からないまま通すと、フィールドの解決できないノードが
+        // codegen に渡って壊れた生成物になる（step 88）。メソッドと
+        // 同じく、型を明示してもらう
+        error_node(node, "型が分からない値にフィールド`%.*s`は使えません（型注釈で型を明示してください）", node->len, node->name);
         return &ty_unknown;
     }
     if (obj->kind == TY_ARRAY && node->len == 3 && !memcmp(node->name, "len", 3)) {
@@ -1417,6 +1550,10 @@ static Type* check_mcall(Node* node) {
     if (obj->kind == TY_UNKNOWN) {
         Type* arg_types[6];
         check_args(node->args, arg_types);
+        // 型が分からないまま通すと、メソッドが解決できないノードが
+        // codegen に渡ってコンパイラが落ちる（step 88）。スライスの
+        // 対象と同じく、型を明示してもらう
+        error_node(node, "型が分からない値にメソッド`%.*s`は使えません（型注釈で型を明示してください）", node->len, node->name);
         return &ty_unknown;
     }
     if (obj->kind == TY_ARRAY && node->len == 6 && !memcmp(node->name, "append", 6)) {
@@ -2317,6 +2454,59 @@ static void error_undef(Node* node) {
         error_node(node, "変数`%.*s`は定義されていません ヒント: もしかして `%.*s` ですか（定義は %ld 行目）", node->len, node->name, best_len, best_name, best_line);
     } else {
         error_node(node, "変数`%.*s`は定義されていません", node->len, node->name);
+    }
+}
+
+// 未定義の関数呼び出しを報告する。変数の error_undef と同じ基準
+// （編集距離の近いものが1つだけ突出してあれば候補を添える）で、
+// 定義済みの素の関数・外部関数・特殊な名前（print / eprint / exit）
+// の中から typo の候補を探す。Function には定義トークンを保持して
+// いないため、変数版にある「定義は N 行目」は付けない
+static void undef_func_candidate(Node* node, const char* name, int len,
+        const char** best_name, int* best_len, int* best_dist, int* second_dist) {
+    if (len == node->len && !memcmp(name, node->name, len)) {
+        return;
+    }
+    int dist = edit_distance(node->name, node->len, name, len);
+    if (dist < *best_dist) {
+        *second_dist = *best_dist;
+        *best_dist = dist;
+        *best_name = name;
+        *best_len = len;
+    } else if (dist < *second_dist) {
+        *second_dist = dist;
+    }
+}
+
+static void error_undef_func(Node* node) {
+    const char* best_name = NULL;
+    int best_len = 0;
+    int best_dist = 1 << 20;
+    int second_dist = 1 << 20;
+    if (node->len >= 2) {
+        for (Function* fn = functions; fn; fn = fn->next) {
+            if (fn->klass || fn->is_lambda) {
+                continue;
+            }
+            undef_func_candidate(node, fn->name, fn->len, &best_name, &best_len, &best_dist, &second_dist);
+        }
+        ExternInfo* table = extern_table();
+        for (int i = 0; i < 8; i++) {
+            undef_func_candidate(node, table[i].name, (int)strlen(table[i].name), &best_name, &best_len, &best_dist, &second_dist);
+        }
+        undef_func_candidate(node, "print", 5, &best_name, &best_len, &best_dist, &second_dist);
+        undef_func_candidate(node, "eprint", 6, &best_name, &best_len, &best_dist, &second_dist);
+        undef_func_candidate(node, "exit", 4, &best_name, &best_len, &best_dist, &second_dist);
+        int longer = node->len > best_len ? node->len : best_len;
+        int limit = longer <= 2 ? 1 : longer <= 5 ? 2 : 3;
+        if (best_name && (best_dist > limit || second_dist - best_dist <= 1)) {
+            best_name = NULL;
+        }
+    }
+    if (best_name) {
+        error_node(node, "関数`%.*s`は定義されていません ヒント: もしかして `%.*s` ですか", node->len, node->name, best_len, best_name);
+    } else {
+        error_node(node, "関数`%.*s`は定義されていません", node->len, node->name);
     }
 }
 

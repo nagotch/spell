@@ -348,6 +348,7 @@ void spell_prelude_path(char* buf, long size);
 
 Token* tokenize(char* s);
 Function* program();
+Function* ensure_entry_point(Function* prog);
 void desugar(Function* prog);
 void typecheck(Function* prog);
 void codegen(Function* prog);

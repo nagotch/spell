@@ -109,6 +109,17 @@ tests=(
     # 定義として扱える（値側の検査を締めても壊れないこと）
     "def main() { q = Deque(int); q <- 42; x <- q; return x; }|42"
     "def main() { q = Deque(int); q <- 7; w = 0; q -> w; return w + 35; }|42"
+    # step 88: 異型 `==` をエラーにしても、正当な形は壊れないこと。
+    # bool と int の比較（実体が同じ 0/1 の int 値）と、型が分からない
+    # 値との比較（緩く通す）
+    "def main() { b = 1 == 1; if (b == 1 && 1 == b && b == true) { return 42; } return 0; }|42"
+    "def g(x) { return x; } def main() { if (g(1) == 1 && g(1) != 2) { return 42; } return 0; }|42"
+    # step 88: ジェネリック本体の [T] と [int] の比較は緩く通り、
+    # 実体化された時点で具体型として判定される
+    "class Box88<T> { v: [T]; def __init__(self, v: [T]) { self.v = v; } def same(self, y: [int]) -> bool { return self.v == y; } } def main() { b = Box88<int>([1, 2]); if (b.same([1, 2])) { return 42; } return 0; }|42"
+    # step 88: 定義なしで呼べる外部関数（署名表にあるもの）は従来
+    # どおり呼べる
+    "def main() { putchar(65); return ret3() + add(2, 3) + 34; }|42"
 )
 
 error_tests=(
@@ -329,6 +340,33 @@ def main():
     "def main() { a = []; a.append(1); a.append(\"s\"); return 0; }|append\`の引数には\`int\`が必要です"
     # step 87: 矢印 push の値側でも未定義変数の検査が効く
     "def main() { q = Deque(int); q <- misspelled; return 0; }|変数\`misspelled\`は定義されていません"
+    # step 88: 未定義の関数呼び出しはリンクエラーに漏らさず、位置つき
+    # のコンパイルエラーにする。typo の候補も出す
+    "def main() { x: int = min(3, 5); return x; }|関数\`min\`は定義されていません"
+    "def main() { x = getchr(); return x; }|関数\`getchr\`は定義されていません ヒント: もしかして \`getchar\` ですか"
+    "def main() { nosuchfunc(); return 0; }|関数\`nosuchfunc\`は定義されていません"
+    # step 88: 外部関数（署名表）も引数の個数と型を照合する
+    "def main() { putchar(1, 2); return 0; }|関数\`putchar\`の引数は1個ですが"
+    "def main() { fflush(\"x\"); return 0; }|関数\`fflush\`の引数には\`int\`が必要ですが"
+    # step 88: 型が分からないレシーバへのメソッド・フィールドは、
+    # コンパイラが落ちず位置つきエラーになる
+    "def main() { y: int = nosuchfunc().m(); return y; }|関数\`nosuchfunc\`は定義されていません"
+    "def f(x) { return x.m(); } def main() { y: int = f(1); return y; }|型が分からない値にメソッド\`m\`は使えません"
+    "def f(x) { return x.field; } def main() { y: int = f(1); return y; }|型が分からない値にフィールド\`field\`は使えません"
+    # step 88: 型が分からない値と配列リテラルの `==` でコンパイラが
+    # 落ちない（未定義関数のエラーが先に出る）
+    "def main() { print(nosuchfunc() == [1, 2]); return 0; }|関数\`nosuchfunc\`は定義されていません"
+    # step 88: 異型同士の `==` / `!=` は無言で false にならずエラー
+    "def main() { b = 1 == \"a\"; return 0; }|\`int\`型と\`str\`型の値に演算子\`==\`は使えません"
+    "def main() { s = \"abc\"; b = s.chars[0] == \"a\"; return 0; }|\`int\`型と\`str\`型の値に演算子\`==\`は使えません"
+    "def main() { b = [1, 2] == 3; return 0; }|型と\`int\`型の値に演算子\`==\`は使えません"
+    "def main() { b = 3 != [1, 2]; return 0; }|\`int\`型と\`\[int\]\`型の値に演算子\`!=\`は使えません"
+    "def main() { s = \"abc\"; b = s == 1; return 0; }|メソッド\`__eq__\`の引数には\`str\`が必要ですが、\`int\`が指定されています"
+    "class A88 { v: int; def __init__(self, v: int) { self.v = v; } } class B88 { v: int; def __init__(self, v: int) { self.v = v; } } def main() { b = A88(1) == B88(1); return 0; }|\`A88\`型と\`B88\`型の値に演算子\`==\`は使えません"
+    "class A88 { v: int; def __init__(self, v: int) { self.v = v; } } def main() { b = A88(1) == 1; return 0; }|\`A88\`型と\`int\`型の値に演算子\`==\`は使えません"
+    "class A88 { v: int; def __init__(self, v: int) { self.v = v; } } def main() { b = A88(1) != \"x\"; return 0; }|\`A88\`型と\`str\`型の値に演算子\`!=\`は使えません"
+    # step 88: 連鎖比較の中でも異型の `==` はエラーになる
+    "def main() { b = 1 < 2 == \"a\"; return 0; }|\`bool\`型と\`str\`型の値に演算子\`==\`は使えません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -554,6 +592,13 @@ one_io_test "def main() { a = [1, 2, 3]; a.append(4); a.append(5); print(a); pri
 one_driver_test "def main() { ok = write_file(\"drv_data.txt\", \"ab\"); d = read_file(\"drv_data.txt\"); i = 0; while (i < 100) { d.text.chars.append(99); i = i + 1; } print(d.text.len); print(d.text.chars[0]); print(d.text.chars[101]); return 0; }" "102\n97\n99\n" "" 0
 # step 65: 読み取り失敗時に返る空配列（ヘルパの失敗経路）への append
 one_driver_test "def main() { d = read_file(\"drv_missing.txt\"); d.text.chars.append(65); print(d.text); print(d.text.len); return 0; }" "A\n1\n" "" 0
+# step 88: 入口（main）が無いプログラムでもリンクできること。空の
+# main が合成され、終了コード 0 で終わる
+one_driver_test "" "" "" 0
+one_driver_test "def foo() { return 1; }" "" "" 0
+# step 88: メソッド名 main は入口と混同されないこと（トップレベル文の
+# 合成関数は main になる）
+one_driver_test "class C { def main(self) -> int { return 5; } } print(42);" "42\n" "" 0
 # step 66: 矢印で書く BFS と、メソッド形との等価性
 one_io_test "def main() {
     rows = [\"S..#\", \"##..\", \"...#\", \"..G.\"];
