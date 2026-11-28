@@ -196,6 +196,23 @@ def t137() { r = 0; if ("aBc9z".upper() == "ABC9Z") { r = r + 1; } if ("AbC9Z".l
 def t138() { r = 0; if (chr(65) == "A") { r = r + 1; } if (chr(97) + chr(98) == "ab") { r = r + 2; } if (chr(10) == "\n") { r = r + 4; } if (chr("A".chars[0]) == "A") { r = r + 8; } if (chr(48 + 5) == "5") { r = r + 16; } return r; }
 def t139() { r = 0; if ("\r".chars[0] == 13) { r = r + 1; } if ("\r".len == 1) { r = r + 2; } if ('\r'.chars[0] == 13) { r = r + 4; } if ("\x41" == "A") { r = r + 8; } if ("\x61\x62" == "ab") { r = r + 16; } if ('\x41' == "A") { r = r + 32; } if ("\x4a" == "J") { r = r + 64; } if ("\n".chars[0] == 10) { r = r + 128; } if ("\t".chars[0] == 9) { r = r + 256; } if ("\\".chars[0] == 92) { r = r + 512; } if ("\"".chars[0] == 34) { r = r + 1024; } if ('\''.chars[0] == 39) { r = r + 2048; } if ("\0".chars[0] == 0) { r = r + 4096; } if ("\0".len == 1) { r = r + 8192; } return r; }
 def t140() { r = 0; if ("ab" * 3 == "ababab") { r = r + 1; } if ("ab" * 1 == "ab") { r = r + 2; } if ("ab" * 0 == "") { r = r + 4; } if ("ab" * -2 == "") { r = r + 8; } if ("" * 5 == "") { r = r + 16; } if ("a" * 5 == "aaaaa") { r = r + 32; } s = "xy"; if (s * 2 == "xyxy") { r = r + 64; } if (("ab" * 2).len == 4) { r = r + 128; } if ("ab" * 3 + "c" == "abababc") { r = r + 256; } return r; }
+comp_calls = 0
+def comp_counted() { comp_calls = comp_calls + 1; return [7, 8]; }
+comp_calls2 = 0
+def comp_bump(v) { comp_calls2 = comp_calls2 + 1; return v * 10; }
+def t141() { a = [1, 2, 3, 4]; b = [x * 2 for x in a]; r = 0; if (b.len == 4) { r = r + 1; } if (b[0] == 2) { r = r + 2; } if (b[3] == 8) { r = r + 4; } if (b.sum() == 20) { r = r + 8; } return r; }
+def t142() { a = [1, 2, 3, 4]; b = [x x@a]; c = [x * x x@a]; r = 0; if (b.len == 4) { r = r + 1; } if (b[2] == 3) { r = r + 2; } if (c[3] == 16) { r = r + 4; } return r; }
+def t143() { a = [1, 2, 3, 4]; r = 0; o = [x for x in a if x % 2 == 1]; if (o.len == 2 && o[0] == 1) { r = r + 1; } if (o[1] == 3) { r = r + 2; } g = [x x@a if x > 2]; if (g.len == 2 && g[1] == 4) { r = r + 4; } m = [x for x in a if x > 1 if x < 4]; if (m.len == 2 && m[0] == 2 && m[1] == 3) { r = r + 8; } return r; }
+def t144() { r = 0; a = [i + 1 for i in 3]; if (a.len == 3 && a[2] == 3) { r = r + 1; } s = [c for c in "ab"]; if (s.len == 2) { r = r + 2; } if (s[0] == "a" && s[1] == "b") { r = r + 4; } g = [i * 2 for i in 1..4]; if (g.len == 3 && g[0] == 2 && g[2] == 6) { r = r + 8; } return r; }
+def t145() { d = Dict<str, int>(zero_int); d["b"] = 2; d["a"] = 1; ks = [k for k in d]; vs = [d[k] k@d]; r = 0; if (ks.len == 2) { r = r + 1; } if (ks[0] == "b" && ks[1] == "a") { r = r + 2; } if (vs.sum() == 3) { r = r + 4; } return r; }
+def t146() { r = [v for v in comp_counted()]; return comp_calls * 100 + r[0] * 10 + r[1]; }
+def t147() { x = 99; a = [1, 2]; m = [x for x in a]; r = 0; if (x == 99) { r = r + 1; } if (m[1] == 2) { r = r + 2; } y = [10, 20]; s = [y for y in y]; if (s[0] == 10 && s[1] == 20) { r = r + 4; } if (y[0] == 10 && y.len == 2) { r = r + 8; } return r; }
+def t148() { r = 0; e = [x for x in []]; if (e.len == 0) { r = r + 1; } e2 = [x x@[] if x > 0]; if (e2.len == 0) { r = r + 2; } e3 = [i for i in 0]; if (e3.len == 0) { r = r + 4; } return r; }
+def t149() { b = [[1, 2], [3]]; n = [[y for y in x] for x in b]; r = 0; if (n.len == 2) { r = r + 1; } if (n[0][1] == 2) { r = r + 2; } if (n[1][0] == 3) { r = r + 4; } m = [[v for v in [5]], [6]]; if (m[0][0] == 5) { r = r + 8; } if (m[1][0] == 6) { r = r + 16; } return r; }
+def t150() { a = [3, 1, 4, 1, 5]; r = 0; if ([v for v in a].max() == 5) { r = r + 1; } if ([v for v in a].min() == 1) { r = r + 2; } if ([v for v in a].sum() == 14) { r = r + 4; } if ([v for v in a].sorted()[0] == 1) { r = r + 8; } if ([v * 2 for v in a][1] == 2) { r = r + 16; } if ([v for v in a][1:3].len == 2) { r = r + 32; } if (![v for v in a]?[9]) { r = r + 64; } return r; }
+def t151() { a = [3, 1, 4, 1, 5]; r = 0; if ([v v@a].max() == 5) { r = r + 1; } if ([v v@a].min() == 1) { r = r + 2; } if ([v v@a].sum() == 14) { r = r + 4; } if ([v v@a].sorted()[4] == 5) { r = r + 8; } if ([v v@a][0] == 3) { r = r + 16; } if ([v v@a][0:1].len == 1) { r = r + 32; } return r; }
+def t152() { src = [1, 2, 3]; got = [v for v in src]; got.append(99); r = 0; if (src.len == 3) { r = r + 1; } if (got.len == 4) { r = r + 2; } m = [comp_bump(v) for v in src]; if (comp_calls2 == 3) { r = r + 4; } if (m[2] == 30) { r = r + 8; } return r; }
+def t153() { a = [x for x in (x = [1])]; r = 0; if (a[0] == 1) { r = r + 1; } if (x[0] == 1) { r = r + 2; } b = [x for x in (x = [9]) if x == 9]; if (b.len == 1 && b[0] == 9) { r = r + 4; } return r; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -350,6 +367,19 @@ def main() {
     mark(138); fails=fails+check(t138(), 31);
     mark(139); fails=fails+check(t139(), 16383);
     mark(140); fails=fails+check(t140(), 511);
+    mark(141); fails=fails+check(t141(), 15);
+    mark(142); fails=fails+check(t142(), 7);
+    mark(143); fails=fails+check(t143(), 15);
+    mark(144); fails=fails+check(t144(), 15);
+    mark(145); fails=fails+check(t145(), 7);
+    mark(146); fails=fails+check(t146(), 178);
+    mark(147); fails=fails+check(t147(), 15);
+    mark(148); fails=fails+check(t148(), 7);
+    mark(149); fails=fails+check(t149(), 31);
+    mark(150); fails=fails+check(t150(), 127);
+    mark(151); fails=fails+check(t151(), 63);
+    mark(152); fails=fails+check(t152(), 15);
+    mark(153); fails=fails+check(t153(), 7);
 
     print_str("done"); putchar(10);
     return fails > 0;

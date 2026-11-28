@@ -13,6 +13,11 @@ Node* create_number_node(long num);
 Node* create_binary_operation_node(BinOp kind, Node* left_child, Node* right_child);
 void register_array(int array_len);
 void register_any();
+LVar* register_lvar(Token* tok);
+void note_top_all_locals();
+// トップレベル文の解析中かどうか（parse.c）。内包表記の解析では
+// ループ変数をグローバルにしないため一時的に落とす（step 95）
+extern bool is_top_level;
 
 // expr.c
 Node* expr();

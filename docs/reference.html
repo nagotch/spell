@@ -170,6 +170,30 @@ put f"{{x}} は {x}"</pre>
   <tr><td><code>[[1, 2], [3]]</code></td><td>配列の配列（<code>[[int]]</code>）</td></tr>
 </table>
 
+<h3>内包表記</h3>
+<p>
+  <code>[要素式 for 変数 in 対象]</code> は、対象の各要素について要素式を評価して集めた新しい配列です。対象は for 文と同じく反復できるもの（配列・Range・<code>str</code>・<code>Dict</code> のキー・イテレータプロトコルを持つクラス）で、1回だけ評価されます。末尾に <code>if 条件</code> を付けると条件を満たす要素だけが入り、<code>if</code> は複数並べてもよく（並び順に短絡します）、for 節は1つだけです。糖衣形 <code>[要素式 変数@対象]</code> もあります（<a href="sugar.html">糖衣集</a>）。
+</p>
+<p>
+  ループ変数は内包表記の中だけの局所で、外側の同名変数は壊れません。対象の式は外側のスコープで評価され、ループ変数への代入はエラーです。結果はそのまま式として使え、メソッドチェーン・添え字・スライスが付けられます。
+</p>
+
+<figure class="code">
+  <figcaption>例 — 内包表記</figcaption>
+<pre>a = [1, 2, 3, 4]
+b = [x * 2 for x in a if x % 2 == 0]
+&lt;&lt; b
+&lt;&lt; [x x@a].max()
+&lt;&lt; [c + "!" for c in "ab"]</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>4 8
+4
+a! b!</pre>
+</figure>
+
 <h2 id="s02"><span class="no">02</span>演算子と優先順位</h2>
 
 <table>
