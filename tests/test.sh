@@ -35,6 +35,8 @@ tests=(
     "class P { x: int; y: int; def __init__(self, c: int) { self.x = 1; if (c > 0) { self.y = 2; } else { self.y = 3; } } } def main() { p = P(1); q = P(0); return p.y * 10 + q.y; }|23"
     # step 61: __init__ を普通のメソッドとして明示的に呼ぶこともできる
     "class P { x: int; def __init__(self, a: int) { self.x = a; } } def main() { p = P(1); p.__init__(5); return p.x; }|5"
+    # step 76: クラス名と同名の変数は値として扱い、比較式を構築と誤認しない
+    "class Pair { x: int; def __init__(self, x: int) { self.x = x; } } def main() { Pair = 5; if (Pair < 10 > 3) { return 42; } return 0; }|42"
 )
 
 error_tests=(
