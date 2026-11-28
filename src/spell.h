@@ -213,6 +213,12 @@ typedef enum {
     // イテレータスロット、val が結果スロット。typecheck が for 文と
     // 同じ部品で ND_BLOCK へ書き換えるため、codegen には残らない
     ND_COMPREHENSION,
+    // 配列の束縛コピー（step 96）。配列は値セマンティクスで、束縛
+    // （代入・引数・戻り値・リテラルの要素・append の引数など）では
+    // ディープコピーされる。typecheck が束縛地点で配列型の式をこの
+    // ノードで包み、codegen が __rt_spell_copy_array で構造を複製
+    // する。left_child が元の式、type がその式の型（深さの決定に使う）
+    ND_COPY,
 } NodeKind;
 typedef struct Node Node;
 struct Node {
@@ -258,6 +264,12 @@ struct Node {
     // 引数そのものは作らない（nargs は 0）。typecheck が要素型の
     // ゼロ値ファクトリを合成して引数へ差し込む
     bool ctor_type_arg;
+    // ND_ASSIGN のときだけ使う（step 96）: コンパイラ内部が対象の
+    // コンテナを一時スロットへ退避するために作る代入の印。この代入は
+    // 値の束縛ではなく場所の借用なので、束縛コピー（ND_COPY 化）の
+    // 対象から外す。利用者の書いた代入では立たない（parse は立てず、
+    // create_node の calloc で 0 になる）
+    bool no_bind_copy;
 };
 
 struct Function {

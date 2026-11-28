@@ -130,6 +130,11 @@ class Arr {
     def __setitem__(self, i: int, v: int) -> int { self.a[i] = v; return v; }
 }
 
+class Grid96 {
+    rows: [[int]];
+    def __init__(self) { self.rows = []; }
+}
+
 def t014() {
     v = Vec2(1, 2) + Vec2(3, 4);
     return v.x * 100 + v.y;
@@ -1040,6 +1045,8 @@ class OvPair<T, U> {
     def go(self, a: T, b: U) -> int { return self.val(a) * 10 + self.val(b); }
 }
 def t085() { p: OvPair<int, str> = OvPair(); return p.go(1, "a"); }
+def t086() { g = Grid96(); src = [[1, 2], [3, 4]]; g.rows = src; src[0][0] = 99; g.rows[1][1] = 44; return g.rows[0][0] * 1000 + src[1][1] * 10 + g.rows[1][1]; }
+def t087() { d: Dict<str, [int]> = Dict(zero_array); v = [10, 20]; d["k"] = v; v[0] = 99; got = d["k"]; got[1] = 88; return d["k"][0] * 100 + d["k"][1] * 10 + got[0]; }
 
 def check(got, expected) {
     if (got != expected) return 1;
@@ -1133,6 +1140,8 @@ def main() {
     mark(83); fails=fails+check(t083(), 301);
     mark(84); fails=fails+check(t084(), 12);
     mark(85); fails=fails+check(t085(), 12);
+    mark(86); fails=fails+check(t086(), 1084);
+    mark(87); fails=fails+check(t087(), 1210);
 
     print_str("done"); putchar(10);
     return fails > 0;

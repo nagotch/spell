@@ -537,14 +537,13 @@ static void gen_len(Node* node) {
     printf("  push rax\n");
 }
 
-// [fill; n] の fill が配列リテラルの形（ND_ARRAY / ND_NEWARRAY）の
-// 場合の生成（step 82）。fill を1回だけ評価し、各スロットへは
-// __rt_spell_copy_array で構造の複製を入れる。リテラルは「値の雛形」
-// であって1つの配列オブジェクトの名前ではないため、`[[-1; w]; h]`
-// のようなグリッド構築で行同士が同じ配列を共有すると、書き込みが
-// 全行へ伝播して静かに壊れる（step 75 の個数形が小配列を共有しない
-// のと同じ線引き）。リテラルでない fill（変数や呼び出しの結果）は
-// 従来どおり、評価した1つの値を全スロットへ入れる
+// [fill; n] の fill の型が配列の場合の生成（step 82 でリテラル形に
+// 限り導入し、step 96 で fill の型が配列なら常に、へ拡大）。fill を
+// 1回だけ評価し、各スロットへは __rt_spell_copy_array で構造の複製
+// を入れる。`[[-1; w]; h]` のようなグリッド構築で行同士が同じ配列を
+// 共有すると、書き込みが全行へ伝播して静かに壊れる。step 96 の値
+// セマンティクス（束縛ではディープコピー）により、変数や呼び出し
+// 結果の fill でも各スロットは独立になる
 static void gen_newarray_fresh(Node* node) {
     // 複製の深さ: fill の型の配列の入れ子段数 - 1（fill の値そのものの
     // ブロックは常時複製し、内側の配列を何段まで複製するか）
@@ -605,7 +604,7 @@ static void gen_newarray_fresh(Node* node) {
 }
 
 static void gen_newarray(Node* node) {
-    if (node->left_child->kind == ND_ARRAY || node->left_child->kind == ND_NEWARRAY) {
+    if (node->left_child->type && node->left_child->type->kind == TY_ARRAY) {
         gen_newarray_fresh(node);
         return;
     }
@@ -873,6 +872,8 @@ static void gen_funcref(Node* node) {
 
 // ラムダ式: 組と環境を1つのブロックに確保する（[0]=コード、[8]=環境、
 // 環境はブロックの16バイト目から）。捕捉は生成時点の値をコピーする
+static int copy_depth(Type* t);
+
 static void gen_lambda(Node* node) {
     if (!node->func) {
         error_internal("ラムダの関数が解決されていません");
@@ -906,6 +907,17 @@ static void gen_lambda(Node* node) {
             printf("  mov rcx, [rcx + %d]\n", c->src_offset);
         } else {
             printf("  mov rcx, [rbp-%d]\n", c->src_offset);
+        }
+        if (c->type && c->type->kind == TY_ARRAY) {
+            // キャプチャの束縛コピー（step 96）: 配列は値コピーの
+            // 中身も独立させる。組のポインタ（rax）は呼び出しの間
+            // スタックへ退避する
+            printf("  push rax\n");
+            printf("  mov rdi, rcx\n");
+            printf("  mov rsi, %d\n", copy_depth(c->type));
+            emit_call(new_label(), NULL, 21, "__rt_spell_copy_array");
+            printf("  mov rcx, rax\n");
+            printf("  pop rax\n");
         }
         printf("  mov [rax + %d], rcx\n", 16 + c->env_offset);
     }
@@ -1008,6 +1020,24 @@ static void gen_rax_var(Node* node) {
     // ND_CAPVAR: フレームに退避済みの環境ポインタ経由で読む
     printf("  mov rax, [rbp-%d]\n", current_env_offset);
     printf("  mov rax, [rax + %d]\n", node->offset);
+}
+
+// __rt_spell_copy_array の深さ引数: 配列の入れ子段数 - 1
+static int copy_depth(Type* t) {
+    int depth = 0;
+    for (; t && t->kind == TY_ARRAY; t = t->elem) {
+        depth++;
+    }
+    return depth > 0 ? depth - 1 : 0;
+}
+
+// 束縛コピー（step 96）: 子の値を rax で評価し、配列の構造複製に
+// 置き換える。深さは型検査が付けた静的な型から決める
+static void gen_rax_copy(Node* node) {
+    gen_rax(node->left_child);
+    printf("  mov rdi, rax\n");
+    printf("  mov rsi, %d\n", copy_depth(node->type));
+    emit_call(new_label(), NULL, 21, "__rt_spell_copy_array");
 }
 
 static void gen_rax_assign(Node* node) {
@@ -1215,6 +1245,7 @@ static void gen_rax(Node* node) {
         case ND_GVAR:
         case ND_CAPVAR: gen_rax_var(node); break;
         case ND_ASSIGN: gen_rax_assign(node); break;
+        case ND_COPY: gen_rax_copy(node); break;
         case ND_RETURN: gen_rax_return(node); break;
         case ND_IF: gen_rax_if(node); break;
         case ND_WHILE: gen_rax_while(node); break;
@@ -1248,6 +1279,7 @@ static void gen(Node* node) {
         case ND_GVAR:
         case ND_CAPVAR:
         case ND_ASSIGN:
+        case ND_COPY:
         case ND_IF:
         case ND_WHILE:
         case ND_BLOCK:
@@ -1733,9 +1765,13 @@ static void mark_function(Function* fn);
 
 static void walk_reachable(Node* node) {
     for (Node* n = node; n; n = n->next) {
-        if (n->kind == ND_NEWARRAY && n->left_child
-                && (n->left_child->kind == ND_ARRAY || n->left_child->kind == ND_NEWARRAY)) {
-            // リテラルな fill の [fill; n] は構造複製のヘルパが要る
+        if (n->kind == ND_NEWARRAY && n->left_child && n->left_child->type
+                && n->left_child->type->kind == TY_ARRAY) {
+            // 配列型の fill の [fill; n] は構造複製のヘルパが要る
+            cg_used_copy_array = 1;
+        }
+        if (n->kind == ND_COPY) {
+            // 束縛コピー（step 96）も同じヘルパが要る
             cg_used_copy_array = 1;
         }
         if (n->kind == ND_FUNCALL) {
@@ -1759,6 +1795,12 @@ static void walk_reachable(Node* node) {
                 mark_function(find_plain_function(n->name, n->len));
             }
         } else if (n->kind == ND_LAMBDA) {
+            // 配列型のキャプチャは環境へ詰めるときに構造複製が要る
+            for (Capture* c = n->captures; c; c = c->next) {
+                if (c->type && c->type->kind == TY_ARRAY) {
+                    cg_used_copy_array = 1;
+                }
+            }
             if (n->func) {
                 mark_function(n->func);
             } else {
@@ -1866,6 +1908,26 @@ void codegen(Function* prog) {
         }
         for (int i = 0; i < prog->nparams; i++) {
             printf("  mov [rbp-%d], %s\n", (i+1)*8, arg_regs[i]);
+        }
+        // 引数の束縛コピー（step 96）: 配列型の引数は、呼び出し側と
+        // 独立な複製をスロットへ戻してから本体に入る。メソッドの
+        // self（第0引数）は借用としてコピーしない（sort や append が
+        // 受け側そのものを書き換えるため）。型の分からない引数は
+        // 深さが決められないのでコピーしない。この時点で引数
+        // レジスタは用済みで、実引数の値は全てスロットにある
+        for (int i = 0; i < prog->nparams; i++) {
+            if (prog->klass && i == 0) {
+                continue;
+            }
+            Type* pt = prog->param_types[i];
+            if (!pt || pt->kind != TY_ARRAY) {
+                continue;
+            }
+            printf("  mov rdi, [rbp-%d]\n", (i+1)*8);
+            printf("  mov rsi, %d\n", copy_depth(pt));
+            emit_call(new_label(), NULL, 21, "__rt_spell_copy_array");
+            printf("  mov [rbp-%d], rax\n", (i+1)*8);
+            cg_used_copy_array = 1;
         }
         Node* tail = prog->body;
         while (tail) {

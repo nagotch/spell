@@ -875,6 +875,66 @@ static Type* check_safe_cmp(Node* node) {
     return bool_type();
 }
 
+// ---- 配列の束縛コピー（step 96） ----
+//
+// 配列は値セマンティクス: 束縛（代入・戻り値・リテラルの要素・
+// append の引数）ではディープコピーされ、使いまわし（エイリアス）の
+// 概念を持たない。コピーの深さは静的な型から決める（配列の入れ子
+// 段数。__rt_spell_copy_array の深さ引数は段数 - 1）。型が分からない
+// 値（型不明を含む型）は深さが決められないのでコピーできない
+// （現状維持。language-design.md の step 96 の節に明記）。
+// クラスインスタンスは対象外で、従来どおり参照のまま
+
+// 検査済みの式が「他と共有されない新しい配列」を生む種別かどうか。
+// リテラルは評価ごとに malloc され（step 87）、[fill; n] の各スロット
+// は独立（step 96 の fill 規則）。呼び出し結果は、被呼び出し側の
+// 戻り値コピーと引数コピーで独立性が保証される（組み込み・外部関数
+// で配列を返すものは、実行時ヘルパが毎回新しい配列を作るものだけ）
+static bool expr_is_fresh(Node* expr) {
+    switch (expr->kind) {
+        case ND_ARRAY:
+        case ND_NEWARRAY:
+        case ND_FUNCALL:
+        case ND_MCALL:
+        case ND_VCALL:
+        case ND_COPY:
+            return true;
+        default:
+            return false;
+    }
+}
+
+// 束縛地点で式を包む。型 t が配列型で、式がフレッシュでなければ
+// ND_COPY で包んだノードを返し、それ以外は式をそのまま返す
+static Node* bind_copy(Node* expr, Type* t) {
+    if (!t || t->kind != TY_ARRAY || expr_is_fresh(expr)) {
+        return expr;
+    }
+    Node* c = create_node(ND_COPY);
+    c->left_child = expr;
+    c->type = t;
+    c->tok = expr->tok;
+    return c;
+}
+
+// リテラルの要素など、連結リストの途中にあるノードをその場で包む版
+static void bind_copy_in_place(Node* e, Type* t) {
+    if (!t || t->kind != TY_ARRAY || expr_is_fresh(e)) {
+        return;
+    }
+    Node* inner = malloc(sizeof(Node));
+    *inner = *e;
+    inner->next = NULL;
+    Node* nxt = e->next;
+    Token* tok = e->tok;
+    memset(e, 0, sizeof(Node));
+    e->kind = ND_COPY;
+    e->left_child = inner;
+    e->type = t;
+    e->tok = tok;
+    e->next = nxt;
+}
+
 static Type* check_assign(Node* node) {
     // 安全添え字は読み取り専用（step 81）。複合代入・入力対象・
     // 複数代入の対象も、脱糖や check_multiassign 経由でここへ来る。
@@ -905,6 +965,9 @@ static Type* check_assign(Node* node) {
             base_slot->tok = lhs0->tok;
             Node* base_assign = create_node(ND_ASSIGN);
             base_assign->tok = lhs0->tok;
+            // 対象コンテナの退避は場所の借用で、値の束縛ではない。
+            // コピーすると書き込みが複製側へ行ってしまう（step 96）
+            base_assign->no_bind_copy = true;
             base_assign->left_child = base_slot;
             base_assign->right_child = lhs0->left_child;
             check_node(base_assign);
@@ -923,6 +986,7 @@ static Type* check_assign(Node* node) {
                 idx_slot->tok = lhs0->tok;
                 Node* idx_assign = create_node(ND_ASSIGN);
                 idx_assign->tok = lhs0->tok;
+                idx_assign->no_bind_copy = true;
                 idx_assign->left_child = idx_slot;
                 idx_assign->right_child = lhs0->right_child;
                 check_node(idx_assign);
@@ -1018,6 +1082,14 @@ static Type* check_assign(Node* node) {
         if (lhs->kind == ND_BOOL) {
             error_node(lhs, "`%.*s`には代入できません", lhs->len, lhs->name);
         }
+    }
+    // 束縛コピー（step 96）: 配列型の右辺は、束縛先と独立な複製を
+    // 格納する。__setitem__ への書き換え（上の早期 return と、添え字
+    // 分岐で node 自体が ND_MCALL に書き換わった場合）は対象外で、
+    // 格納は被呼び出し側の引数コピーに任せる。内部の退避代入
+    // （no_bind_copy）も対象外
+    if (!node->no_bind_copy && node->kind == ND_ASSIGN) {
+        node->right_child = bind_copy(node->right_child, rhs);
     }
     return rhs;
 }
@@ -2079,6 +2151,11 @@ static Type* check_append(Node* node, Type* obj) {
         // スロット、引数は1個）を満たさないノードを残さないこと
         return &ty_unknown;
     }
+    // 束縛コピー（step 96）: 追加する値が配列なら、受け側と独立な
+    // 複製を追加する
+    if (nargs == 1) {
+        node->args = bind_copy(node->args, arg_types[0]);
+    }
     node->kind = ND_APPEND;
     return &ty_int;
 }
@@ -2346,6 +2423,9 @@ static Type* check_arraylit(Node* node, Type* expected) {
         expected_type = elem_expected;
         Type* et = check_node(e);
         expected_type = NULL;
+        // 束縛コピー（step 96）: 要素が配列なら、リテラルと独立な
+        // 複製を要素として入れる
+        bind_copy_in_place(e, et);
         if (et->kind == TY_UNKNOWN) {
             continue;
         }
@@ -2901,6 +2981,32 @@ static Type* check_return(Node* node) {
             current_return = rt;
         } else if (!type_equals(current_return, rt)) {
             error_node(node, "関数`%.*s`の戻り値は`%s`ですが、`%s`が返されています", current_fn->len, current_fn->name, type_text(current_return), type_text(rt));
+        }
+    }
+    // 束縛コピー（step 96）: 配列を返すときは、呼び出し側と独立な
+    // 複製を返す。深さは返す値自身の型から決める（値の型が配列で
+    // なければ、宣言・推論された戻り型の深さで包む）。
+    // ただし、素のローカル変数（パラメータ含む）をそのまま返す
+    // ときはコピーしない。step 96 のコピー規律のもとでは、ローカル
+    // 変数の配列は常に関数の呼び出しが独占している（束縛のたびに
+    // 複製され、外部へは複製でしか出ない）ので、return でフレーム
+    // が消える以上、そのまま呼び出し側へ所有を移して安全。prelude
+    // の __add__ や sorted のような「ローカルに作って返す」形で
+    // 無駄な複製を避けるための省略。グローバル変数とキャプチャ
+    // 変数は呼び出し後も残るので、従来どおりコピーする。
+    // 例外はメソッドの self（第0パラメータ、スロット offset 8）:
+    // self は借用で、レシーバの配列そのものは呼び出し側が持って
+    // いる。`return self` を省略するとレシーバと戻り値が同じ配列
+    // になってしまうので、self だけはコピーする（Luna 指摘）
+    if (node->left_child) {
+        Type* eff = current_return ? current_return : rt;
+        Type* vt = rt->kind == TY_ARRAY ? rt : eff;
+        bool self_return = current_fn && current_fn->klass &&
+            node->left_child->kind == ND_LVAR &&
+            node->left_child->offset == 8;
+        if (vt && vt->kind == TY_ARRAY &&
+            (node->left_child->kind != ND_LVAR || self_return)) {
+            node->left_child = bind_copy(node->left_child, vt);
         }
     }
     return rt;
@@ -4066,6 +4172,11 @@ static Type* check_node(Node* node) {
             result = array_type(fill);
             break;
         }
+        case ND_COPY:
+            // 束縛コピーは束縛地点の検査の最後に挿入されるため、通常は
+            // ここへ来ない。再検査の経路でも子の型をそのまま返す
+            result = check_node(node->left_child);
+            break;
         case ND_INDEX:
             result = check_index(node);
             break;

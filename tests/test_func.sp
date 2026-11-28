@@ -43,7 +43,7 @@ def apply1(f: fn(int) -> int, x: int) -> int { return f(x); }
 def apply6(f: fn(int, int, int, int, int, int) -> int, a: int) -> int {
     return f(a, a + 1, a + 2, a + 3, a + 4, a + 5);
 }
-def sort_with(a: [int], cmp: fn(int, int) -> int) {
+def sort_with(a: [int], cmp: fn(int, int) -> int) -> [int] {
     n = a.len;
     i = 0;
     while (i < n) {
@@ -58,6 +58,7 @@ def sort_with(a: [int], cmp: fn(int, int) -> int) {
         }
         i = i + 1;
     }
+    return a;
 }
 def t019() { g = dbl; return g(10); }
 def t020() { return apply1(dbl, 1); }
@@ -123,7 +124,9 @@ def t035() {
 }
 def t036() {
     a = [3, 1, 2];
-    sort_with(a, (x, y) -> x - y);
+    // step 96: 引数の配列はコピーされるため、並べ替えた結果は
+    // 戻り値で受け取る（引数経由の書き換えは呼び出し側へ届かない）
+    a = sort_with(a, (x, y) -> x - y);
     return a[0] * 100 + a[1] * 10 + a[2];
 }
 def t037() {
@@ -238,6 +241,13 @@ def t057() { return min(max(1, 9), max(2, 3)) + pick92(5) + pick92(2); }
 def fmax92(v) -> int { return max(v, 10); }
 def t058() { return fmax92(5) + fmax92(20); }
 
+def stomp96(a: [[int]]) { a[0][0] = 99; }
+def maker96() -> [[int]] { r = [[5]]; return r; }
+def ident96(a: [[int]]) -> [[int]] { return a; }
+def t059() { g = [[1]]; stomp96(g); return g[0][0]; }
+def t060() { a = maker96(); a[0][0] = 9; b = maker96(); return a[0][0] * 10 + b[0][0]; }
+def t061() { g = [[3]]; h = ident96(g); h[0][0] = 8; return g[0][0] * 10 + h[0][0]; }
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -312,6 +322,9 @@ def main() {
     mark(59); fails=fails+check(t056(), 10);
     mark(60); fails=fails+check(t057(), 8);
     mark(61); fails=fails+check(t058(), 30);
+    mark(62); fails=fails+check(t059(), 1);
+    mark(63); fails=fails+check(t060(), 95);
+    mark(64); fails=fails+check(t061(), 38);
 
     print_str("done"); putchar(10);
     return fails > 0;

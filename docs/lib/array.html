@@ -112,7 +112,8 @@
   <figcaption>シグネチャ</figcaption>
 <pre>class array&lt;T&gt;</pre>
 </figure>
-<p>配列リテラル <code>[1, 2, 3]</code>、詰め物つきの生成 <code>[fill; n]</code>、空の <code>[]</code> が作ります。リテラルは評価のたびに新しい配列が作られます（前に作った配列が上書きされることはありません）。<code>[fill; n]</code> の fill が配列リテラルのときは、スロットごとに中身までコピーされるため、行同士が共有されることはありません。fill が変数や呼び出し結果のときは、同じ値が全スロットに入ります。</p>
+<p>配列リテラル <code>[1, 2, 3]</code>、詰め物つきの生成 <code>[fill; n]</code>、空の <code>[]</code> が作ります。リテラルは評価のたびに新しい配列が作られます（前に作った配列が上書きされることはありません）。<code>[fill; n]</code> の fill が配列のときは、形（リテラル・変数・呼び出し結果）によらずスロットごとに複製が入るため、行同士が共有されることはありません。</p>
+<p>配列は<strong>値</strong>です。代入・関数の引数と戻り値・リテラルの要素・辞書への格納など、値が束縛されるたびにディープコピーされるため、<code>b = a</code> のあとで <code>a</code> を書き換えても <code>b</code> は変わりません（使いまわし＝エイリアスはありません。クラスインスタンスは対象外で、参照のままです）。</p>
 <p>配列は容量を持ちます。作りたての配列は容量＝要素数です。</p>
 <h2>メソッドと演算</h2>
 <table>
@@ -121,9 +122,9 @@
   <tr id="m-getitem"><td><code>a[i]</code></td><td>要素の読み書き。添え字は回り込みます（下の「添え字の回り込み」参照）</td></tr>
   <tr id="m-safeindex"><td><code>a?[i][j]...</code></td><td>安全添え字。全段の範囲を検査する読み取り専用の形（下の「安全添え字」参照）</td></tr>
   <tr id="m-slice"><td><code>a[i:j]</code></td><td>スライス。i 以上 j 未満の部分配列（要素をコピーした新しい配列）。端は省略でき、負の添え字は末尾から数え、範囲外は端に丸める</td></tr>
-  <tr id="m-append"><td><code>append(v) -&gt; int</code></td><td>末尾に要素を足し、新しい要素数を返す。コンパイラが処理する組み込み操作（下の「append と別名」参照）</td></tr>
+  <tr id="m-append"><td><code>append(v) -&gt; int</code></td><td>末尾に要素を足し、新しい要素数を返す。コンパイラが処理する組み込み操作（下の「append と値セマンティクス」参照）</td></tr>
   <tr id="m-add"><td><code>a + b</code></td><td>連結した新しい配列（<code>__add__</code>）</td></tr>
-  <tr id="m-mul"><td><code>a * n</code></td><td><code>n</code> 回繰り返した新しい配列（<code>__mul__</code>）</td></tr>
+  <tr id="m-mul"><td><code>a * n</code></td><td><code>n</code> 回繰り返した新しい配列（<code>__mul__</code>）。要素が配列なら各繰り返しは独立した複製になる</td></tr>
   <tr id="m-eq"><td><code>a == b / a != b</code></td><td>中身の比較。順序比較（<code>&lt;</code> / <code>&lt;=</code>）は無く、エラーになる</td></tr>
   <tr id="m-sort"><td><code>sort()</code></td><td>昇順に並べ替える（インプレース）。<strong>安定ソートではない</strong>（等しい要素の前後関係は保たれない）。要素型に <code>__lt__</code> が必要</td></tr>
   <tr id="m-sorted"><td><code>sorted() -&gt; [T]</code></td><td>並べ替えた新しい配列（元の配列は変わらない）。要素型に <code>__lt__</code> が必要</td></tr>
@@ -137,8 +138,8 @@
 <p>通常の添え字 <code>a[i]</code> は、実効添え字を <code>i % a.len</code>（<code>%</code> と同じ Python 式で、負数でも 0 以上）として解釈します。そのため <code>a[-1]</code> は最後の要素、<code>a[a.len]</code> は先頭の要素を指し、読み書きのどちらでも同じです。入れ子の配列では段ごとに回り込み、座標添え字 <code>a[p]</code> も成分ごとに回り込みます。長さ 0 の配列は余りが取れないため、添え字アクセスは不定です。範囲外を厳密に判定したい場合は安全添え字を使ってください。<code>str</code> の添え字も同じく回り込みます。</p>
 <h2>安全添え字</h2>
 <p><code>a?[i][j]...</code> は範囲チェックつきの読み取りです。対象の直後に <code>?</code> を1回だけ置き、後ろに通常の添え字の連鎖を続けます。単独で書くと「連鎖の全段とも範囲内か」を表す <code>bool</code> になり、比較の直接の被演算子として書くと、どこかの段で範囲外なら比較全体が <code>false</code>（<code>!=</code> でも <code>false</code>）になります。対象と各添え字はちょうど1回だけ評価され、範囲チェックは浅い段から順に短絡します。対象にできるのは配列と <code>str</code> だけで、代入先には使えず、連鎖比較の中でも使えません（どちらもコンパイルエラー）。</p>
-<h2>append と別名</h2>
-<p><code>append</code> は prelude のメソッドではなく、コンパイラが処理する組み込み操作です（メソッドでは呼び出し元の変数を付け替えられないため）。対象にできるのは、変数・フィールド・配列の要素など、スロットを持つ場所だけです（<code>(a + b).append(x)</code> のような一時値への append はエラー）。容量に空きがある間は同じブロックが伸びて別名からも見えますが、容量を超える append では新しいブロックへコピーして対象の変数だけが付け替わります（別名や、引数として渡した先の呼び出し元には伝わりません）。</p>
+<h2>append と値セマンティクス</h2>
+<p><code>append</code> は prelude のメソッドではなく、コンパイラが処理する組み込み操作です（メソッドでは呼び出し元の変数を付け替えられないため）。対象にできるのは、変数・フィールド・配列の要素など、スロットを持つ場所だけです（<code>(a + b).append(x)</code> のような一時値への append はエラー）。配列は値なので、append の効果は対象のスロットそのものにだけ及びます。他の変数が同じ配列を持っていることはなく、引数として渡した先での append も呼び出し元には伝わりません。内部では容量を持ち、容量を超える append では新しいブロックへ移して対象だけが付け替わります。</p>
 <p>条件に配列を書くと「空でなければ真」で判定されます（<code>__bool__</code>）。配列には <code>__hash__</code> がありますが、書き換え可能なため、辞書のキーにした後で中身を変えるとそのエントリは引けなくなります。</p>
 <figure class="code">
   <figcaption>例 — 基本と回り込み</figcaption>
@@ -185,7 +186,7 @@ false</pre>
 0</pre>
 </figure>
 <figure class="code">
-  <figcaption>例 — append と別名</figcaption>
+  <figcaption>例 — append と値セマンティクス</figcaption>
 <pre>a = [1, 2, 3]
 r = a.append(4)
 &lt;&lt; a
@@ -204,7 +205,7 @@ for i in 20:
 <pre>1 2 3 4
 4
 5
-5
+4
 20</pre>
 </figure>
 <figure class="code">
@@ -243,17 +244,21 @@ b = [3, 1, 2]
 3 2 1</pre>
 </figure>
 <h2>ArrayIter — 配列の反復子</h2>
-<p><code>a.__iter__()</code> が返す反復子で、<code>Vec</code> と <code>Deque</code> の反復にも使われます。配列そのものへの反復では、ループ変数への代入は要素へ書き戻されます（<code>__set_current__</code>）。反復中に <code>append</code> した場合、容量内の append は反復にも伸びが見え、容量を超えて付け替えられた後は、反復子は元のブロックの範囲をたどります。</p>
+<p><code>a.__iter__()</code> が返す反復子で、<code>Vec</code> と <code>Deque</code> の反復にも使われます。反復はイテレータが受け取った時点のスナップショットを回ります。ループ変数への代入の書き戻し（<code>__set_current__</code>）はスナップショットに効くため、ループ内では更新後の値が見えますが、元の配列へは届きません。反復中に元の配列へ <code>append</code> しても、反復の要素は増えません。</p>
 <figure class="code">
-  <figcaption>例 — 反復での書き戻し</figcaption>
+  <figcaption>例 — 反復とスナップショット</figcaption>
 <pre>a = [1, 2, 3]
+s = 0
 for x in a:
     x = x * 10
+    s = s + x
+&lt;&lt; s
 &lt;&lt; a</pre>
 </figure>
 <figure class="out">
   <figcaption>出力</figcaption>
-<pre>10 20 30</pre>
+<pre>60
+1 2 3</pre>
 </figure>
 <h2>関係する糖衣構文</h2>
 <ul>
