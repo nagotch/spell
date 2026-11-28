@@ -2,6 +2,9 @@
 
 // typecheck.c
 extern Function* functions;
+Type* fn_param(Function* fn, int i);
+bool sig_equal(Function* a, Function* b);
+void error_at_token(Token* tok, char* fmt, ...);
 
 // parse.c（typecheck の書き換えで数値ノードを作るために使う）
 Node* create_number_node(long num);

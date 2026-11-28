@@ -1287,6 +1287,7 @@ static Function* function(Class* klass) {
     Function* func = calloc(1, sizeof(Function));
     func->name = name;
     func->len = len;
+    func->name_tok = tok;
     func->body = body;
     func->nparams = nparams;
     func->return_type = return_type;
@@ -1568,6 +1569,27 @@ static void class_decl(Function** cur) {
         error_at(token_start(token), token_end(token), "クラス名が必要ですが、%sが見つかりました", token_text(token));
     }
     Class* klass = register_class(tok->str, tok->len);
+    // 同名クラスの再定義はエラー（step 91）。先行スキャンの仮登録では
+    // declared は立たないので、ここで初めて宣言されたものだけが通る。
+    // prelude のクラスも宣言済みのため、利用者が同名を再定義しても
+    // ここで止まる。最初の宣言が同じソース内にあれば行も併記する
+    if (klass->declared) {
+        Token* first = klass->decl_tok;
+        bool same_src = false;
+        if (first && first->str && src) {
+            uintptr_t p = (uintptr_t)first->str;
+            uintptr_t lo = (uintptr_t)src;
+            uintptr_t hi = lo + (uintptr_t)strlen(src);
+            same_src = p >= lo && p + (uintptr_t)first->len <= hi;
+        }
+        if (same_src) {
+            error_at(token_start(tok), token_end(tok), "クラス`%.*s`は既に定義されています（%d行目）", tok->len, tok->str, first->line);
+        } else {
+            error_at(token_start(tok), token_end(tok), "クラス`%.*s`は既に定義されています", tok->len, tok->str);
+        }
+    }
+    klass->declared = true;
+    klass->decl_tok = tok;
     if (consume("<")) {
         int count = 0;
         Token* extra = NULL;
