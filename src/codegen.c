@@ -13,6 +13,7 @@ static void gen_discard(Node* node);
 static void gen_push(Node* node);
 static void gen_rax_num(Node* node);
 static bool fits_imm32(long val);
+static void emit_divmod_adjust(bool is_mod);
 static Function* find_plain_function(char* name, int len);
 
 static int max_label = 0;
@@ -190,6 +191,26 @@ static void gen_index_addr(Node* node) {
     gen(node->right_child);
     printf("  pop rdi\n");
     printf("  pop rax\n");
+    if (node->left_child->type && node->left_child->type->kind == TY_ARRAY) {
+        // 添え字の回り込み（step 86）: 配列の実効添え字は i % len
+        // （spell の `%` と同じ Python 式。負数でも 0 以上になる）。
+        // 長さは要素0の8バイト手前にある。長さ 0 のときは剰余を
+        // 取らず従来どおりにする（0 除算で落とさない。長さ 0 の
+        // 配列への添え字アクセスは従来どおり未定義）
+        int label = new_label();
+        printf("  mov rcx, [rax-8]\n");
+        printf("  test rcx, rcx\n");
+        printf("  je .Lwrap%d\n", label);
+        printf("  push rax\n");
+        printf("  mov rax, rdi\n");
+        printf("  mov rdi, rcx\n");
+        printf("  cqo\n");
+        printf("  idiv rdi\n");
+        emit_divmod_adjust(true);
+        printf("  mov rdi, rdx\n");
+        printf("  pop rax\n");
+        printf(".Lwrap%d:\n", label);
+    }
     printf("  imul rdi, 8\n");
     printf("  add rax, rdi\n");
 }

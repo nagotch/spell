@@ -173,6 +173,15 @@ def t114() { a = "a,b,,c".split(","); r = a.len * 1000; if (a[0] == "a") { r = r
 def t115() { r = 0; if (",".join(["x", "y", "z"]) == "x,y,z") { r = r + 1; } if (",".join([]) == "") { r = r + 2; } if ("-".join(["one"]) == "one") { r = r + 4; } if ("".join(["a", "b"]) == "ab") { r = r + 8; } if ("::".join(["a", "b"]) == "a::b") { r = r + 16; } return r; }
 def t116() { return "123".to_int() * 1000000 + "-42".to_int() * 1000 + "  +17x".to_int() * 10 + "abc".to_int(); }
 def t117() { s = "abcdefgh"; r = 0; if (s[1:6][1:3] == "cd") { r = r + 1; } if (s[1:3] + "!" == "bc!") { r = r + 2; } t = ""; for part in "a,b,c".split(",") { t = t + part; } if (t == "abc") { r = r + 4; } if ("hello"[1:3] == "el") { r = r + 8; } return r; }
+def t118() { a = [10, 20, 30]; return a[-1] * 10000 + a[3] * 100 + a[4]; }
+def t119() { a = [10, 20, 30]; return a[-4] * 10000 + a[-7] * 100 + a[-3]; }
+def t120() { a = [10, 20, 30]; a[-1] = 99; a[3] = 11; a[5] = 77; return a[0] * 10000 + a[1] * 100 + a[2]; }
+def t121() { g = [[1, 2], [3, 4]]; return g[-1][-1] * 100 + g[2][3]; }
+def t122() { g = [[1, 2], [3, 4]]; p = (2, 3); q = (-1, -1); return g[p] * 100 + g[q]; }
+def t123() { a = [1, 2, 3]; a[-1] += 10; a[3] += 100; return a[0] * 10000 + a[2]; }
+def t124() { g = [[1], [2]]; g[-1].append(5); g[2].append(7); return g[0].len * 1000 + g[1].len * 100 + g[1][1] * 10 + g[0][1]; }
+def t125() { s = "abc"; r = 0; if (s[-1] == "c") { r = r + 1; } if (s[3] == "a") { r = r + 2; } if (s[4] == "b") { r = r + 4; } if (s[-4] == "c") { r = r + 8; } return r; }
+def t126() { a = [10, 20, 30]; r = 0; if (a?[-1]) { r = r + 1; } if (a?[3] == 10) { r = r + 2; } if (a?[2] == 30) { r = r + 4; } s = "abc"; if (s?[-1]) { r = r + 8; } if (s?[3] == "a") { r = r + 16; } if (s?[2] == "c") { r = r + 32; } return r; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -304,6 +313,15 @@ def main() {
     mark(115); fails=fails+check(t115(), 31);
     mark(116); fails=fails+check(t116(), 122958170);
     mark(117); fails=fails+check(t117(), 15);
+    mark(118); fails=fails+check(t118(), 301020);
+    mark(119); fails=fails+check(t119(), 303010);
+    mark(120); fails=fails+check(t120(), 112077);
+    mark(121); fails=fails+check(t121(), 402);
+    mark(122); fails=fails+check(t122(), 204);
+    mark(123); fails=fails+check(t123(), 1010013);
+    mark(124); fails=fails+check(t124(), 2257);
+    mark(125); fails=fails+check(t125(), 15);
+    mark(126); fails=fails+check(t126(), 36);
 
     print_str("done"); putchar(10);
     return fails > 0;
