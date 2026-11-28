@@ -2425,6 +2425,23 @@ static bool check_init_stmts(Node* stmt, Class* klass, bool* assigned, int nfiel
 
 void typecheck(Function* prog) {
     functions = prog;
+    // 定義収集の状態はコンパイル単位ごとに作り直す（同一プロセスで
+    // 複数回コンパイルされても、前のソースの定義が残らないように）
+    while (fn_defs_list) {
+        FnDefs* fd = fn_defs_list;
+        fn_defs_list = fd->next;
+        while (fd->locals) {
+            DefName* d = fd->locals;
+            fd->locals = d->next;
+            free(d);
+        }
+        free(fd);
+    }
+    while (global_defs) {
+        DefName* d = global_defs;
+        global_defs = d->next;
+        free(d);
+    }
     // 未定義変数の検出（step 79）に備え、先に全関数の代入を集める。
     // グローバルはプログラム全体が対象（前方参照を許すため）
     for (Function* fn = prog; fn; fn = fn->next) {
