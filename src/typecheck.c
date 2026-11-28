@@ -1722,17 +1722,23 @@ static Type* check_minmax(Node* node, bool is_min, Type* expected) {
         return &ty_unknown;
     }
     if (nargs == 1) {
-        // 1個ならその値自体。期待型はそのまま引数へ渡す
+        // 1個ならその値自体。期待型はそのまま引数へ渡す（呼び出し
+        // 時点の expected_type は check_node の前処理で NULL に戻され
+        // ているが、保存・復元して文脈に依存しない形にする）
+        Type* saved_expected = expected_type;
         expected_type = expected;
         Type* t = check_node(node->args);
-        expected_type = NULL;
+        expected_type = saved_expected;
         Node* nxt = node->next;
         *node = *node->args;
         node->next = nxt;
         return t;
     }
     // 2個以上は [引数...].min() / .max() へ書き換える。引数の検査は
-    // 配列リテラルの検査（要素型の統一）が担う
+    // 配列リテラルの検査（要素型の統一）が担う。呼び出し側の期待型
+    // （= 要素の型）は要素へ伝播しないため、型の手がかりの無いラムダ
+    // や曖昧な関数参照を引数にするときは注釈が要る（メソッド呼び出し
+    // の検査が期待型を受け取らないための制限）
     Node* arr = create_node(ND_ARRAY);
     arr->tok = node->tok;
     arr->body = node->args;
