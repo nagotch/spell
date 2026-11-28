@@ -92,6 +92,11 @@ tests=(
     # 再評価で前に保持した配列が化けない／関数から返しても化けない）
     "def main() { first = [0]; i = 0; while (i < 2) { a = [i]; if (i == 0) { first = a; } i = i + 1; } return first[0] + 42; }|42"
     "def one(x: int) -> [int] { return [x]; } def main() { a = one(11); b = one(22); return a[0] + 31; }|42"
+    # step 87: リテラルの要素に関数呼び出しがあっても正しい（要素の
+    # 評価の間、先頭ポインタをスタックに退避する形の回帰。呼び出しの
+    # アラインメントは emit_call が実行時に rsp&15 で調整する）
+    "def f(x: int) -> int { return x * 2; } def main() { a = [f(1), f(2), f(3)]; return a[0] + a[1] + a[2] + 30; }|42"
+    "def f(x: int) -> int { return x + 1; } def main() { b = [[f(1)], [f(2)]]; return b[0][0] + b[1][0] + 37; }|42"
     # step 87: append で要素型が確定し、育てたグリッドでも安全添え字の
     # 範囲チェックと Pos 添え字の深さ判定が効く
     "def main() { rows = []; rows.append([7]); if (rows[0]?[5]) { return 1; } if (rows[0]?[0]) { return 42; } return 0; }|42"
