@@ -224,6 +224,11 @@ struct Node {
     // `名前<型, ...>` と書く形は無い
     Type* ctor_targs[MAX_TPARAMS];
     int ctor_targ_count;
+    // ND_FUNCREF のときだけ使う（step 91）: オーバーロードされた名前の
+    // 関数参照で、期待型が無く解決を保留した印。保留したまま検査が
+    // 終わらないよう、保留した呼び出し側が勝者を決めた後に再検査し、
+    // 残っていれば曖昧エラーにする
+    bool funcref_deferred;
     // 型を引数に渡す構築（step 77）。`Deque(int)` のように構築の引数が
     // 型1つだけの場合に parse が立てる。要素型は ctor_targs[0] に入り、
     // 引数そのものは作らない（nargs は 0）。typecheck が要素型の
@@ -255,6 +260,10 @@ struct Function {
     // だけを typecheck が検査する。tc_done は検査済みの印
     bool tc_wanted;
     bool tc_done;
+    // 定義した名前のトークン（step 91）。再定義エラーの位置と行番号に
+    // 使う。合成された関数（ラムダ・入口・ゼロ値ファクトリ等）は
+    // NULL のまま
+    Token* name_tok;
 };
 
 typedef struct LVar LVar;
@@ -286,6 +295,12 @@ struct Class {
     Class* origin;
     Type* targs[MAX_TPARAMS];
     int targ_count;
+    // クラス宣言を既に読んだか（step 91）。program() の先行スキャンは
+    // register_class で仮登録だけをするため、宣言済みかどうかは
+    // class_decl がこの印で管理し、同名クラスの再定義を止める。
+    // decl_tok は最初の宣言の名前トークン（行番号の併記用）
+    bool declared;
+    Token* decl_tok;
 };
 
 extern Token* token;

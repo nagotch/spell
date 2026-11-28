@@ -1001,6 +1001,46 @@ def t080() {
     return n1.x * 1000 + n1.y * 100 + n2.x * 10 + n2.y;
 }
 
+// step 91: メソッドのオーバーロード（型違い・個数違い）
+class OvC {
+    def m(self, x: int) -> int { return 10; }
+    def m(self, x: str) -> int { return 20; }
+    def m(self, x: int, y: int) -> int { return 30; }
+}
+def t081() { c = OvC(); return c.m(1) + c.m("a") + c.m(1, 2); }
+
+// step 91: __init__ のオーバーロードは引数で選ばれる
+class OvP {
+    x: int;
+    def __init__(self, a: int) { self.x = a; }
+    def __init__(self, a: str) { self.x = 99; }
+}
+def t082() { p = OvP(42); q = OvP("a"); return p.x + q.x; }
+
+// step 91: dunder（__add__）もオーバーロードできる
+class OvV {
+    def __add__(self, o: int) -> int { return 100 + o; }
+    def __add__(self, o: str) -> int { return 200; }
+}
+def t083() { v = OvV(); return (v + 1) + (v + "a"); }
+
+// step 91: ジェネリッククラスのメソッドのオーバーロードは、実体化
+// された型で解決される
+class OvBox<T> {
+    def store(self, v: T) -> int { return 1; }
+    def store(self, v: int) -> int { return 2; }
+}
+def t084() { b: OvBox<str> = OvBox(); return b.store("a") * 10 + b.store(3); }
+
+// step 91: テンプレート内では型変数同士でも別署名として共存し、
+// 実体化後の具体型で呼び分けられる
+class OvPair<T, U> {
+    def val(self, x: T) -> int { return 1; }
+    def val(self, x: U) -> int { return 2; }
+    def go(self, a: T, b: U) -> int { return self.val(a) * 10 + self.val(b); }
+}
+def t085() { p: OvPair<int, str> = OvPair(); return p.go(1, "a"); }
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -1088,6 +1128,11 @@ def main() {
     mark(78); fails=fails+check(t078(), 9907);
     mark(79); fails=fails+check(t079(), 630);
     mark(80); fails=fails+check(t080(), 6545);
+    mark(81); fails=fails+check(t081(), 60);
+    mark(82); fails=fails+check(t082(), 141);
+    mark(83); fails=fails+check(t083(), 301);
+    mark(84); fails=fails+check(t084(), 12);
+    mark(85); fails=fails+check(t085(), 12);
 
     print_str("done"); putchar(10);
     return fails > 0;

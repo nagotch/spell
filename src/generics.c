@@ -207,6 +207,7 @@ Class* instantiate(Class* tmpl, Type* targs[], int targ_count) {
     while (tail->next) {
         tail = tail->next;
     }
+    Function* clone_start = tail;
     for (Function* fn = functions; fn; fn = fn->next) {
         if (fn->klass != tmpl) {
             continue;
@@ -224,6 +225,20 @@ Class* instantiate(Class* tmpl, Type* targs[], int targ_count) {
         nf->body = clone_node(fn->body, tmpl, targs);
         tail->next = nf;
         tail = nf;
+    }
+    // 実体化で署名が重なるメソッド同士は、再定義として止める
+    // （step 91）。テンプレート上は別署名でも、型引数の代入で同じ
+    // 署名になりうる（例: put(T) と put(int) を持つ Box<int>）。
+    // ラベルが衝突してアセンブラエラーになる前に、ここで止める
+    {
+        Function* stop = tail->next;
+        for (Function* a = clone_start->next; a != stop; a = a->next) {
+            for (Function* b = a->next; b != stop; b = b->next) {
+                if (a->len == b->len && !memcmp(a->name, b->name, a->len) && sig_equal(a, b)) {
+                    error_at_token(b->name_tok, "クラス`%.*s`のメソッド`%.*s`は、型引数を当てはめると同じ引数を持つ定義と重なります", tmpl->len, tmpl->name, b->len, b->name);
+                }
+            }
+        }
     }
     while (cloned_lambdas) {
         Function* lf = cloned_lambdas;

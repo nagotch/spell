@@ -142,6 +142,303 @@ static Function* find_callable(Class* klass, char* name, int len) {
     return NULL;
 }
 
+// 名前と引数の個数（self を含む）が合う最初の定義。署名がプロトコルで
+// 固定のメソッド（__iter__ 等）を引くときに使い、同名のオーバーロード
+// の中からプロトコル形のものを優先する。個数が合うものが無ければ
+// 従来の最初の一致に落とす（検証エラーは呼び出し側が出す）
+static Function* find_callable_arity(Class* klass, char* name, int len, int nparams) {
+    Function* first = NULL;
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->klass == klass && fn->len == len && !memcmp(fn->name, name, len)) {
+            if (fn->nparams == nparams) {
+                return fn;
+            }
+            if (!first) {
+                first = fn;
+            }
+        }
+    }
+    return first;
+}
+
+// ---- step 91: 同名再定義の禁止とオーバーロード解決 ----
+
+// 関数参照の解決保留。オーバーロードされた呼び出しの引数を検査して
+// いる間だけ立て、候補が複数ある名前の関数参照はその場では決めず、
+// 呼び出し側が勝者を決めてから期待型で検査し直す
+static bool defer_funcref;
+
+// トークンが現在のソース（利用者のファイル）の範囲内にあるか。
+// prelude 由来のトークンは別バッファを指すため、位置つきエラーに
+// 使えるのは利用者のファイル内のものだけ（error_node と同じ判定）
+static bool tok_in_src(Token* tok) {
+    if (!tok || !tok->str || !src) {
+        return false;
+    }
+    uintptr_t p = (uintptr_t)tok->str;
+    uintptr_t lo = (uintptr_t)src;
+    uintptr_t hi = lo + (uintptr_t)strlen(src);
+    return p >= lo && p + (uintptr_t)tok->len <= hi;
+}
+
+// トークンの位置でエラーを出す。範囲外（prelude 由来等）なら位置なし
+// （generics.c の実体化時チェックからも使う）
+void error_at_token(Token* tok, char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    if (tok_in_src(tok)) {
+        long start = (long)((uintptr_t)tok->str - (uintptr_t)src);
+        error_at_v(start, start + tok->len, fmt, ap);
+        va_end(ap);
+        return;
+    }
+    error_plain_v(fmt, ap);
+    va_end(ap);
+}
+
+// 引数の型を取り出す（注釈なしは NULL なので unknown として扱う）
+Type* fn_param(Function* fn, int i) {
+    Type* t = fn->param_types[i];
+    return t ? t : &ty_unknown;
+}
+
+// シグネチャ（引数の個数と型列）が一致するか。メソッドは self を
+// 含めた全引数で比べる（同じクラス内では self の型は常に同じため、
+// 実質の比較は self 以降になる）。型の一致は厳密な方を使う:
+// 注釈なし（unknown）同士は一致し、型変数は名前まで一致を要求する
+bool sig_equal(Function* a, Function* b) {
+    if (a->nparams != b->nparams) {
+        return false;
+    }
+    for (int i = 0; i < a->nparams; i++) {
+        if (!type_strict_equals(fn_param(a, i), fn_param(b, i))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// (klass, 名前) の定義の数を数える。klass が NULL なら素の関数
+static int count_callables(Class* klass, char* name, int len) {
+    int n = 0;
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->klass == klass && fn->len == len && !memcmp(fn->name, name, len)) {
+            n++;
+        }
+    }
+    return n;
+}
+
+// シグネチャの表示（エラー文用）: `f(int, str)`。メソッドは self を省く
+static void sig_text(char* buf, size_t cap, Function* fn) {
+    int off = fn->klass ? 1 : 0;
+    size_t used = 0;
+    used += snprintf(buf + used, cap - used, "%.*s(", fn->len, fn->name);
+    for (int i = off; i < fn->nparams; i++) {
+        if (used >= cap) {
+            break;
+        }
+        // type_text は使い回しバッファを返すため、その場で写し取る
+        char t[256];
+        snprintf(t, sizeof(t), "%s", type_text(fn_param(fn, i)));
+        used += snprintf(buf + used, cap - used, "%s%s", i > off ? ", " : "", t);
+    }
+    if (used < cap) {
+        snprintf(buf + used, cap - used, ")");
+    }
+}
+
+// 候補のシグネチャ一覧を `f(int) / f(str)` の形で組み立てる
+// （エラー文用）。arity >= 0 なら引数の個数が合うものだけを載せる
+static void candidates_text(char* buf, size_t cap, Class* klass, char* name, int len, int arity) {
+    buf[0] = '\0';
+    size_t used = 0;
+    bool first = true;
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->klass != klass || fn->len != len || memcmp(fn->name, name, len)) {
+            continue;
+        }
+        int off = fn->klass ? 1 : 0;
+        if (arity >= 0 && fn->nparams - off != arity) {
+            continue;
+        }
+        if (used >= cap) {
+            break;
+        }
+        char sig[512];
+        sig_text(sig, sizeof(sig), fn);
+        int w = snprintf(buf + used, cap - used, "%s%s", first ? "" : " / ", sig);
+        if (w < 0) {
+            break;
+        }
+        used += (size_t)w;
+        first = false;
+    }
+}
+
+typedef enum {
+    RES_OK,        // 一意に決まった
+    RES_NONE,      // 名前自体が無い
+    RES_NO_ARITY,  // 名前はあるが、引数の個数が合うものが無い
+    RES_AMBIGUOUS, // 完全一致・緩い一致のどちらでも複数が残った
+    RES_NO_MATCH   // 個数は合うが、型が合うものが無い
+} ResKind;
+
+// 候補1件と引数列の合い具合: 2=完全（両方とも判明していて厳密一致）、
+// 1=緩い（unknown を含みつつ type_equals で一致）、0=不適合。
+// bool と int は type_equals でも一致しないため、別型として区別される
+static int score_candidate(Function* fn, Type* arg_types[], int nargs) {
+    int off = fn->klass ? 1 : 0;
+    bool exact = true;
+    bool loose = true;
+    for (int i = 0; i < nargs; i++) {
+        Type* at = arg_types[i];
+        Type* pt = fn_param(fn, off + i);
+        if (type_has_unknown(at) || type_has_unknown(pt) || !type_strict_equals(at, pt)) {
+            exact = false;
+        }
+        if (!type_equals(at, pt)) {
+            loose = false;
+        }
+    }
+    if (exact) {
+        return 2;
+    }
+    if (loose) {
+        return 1;
+    }
+    return 0;
+}
+
+// (klass, 名前) の候補から、引数の個数と型で1件に絞る。完全一致が
+// 1件だけあればそれを選び、無ければ緩い一致が1件だけのときに選ぶ。
+// それ以外は NULL を返し、理由を *kind に入れる
+static Function* resolve_callable(Class* klass, char* name, int len,
+                                  Type* arg_types[], int nargs, ResKind* kind) {
+    bool any = false;
+    bool any_arity = false;
+    Function* exact_fn = NULL;
+    int exact_n = 0;
+    Function* loose_fn = NULL;
+    int loose_n = 0;
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->klass != klass || fn->len != len || memcmp(fn->name, name, len)) {
+            continue;
+        }
+        any = true;
+        int off = fn->klass ? 1 : 0;
+        if (fn->nparams - off != nargs) {
+            continue;
+        }
+        any_arity = true;
+        int s = score_candidate(fn, arg_types, nargs);
+        if (s == 2) {
+            exact_n++;
+            exact_fn = fn;
+        } else if (s == 1) {
+            loose_n++;
+            loose_fn = fn;
+        }
+    }
+    if (exact_n == 1) {
+        *kind = RES_OK;
+        return exact_fn;
+    }
+    if (exact_n > 1) {
+        *kind = RES_AMBIGUOUS;
+        return NULL;
+    }
+    if (loose_n == 1) {
+        *kind = RES_OK;
+        return loose_fn;
+    }
+    if (loose_n > 1) {
+        *kind = RES_AMBIGUOUS;
+        return NULL;
+    }
+    if (any_arity) {
+        *kind = RES_NO_MATCH;
+        return NULL;
+    }
+    if (any) {
+        *kind = RES_NO_ARITY;
+        return NULL;
+    }
+    *kind = RES_NONE;
+    return NULL;
+}
+
+// dunder や添え字など、コンパイラ内部から引くメソッドの解決。定義が
+// 1件以下なら従来どおり最初の一致（または NULL）を返し、診断は呼び
+// 出し側の既存チェックに委ねる。複数ある場合は引数型で選び、曖昧・
+// 不適合なら node の位置でエラーを出して *errored を立て、NULL を返す
+static Function* resolve_method_soft(Node* node, Class* klass, char* name, int len,
+                                     Type* arg_types[], int nargs, bool* errored) {
+    *errored = false;
+    if (count_callables(klass, name, len) <= 1) {
+        return find_callable(klass, name, len);
+    }
+    ResKind rk;
+    Function* fn = resolve_callable(klass, name, len, arg_types, nargs, &rk);
+    if (fn) {
+        return fn;
+    }
+    if (rk == RES_NO_ARITY) {
+        // 個数が合うものが無い場合は、個数エラーの診断を呼び出し側の
+        // 従来チェックに委ねるため、最初の一致を返す
+        return find_callable(klass, name, len);
+    }
+    char cands[1024];
+    candidates_text(cands, sizeof(cands), klass, name, len, nargs);
+    if (rk == RES_AMBIGUOUS) {
+        error_node(node, "クラス`%.*s`のメソッド`%.*s`の呼び出しが曖昧です（候補: %s）", klass->len, klass->name, len, name, cands);
+    } else {
+        error_node(node, "クラス`%.*s`のメソッド`%.*s`に合うオーバーロードがありません（候補: %s）", klass->len, klass->name, len, name, cands);
+    }
+    *errored = true;
+    return NULL;
+}
+
+// 同名・同じ引数シグネチャの再定義を止める。typecheck の冒頭（実体化
+// で複製が増える前）に、連結済みの全定義を走査する。prelude の定義も
+// 対象で、利用者が prelude と同じ署名を再定義してもここで止まる
+// （エラー位置は、後から現れた定義=通常は利用者側に出る）
+static void check_redefinitions(void) {
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->is_lambda) {
+            continue;  // ラムダや合成関数の名前は一意に作られている
+        }
+        for (Function* prev = functions; prev != fn; prev = prev->next) {
+            if (prev->is_lambda || prev->klass != fn->klass) {
+                continue;
+            }
+            if (prev->len != fn->len || memcmp(prev->name, fn->name, fn->len)) {
+                continue;
+            }
+            if (!sig_equal(prev, fn)) {
+                continue;
+            }
+            char sig[512];
+            sig_text(sig, sizeof(sig), fn);
+            bool both_here = tok_in_src(prev->name_tok) && tok_in_src(fn->name_tok);
+            if (fn->klass) {
+                if (both_here) {
+                    error_at_token(fn->name_tok, "クラス`%.*s`のメソッド`%s`は既に定義されています（%d行目）", fn->klass->len, fn->klass->name, sig, prev->name_tok->line);
+                } else {
+                    error_at_token(fn->name_tok, "クラス`%.*s`のメソッド`%s`は既に定義されています", fn->klass->len, fn->klass->name, sig);
+                }
+            } else {
+                if (both_here) {
+                    error_at_token(fn->name_tok, "関数`%s`は既に定義されています（%d行目）", sig, prev->name_tok->line);
+                } else {
+                    error_at_token(fn->name_tok, "関数`%s`は既に定義されています", sig);
+                }
+            }
+            break;
+        }
+    }
+}
+
 static Type* bool_type() {
     Class* klass = find_class("bool", 4);
     return klass ? klass->type : &ty_int;
@@ -150,7 +447,7 @@ static Type* bool_type() {
 static Type* scalar_cmp_result(const char* dunder) {
     Class* klass = find_class("int", 3);
     if (klass) {
-        Function* method = find_callable(klass, (char*)dunder, 6);
+        Function* method = find_callable_arity(klass, (char*)dunder, 6, 2);
         if (method && method->return_type) {
             return method->return_type;
         }
@@ -213,7 +510,12 @@ static Type* rewrite_to_mcall(Node* node, Type* lt, Type* rt, const char* name, 
 }
 
 static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index, Type* it, Type* rhs, Node* value) {
-    Function* method = find_callable(klass, "__setitem__", 11);
+    Type* margs[2] = { it, rhs };
+    bool merr = false;
+    Function* method = resolve_method_soft(node, klass, "__setitem__", 11, margs, 2, &merr);
+    if (merr) {
+        return;
+    }
     if (!method) {
         error_node(node, "クラス`%.*s`に`__setitem__`は定義されていません", klass->len, klass->name);
         // 通常モードでは error_node は戻らない。キャプチャ有効時に
@@ -240,7 +542,7 @@ static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index
 }
 
 static Type* check_node(Node* node);
-static Type* check_funcref(Node* node);
+static Type* check_funcref(Node* node, Type* expected);
 static Node* make_mcall(Node* receiver, Class* klass, Function* fn, const char* name, int len);
 static Node* boolify(Node* expr, Type* t);
 static void ensure_defs(Function* fn);
@@ -289,8 +591,10 @@ static Type* check_array_arith(Node* node, Type* lt, Type* rt) {
         if (ot->kind != TY_ARRAY && ot->kind != TY_UNKNOWN) {
             error_node(node, "`%s`型の値に演算子`%s`は使えません", type_text(lt), op_text(node->op.binop));
         }
-        Function* method = find_callable(class_of(lt), "__add__", 7);
-        Type* result = rewrite_to_mcall(node, lt, rt, "__add__", 7, method);
+        Type* margs[1] = { rt };
+        bool merr = false;
+        Function* method = resolve_method_soft(node, class_of(lt), "__add__", 7, margs, 1, &merr);
+        Type* result = merr ? &ty_unknown : rewrite_to_mcall(node, lt, rt, "__add__", 7, method);
         if (result->kind == TY_UNKNOWN) { result = lt; }
         return result;
     }
@@ -298,8 +602,10 @@ static Type* check_array_arith(Node* node, Type* lt, Type* rt) {
         if (ot->kind != TY_INT && ot->kind != TY_UNKNOWN) {
             error_node(node, "`%s`型の値に演算子`%s`は使えません", type_text(lt), op_text(node->op.binop));
         }
-        Function* method = find_callable(class_of(lt), "__mul__", 7);
-        Type* result = rewrite_to_mcall(node, lt, rt, "__mul__", 7, method);
+        Type* margs[1] = { rt };
+        bool merr = false;
+        Function* method = resolve_method_soft(node, class_of(lt), "__mul__", 7, margs, 1, &merr);
+        Type* result = merr ? &ty_unknown : rewrite_to_mcall(node, lt, rt, "__mul__", 7, method);
         if (result->kind == TY_UNKNOWN) { result = lt; }
         return result;
     }
@@ -351,12 +657,18 @@ static Type* check_array_cmp(Node* node, Type* lt, Type* rt) {
     if (lt->kind == TY_ARRAY && rt->kind == TY_ARRAY) {
         // 配列同士は __eq__ / __ne__ へ書き換える。要素型の不一致は
         // rewrite_to_mcall の引数照合が止める
+        Type* margs[1] = { rt };
+        bool merr = false;
         if (node->op.binop == OP_EQ) {
-            Function* method = find_callable(class_of(lt), "__eq__", 6);
-            rewrite_to_mcall(node, lt, rt, "__eq__", 6, method);
+            Function* method = resolve_method_soft(node, class_of(lt), "__eq__", 6, margs, 1, &merr);
+            if (!merr) {
+                rewrite_to_mcall(node, lt, rt, "__eq__", 6, method);
+            }
         } else {
-            Function* method = find_callable(class_of(lt), "__ne__", 6);
-            rewrite_to_mcall(node, lt, rt, "__ne__", 6, method);
+            Function* method = resolve_method_soft(node, class_of(lt), "__ne__", 6, margs, 1, &merr);
+            if (!merr) {
+                rewrite_to_mcall(node, lt, rt, "__ne__", 6, method);
+            }
         }
         return bool_type();
     }
@@ -372,12 +684,18 @@ static Type* check_array_cmp(Node* node, Type* lt, Type* rt) {
         return bool_type();
     }
     // 左辺が配列で、右辺は型が分からない: 従来どおり書き換える
+    Type* margs[1] = { rt };
+    bool merr = false;
     if (node->op.binop == OP_EQ) {
-        Function* method = find_callable(class_of(lt), "__eq__", 6);
-        rewrite_to_mcall(node, lt, rt, "__eq__", 6, method);
+        Function* method = resolve_method_soft(node, class_of(lt), "__eq__", 6, margs, 1, &merr);
+        if (!merr) {
+            rewrite_to_mcall(node, lt, rt, "__eq__", 6, method);
+        }
     } else {
-        Function* method = find_callable(class_of(lt), "__ne__", 6);
-        rewrite_to_mcall(node, lt, rt, "__ne__", 6, method);
+        Function* method = resolve_method_soft(node, class_of(lt), "__ne__", 6, margs, 1, &merr);
+        if (!merr) {
+            rewrite_to_mcall(node, lt, rt, "__ne__", 6, method);
+        }
     }
     return bool_type();
 }
@@ -393,7 +711,12 @@ static Type* check_binop_rest(Node* node, Type* lt, Type* rt) {
     const char* dunder = arith_dunder(node->op.binop);
     if (dunder) {
         if (lt->kind == TY_CLASS) {
-            Function* method = find_callable(class_of(lt), (char*)dunder, 7);
+            Type* margs[1] = { rt };
+            bool merr = false;
+            Function* method = resolve_method_soft(node, class_of(lt), (char*)dunder, 7, margs, 1, &merr);
+            if (merr) {
+                return &ty_unknown;
+            }
             if (!method) {
                 error_node(node, "クラス`%.*s`に演算子`%s`は定義されていません", lt->klass->len, lt->klass->name, op_text(node->op.binop));
                 return &ty_unknown;
@@ -411,7 +734,12 @@ static Type* check_binop_rest(Node* node, Type* lt, Type* rt) {
     const char* cdunder = cmp_dunder(node->op.binop);
     if (cdunder) {
         if (lt->kind == TY_CLASS) {
-            Function* method = find_callable(class_of(lt), (char*)cdunder, 6);
+            Type* margs[1] = { rt };
+            bool merr = false;
+            Function* method = resolve_method_soft(node, class_of(lt), (char*)cdunder, 6, margs, 1, &merr);
+            if (merr) {
+                return bool_type();
+            }
             if (method) {
                 return rewrite_to_mcall(node, lt, rt, cdunder, 6, method);
             }
@@ -847,7 +1175,20 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
         error_node(node, "`%.*s`はクラスではありません", klass->len, klass->name);
     }
     if (klass->tparam_count > 0) {
-        Function* ginit = find_callable(klass, "__init__", 8);
+        // __init__ がオーバーロードされている場合は、引数の個数が合う
+        // ものを推論に使う（step 91）。合うものが無ければ最初の定義
+        Function* ginit = NULL;
+        for (Function* fn = functions; fn; fn = fn->next) {
+            if (fn->klass == klass && fn->len == 8 && !memcmp(fn->name, "__init__", 8)) {
+                if (!ginit) {
+                    ginit = fn;
+                }
+                if (fn->nparams - 1 == nargs) {
+                    ginit = fn;
+                    break;
+                }
+            }
+        }
         Type* gtargs[MAX_TPARAMS] = {};
         if (ginit) {
             for (int i = 0; i < nargs && i + 1 < ginit->nparams; i++) {
@@ -935,7 +1276,7 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
             return &ty_unknown;
         }
         if (factory->kind == ND_FUNCREF) {
-            arg_types[0] = check_funcref(factory);
+            arg_types[0] = check_funcref(factory, NULL);
         } else {
             expected_type = func_type(NULL, 0, elem);
             arg_types[0] = check_node(factory);
@@ -961,9 +1302,29 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
             // キャプチャ有効時（error_node から戻る場合）は打ち切る
             return &ty_unknown;
         }
-        arg_types[0] = check_funcref(fref);
+        arg_types[0] = check_funcref(fref, NULL);
         node->args = fref;
         nargs = 1;
+    }
+    // __init__ がオーバーロードされている場合は、最終的な引数（合成
+    // されたファクトリを含む）で選び直す（step 91）。個数が合うものが
+    // 無い場合は、従来の個数エラーを出すため最初の定義のままにする
+    if (init && count_callables(klass, "__init__", 8) >= 2) {
+        ResKind rk;
+        Function* winner = resolve_callable(klass, "__init__", 8, arg_types, nargs, &rk);
+        if (winner) {
+            init = winner;
+            node->func = init;
+        } else if (rk == RES_AMBIGUOUS || rk == RES_NO_MATCH) {
+            char cands[1024];
+            candidates_text(cands, sizeof(cands), klass, "__init__", 8, nargs);
+            if (rk == RES_AMBIGUOUS) {
+                error_node(node, "クラス`%.*s`の`__init__`の呼び出しが曖昧です（候補: %s）", klass->len, klass->name, cands);
+            } else {
+                error_node(node, "クラス`%.*s`の`__init__`に合うオーバーロードがありません（候補: %s）", klass->len, klass->name, cands);
+            }
+            return &ty_unknown;
+        }
     }
     int expected = init ? init->nparams - 1 : 0;
     if (nargs != expected) {
@@ -980,18 +1341,80 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
     return klass->type;
 }
 
-// 関数参照: 関数のシグネチャから関数型を組み立てる
-static Type* check_funcref(Node* node) {
-    Function* fn = find_callable(NULL, node->name, node->len);
-    if (!fn) {
-        return &ty_unknown;
-    }
+// 関数参照の解決先を記録し、その関数型を返す
+static Type* funcref_type(Node* node, Function* fn) {
     node->func = fn;
+    node->funcref_deferred = false;
     Type* params[6];
     for (int i = 0; i < fn->nparams && i < 6; i++) {
-        params[i] = fn->param_types[i] ? fn->param_types[i] : &ty_unknown;
+        params[i] = fn_param(fn, i);
     }
     return func_type(params, fn->nparams, fn->return_type ? fn->return_type : &ty_unknown);
+}
+
+// 関数参照: 関数のシグネチャから関数型を組み立てる。同名の定義が
+// 複数ある場合（step 91）は、期待される関数型（注釈など）の引数型列と
+// 戻り値型が合うものを選ぶ。期待型が無ければ曖昧エラーにする。ただし
+// オーバーロードされた呼び出しの引数として検査されている間は解決を
+// 保留し（defer_funcref）、呼び出し側が勝者を決めてから期待型で
+// 検査し直す
+static Type* check_funcref(Node* node, Type* expected) {
+    if (count_callables(NULL, node->name, node->len) <= 1) {
+        Function* fn = find_callable(NULL, node->name, node->len);
+        if (!fn) {
+            return &ty_unknown;
+        }
+        return funcref_type(node, fn);
+    }
+    if (expected && expected->kind == TY_FUNC) {
+        Function* found = NULL;
+        int nfound = 0;
+        for (Function* fn = functions; fn; fn = fn->next) {
+            if (fn->klass || fn->len != node->len || memcmp(fn->name, node->name, node->len)) {
+                continue;
+            }
+            if (fn->nparams != expected->func_nparams) {
+                continue;
+            }
+            bool ok = true;
+            for (int i = 0; i < fn->nparams; i++) {
+                Type* et = expected->func_params[i] ? expected->func_params[i] : &ty_unknown;
+                if (!type_equals(et, fn_param(fn, i))) {
+                    ok = false;
+                    break;
+                }
+            }
+            Type* er = expected->func_ret ? expected->func_ret : &ty_unknown;
+            Type* fr = fn->return_type ? fn->return_type : &ty_unknown;
+            if (!type_equals(er, fr)) {
+                ok = false;
+            }
+            if (ok) {
+                nfound++;
+                found = fn;
+            }
+        }
+        if (nfound == 1) {
+            return funcref_type(node, found);
+        }
+        if (nfound == 0) {
+            error_node(node, "関数`%.*s`に、期待される型`%s`に合うオーバーロードがありません", node->len, node->name, type_text(expected));
+        } else {
+            char cands[1024];
+            candidates_text(cands, sizeof(cands), NULL, node->name, node->len, -1);
+            error_node(node, "関数`%.*s`の参照が曖昧です（候補: %s）", node->len, node->name, cands);
+        }
+        return &ty_unknown;
+    }
+    if (defer_funcref) {
+        node->func = NULL;
+        node->funcref_deferred = true;
+        return &ty_unknown;
+    }
+    char cands[1024];
+    candidates_text(cands, sizeof(cands), NULL, node->name, node->len, -1);
+    error_node(node, "関数`%.*s`は複数定義されているため、型注釈でシグネチャを指定してください（候補: %s）", node->len, node->name, cands);
+    return &ty_unknown;
 }
 
 // ラムダ本体のオンデマンド検査。本体は外側の関数の検査の途中で呼ばれるため、
@@ -1058,6 +1481,11 @@ static Type* check_lambda(Node* node, Type* expected) {
     Function* saved_fn = current_fn;
     Type* saved_return = current_return;
     Capture* saved_captures = current_captures;
+    // ラムダ本体は独立した解決の範囲。本体の中の関数参照は、外側の
+    // オーバーロード呼び出しの保留（勝者の期待型での再検査）の対象に
+    // ならないため、保留はここで落とす（step 91）
+    bool saved_defer = defer_funcref;
+    defer_funcref = false;
     memset(local_types, 0, sizeof(local_types));
     ensure_defs(fn);
     current_fn = fn;
@@ -1071,6 +1499,7 @@ static Type* check_lambda(Node* node, Type* expected) {
     for (Node* stmt = fn->body; stmt; stmt = stmt->next) {
         check_node(stmt);
     }
+    defer_funcref = saved_defer;
     fn->lambda_checked = true;
     Type* params[6];
     for (int i = 0; i < fn->nparams && i < 6; i++) {
@@ -1094,7 +1523,12 @@ static Type* check_vcall(Node* node) {
         }
     }
     Type* arg_types[6];
+    // 関数値の呼び出しはシグネチャが1つに定まっているため、その引数に
+    // 現れる関数参照は保留せず、その場の期待型で解決する（step 91）
+    bool saved_defer = defer_funcref;
+    defer_funcref = false;
     int nargs = check_args_expected(node->args, arg_types, expected_list);
+    defer_funcref = saved_defer;
     if (lt->kind == TY_UNKNOWN) {
         return &ty_unknown;
     }
@@ -1115,7 +1549,170 @@ static Type* check_vcall(Node* node) {
     return lt->func_ret ? lt->func_ret : &ty_unknown;
 }
 
+// 保留したまま残っている関数参照を探す（step 91）。直接の引数として
+// 現れたものは勝者の期待型で検査し直されるため、ここに残るのは
+// 入れ子の式の中に現れたものだけ。それらは曖昧エラーにする
+static void fail_deferred_funcrefs(Node* node) {
+    for (Node* n = node; n; n = n->next) {
+        if (n->kind == ND_FUNCREF && n->funcref_deferred && !n->func) {
+            char cands[1024];
+            candidates_text(cands, sizeof(cands), NULL, n->name, n->len, -1);
+            error_node(n, "関数`%.*s`は複数定義されているため、型注釈でシグネチャを指定してください（候補: %s）", n->len, n->name, cands);
+        }
+        fail_deferred_funcrefs(n->left_child);
+        fail_deferred_funcrefs(n->right_child);
+        fail_deferred_funcrefs(n->cond);
+        fail_deferred_funcrefs(n->then);
+        fail_deferred_funcrefs(n->els);
+        fail_deferred_funcrefs(n->init);
+        fail_deferred_funcrefs(n->inc);
+        fail_deferred_funcrefs(n->body);
+        fail_deferred_funcrefs(n->args);
+    }
+}
+
+// オーバーロードされた呼び出し（同名の定義が複数ある場合）の引数検査
+// と解決（step 91）。勝者を返し、arg_types と *nargs_out を埋める。
+// 勝者が決まらなければ node の位置でエラーを出して NULL を返す
+static Function* resolve_overloaded_call(Node* node, Class* klass, char* name, int len,
+                                         Type* arg_types[6], int* nargs_out) {
+    int off = klass ? 1 : 0;
+    int nargs = 0;
+    for (Node* a = node->args; a; a = a->next) {
+        nargs++;
+    }
+    *nargs_out = nargs;
+    // 引数の個数が合う候補を数える
+    int arity_n = 0;
+    Function* arity_fn = NULL;
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->klass == klass && fn->len == len && !memcmp(fn->name, name, len)
+                && fn->nparams - off == nargs) {
+            arity_n++;
+            arity_fn = fn;
+        }
+    }
+    if (arity_n == 0) {
+        // 引数は検査だけしておき（後続の診断のため）、個数の合う候補が
+        // 無いことを、定義されている個数つきで伝える
+        Type* dummy[6];
+        check_args_expected(node->args, dummy, NULL);
+        char arities[256];
+        arities[0] = '\0';
+        size_t used = 0;
+        bool first = true;
+        for (Function* fn = functions; fn; fn = fn->next) {
+            if (fn->klass != klass || fn->len != len || memcmp(fn->name, name, len)) {
+                continue;
+            }
+            if (used >= sizeof(arities)) {
+                break;
+            }
+            int w = snprintf(arities + used, sizeof(arities) - used, "%s%d", first ? "" : " / ", fn->nparams - off);
+            if (w < 0) {
+                break;
+            }
+            used += (size_t)w;
+            first = false;
+        }
+        if (klass) {
+            error_node(node, "クラス`%.*s`のメソッド`%.*s`の引数は%d個ですが、合うオーバーロードがありません（定義されている引数の個数: %s）", klass->len, klass->name, len, name, nargs, arities);
+        } else {
+            error_node(node, "関数`%.*s`の引数は%d個ですが、合うオーバーロードがありません（定義されている引数の個数: %s）", len, name, nargs, arities);
+        }
+        return NULL;
+    }
+    if (arity_n == 1) {
+        Type* expected_list[6] = {};
+        for (int i = 0; i < arity_fn->nparams - off && i < 6; i++) {
+            expected_list[i] = arity_fn->param_types[off + i];
+        }
+        check_args_expected(node->args, arg_types, expected_list);
+        return arity_fn;
+    }
+    // 複数候補: 全候補で厳密に一致する引数だけを期待型にして検査する。
+    // 候補ごとに違う引数（ラムダ・関数参照）は期待型なしで検査し、
+    // 関数参照の解決は保留する
+    Type* expected_list[6] = {};
+    for (int i = 0; i < nargs && i < 6; i++) {
+        Type* common = NULL;
+        bool all_same = true;
+        for (Function* fn = functions; fn; fn = fn->next) {
+            if (fn->klass != klass || fn->len != len || memcmp(fn->name, name, len)
+                    || fn->nparams - off != nargs) {
+                continue;
+            }
+            Type* pt = fn_param(fn, off + i);
+            if (!common) {
+                common = pt;
+            } else if (!type_strict_equals(common, pt)) {
+                all_same = false;
+                break;
+            }
+        }
+        expected_list[i] = all_same ? common : NULL;
+    }
+    bool saved_defer = defer_funcref;
+    defer_funcref = true;
+    check_args_expected(node->args, arg_types, expected_list);
+    defer_funcref = false;
+    ResKind rk;
+    Function* winner = resolve_callable(klass, name, len, arg_types, nargs, &rk);
+    if (!winner) {
+        char cands[1024];
+        candidates_text(cands, sizeof(cands), klass, name, len, nargs);
+        if (klass) {
+            if (rk == RES_AMBIGUOUS) {
+                error_node(node, "クラス`%.*s`のメソッド`%.*s`の呼び出しが曖昧です（候補: %s）", klass->len, klass->name, len, name, cands);
+            } else {
+                error_node(node, "クラス`%.*s`のメソッド`%.*s`に合うオーバーロードがありません（候補: %s）", klass->len, klass->name, len, name, cands);
+            }
+        } else {
+            if (rk == RES_AMBIGUOUS) {
+                error_node(node, "関数`%.*s`の呼び出しが曖昧です（候補: %s）", len, name, cands);
+            } else {
+                error_node(node, "関数`%.*s`に合うオーバーロードがありません（候補: %s）", len, name, cands);
+            }
+        }
+        defer_funcref = saved_defer;
+        return NULL;
+    }
+    // 保留した関数参照引数を、勝者の期待型で検査し直す
+    int i = 0;
+    for (Node* arg = node->args; arg; arg = arg->next, i++) {
+        if (arg->kind == ND_FUNCREF && arg->funcref_deferred) {
+            expected_type = fn_param(winner, off + i);
+            Type* t = check_node(arg);
+            expected_type = NULL;
+            if (i < 6) {
+                arg_types[i] = t;
+            }
+        }
+    }
+    // 直接の引数でない場所に残った保留は、曖昧エラーにする
+    fail_deferred_funcrefs(node->args);
+    defer_funcref = saved_defer;
+    return winner;
+}
+
 static Type* check_funcall(Node* node, Type* expected) {
+    // 同名の定義が複数ある場合はオーバーロード解決へ（step 91）
+    if (count_callables(NULL, node->name, node->len) >= 2) {
+        Type* arg_types[6];
+        int nargs = 0;
+        Function* callee = resolve_overloaded_call(node, NULL, node->name, node->len, arg_types, &nargs);
+        if (!callee) {
+            return &ty_unknown;
+        }
+        node->func = callee;
+        for (int i = 0; i < nargs && i < callee->nparams && i < 6; i++) {
+            Type* pt = callee->param_types[i];
+            if (pt && arg_types[i]->kind != TY_UNKNOWN && !type_equals(pt, arg_types[i])) {
+                error_node(node, "関数`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", node->len, node->name, type_text(pt), type_text(arg_types[i]));
+            }
+        }
+        return callee->return_type ? callee->return_type : &ty_unknown;
+    }
     Function* callee = find_callable(NULL, node->name, node->len);
     Class* klass = callee ? NULL : find_class(node->name, node->len);
     BuiltinInfo* builtin = (callee || klass) ? NULL : find_builtin(node->name, node->len);
@@ -1153,7 +1750,7 @@ static Type* check_funcall(Node* node, Type* expected) {
             return &ty_unknown;
         }
         Class* klass = class_of(at);
-        Function* method = klass ? find_callable(klass, "__str__", 7) : NULL;
+        Function* method = klass ? find_callable_arity(klass, "__str__", 7, 1) : NULL;
         if (!method) {
             error_node(node, "`%s`型の値は %.*s できません", type_text(at), node->len, node->name);
             return &ty_unknown;
@@ -1238,6 +1835,8 @@ static Type* check_funcall(Node* node, Type* expected) {
             error_node(node, "関数`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", node->len, node->name, type_text(pt), type_text(arg_types[i]));
         }
     }
+    // 解決先を記録する。codegen はこれを見てラベルを出す（step 91）
+    node->func = callee;
     return callee->return_type ? callee->return_type : &ty_unknown;
 }
 
@@ -1276,13 +1875,27 @@ static Type* check_member(Node* node) {
         node->offset = field->offset;
         return field->type;
     }
-    Function* method = find_callable(klass, node->name, node->len);
-    if (method) {
-        if (method->nparams > 1) {
-            error_node(node, "メソッド`%.*s`には引数が必要ですが、括弧なしで使われています", node->len, node->name);
+    // 括弧なしの参照は、引数なしのメソッドだけを指せる。同名の
+    // オーバーロードが複数あっても、引数なしのものは署名の重複に
+    // ならないため最大で1件しかない（step 91）
+    Function* method = NULL;
+    bool any_method = false;
+    for (Function* fn = functions; fn; fn = fn->next) {
+        if (fn->klass == klass && fn->len == node->len && !memcmp(fn->name, node->name, node->len)) {
+            any_method = true;
+            if (fn->nparams == 1) {
+                method = fn;
+                break;
+            }
         }
+    }
+    if (method) {
         node->func = method;
         return method->return_type ? method->return_type : &ty_unknown;
+    }
+    if (any_method) {
+        error_node(node, "メソッド`%.*s`には引数が必要ですが、括弧なしで使われています", node->len, node->name);
+        return &ty_unknown;
     }
     error_node(node, "クラス`%.*s`にフィールド`%.*s`は定義されていません", klass->len, klass->name, node->len, node->name);
     return &ty_unknown;
@@ -1460,7 +2073,12 @@ static Type* check_arrow(Node* node) {
         const char* dunder = left_arrow ? "__push_back__" : "__push_front__";
         int dlen = left_arrow ? 13 : 14;
         Class* klass = ct->kind == TY_UNKNOWN ? NULL : class_of(ct);
-        Function* method = klass ? find_callable(klass, (char*)dunder, dlen) : NULL;
+        Type* margs[1] = { vt };
+        bool merr = false;
+        Function* method = klass ? resolve_method_soft(node, klass, (char*)dunder, dlen, margs, 1, &merr) : NULL;
+        if (merr) {
+            return &ty_unknown;
+        }
         if (method) {
             if (left_arrow) {
                 return rewrite_to_mcall(node, lt, rt, dunder, dlen, method);
@@ -1492,7 +2110,7 @@ static Type* check_arrow(Node* node) {
         const char* dunder = left_arrow ? "__pop_front__" : "__pop_back__";
         int dlen = left_arrow ? 13 : 12;
         Class* klass = ct->kind == TY_UNKNOWN ? NULL : class_of(ct);
-        Function* method = klass ? find_callable(klass, (char*)dunder, dlen) : NULL;
+        Function* method = klass ? find_callable_arity(klass, (char*)dunder, dlen, 1) : NULL;
         if (method) {
             if (method->nparams != 1) {
                 error_node(node, "クラス`%.*s`の`%.*s`は引数を取れません", klass->len, klass->name, dlen, dunder);
@@ -1563,6 +2181,24 @@ static Type* check_mcall(Node* node) {
     if (!klass) {
         error_node(node, "`%s`型の値にメソッドは使えません", type_text(obj));
         return &ty_unknown;
+    }
+    // 同名のメソッドが複数ある場合はオーバーロード解決へ（step 91）
+    if (count_callables(klass, node->name, node->len) >= 2) {
+        Type* arg_types[6];
+        int nargs = 0;
+        Function* method = resolve_overloaded_call(node, klass, node->name, node->len, arg_types, &nargs);
+        if (!method) {
+            return &ty_unknown;
+        }
+        node->func = method;
+        node->klass = klass;
+        for (int i = 0; i < nargs && i + 1 < method->nparams; i++) {
+            Type* pt = method->param_types[i + 1];
+            if (pt && arg_types[i]->kind != TY_UNKNOWN && !type_equals(pt, arg_types[i])) {
+                error_node(node, "クラス`%.*s`のメソッド`%.*s`の引数には`%s`が必要ですが、`%s`が指定されています", klass->len, klass->name, node->len, node->name, type_text(pt), type_text(arg_types[i]));
+            }
+        }
+        return method->return_type ? method->return_type : &ty_unknown;
     }
     Function* method = find_callable(klass, node->name, node->len);
     if (!method) {
@@ -1660,7 +2296,7 @@ static Type* stage_elem_type(Type* cont_type) {
     if (cont_type->kind == TY_ARRAY) {
         return cont_type->elem;
     }
-    Function* fn = find_callable(class_of(cont_type), "__getitem__", 11);
+    Function* fn = find_callable_arity(class_of(cont_type), "__getitem__", 11, 2);
     return fn ? fn->return_type : &ty_unknown;
 }
 
@@ -1704,7 +2340,7 @@ static Node* safe_num(Node* at, long val) {
 static Node* safe_len(Node* at, Node* cont, Type* cont_type) {
     if (is_str_type(cont_type)) {
         Class* klass = class_of(cont_type);
-        Function* fn = find_callable(klass, "len", 3);
+        Function* fn = find_callable_arity(klass, "len", 3, 1);
         Node* call = make_mcall(cont, klass, fn, "len", 3);
         call->tok = at->tok;
         call->type = &ty_int;
@@ -1723,7 +2359,7 @@ static Node* safe_len(Node* at, Node* cont, Type* cont_type) {
 static Node* safe_elem(Node* at, Node* cont, Type* cont_type, Node* idx) {
     if (is_str_type(cont_type)) {
         Class* klass = class_of(cont_type);
-        Function* fn = find_callable(klass, "__getitem__", 11);
+        Function* fn = find_callable_arity(klass, "__getitem__", 11, 2);
         Node* call = make_mcall(cont, klass, fn, "__getitem__", 11);
         call->tok = at->tok;
         call->args = idx;
@@ -1741,7 +2377,7 @@ static Node* safe_elem(Node* at, Node* cont, Type* cont_type, Node* idx) {
 // Pos の d 番目の成分を取り出すノード（レシーバは呼び出し側で用意する）
 static Node* safe_pos_comp(Node* at, Node* recv, Type* pos_type, int d) {
     Class* klass = class_of(pos_type);
-    Function* fn = find_callable(klass, "__getitem__", 11);
+    Function* fn = find_callable_arity(klass, "__getitem__", 11, 2);
     Node* call = make_mcall(recv, klass, fn, "__getitem__", 11);
     call->tok = at->tok;
     call->args = safe_num(at, d);
@@ -1924,7 +2560,7 @@ static Type* check_pos_index(Node* node, Type* lt, Type* it) {
         return &ty_unknown;
     }
     Class* pklass = class_of(it);
-    Function* getitem = find_callable(pklass, "__getitem__", 11);
+    Function* getitem = find_callable_arity(pklass, "__getitem__", 11, 2);
     if (!getitem) {
         error_node(node, "クラス`%.*s`に`__getitem__`は定義されていません", pklass->len, pklass->name);
         return &ty_unknown;
@@ -1968,7 +2604,7 @@ static Type* check_pos_index(Node* node, Type* lt, Type* it) {
             // __getitem__ 呼び出しにする。cur_elem は要素ではなく
             // str そのものなので、その戻り型が次の要素型になる
             Class* sklass = class_of(cur_elem);
-            Function* sgetitem = find_callable(sklass, "__getitem__", 11);
+            Function* sgetitem = find_callable_arity(sklass, "__getitem__", 11, 2);
             if (!sgetitem) {
                 error_node(node, "クラス`%.*s`に`__getitem__`は定義されていません", sklass->len, sklass->name);
                 return &ty_unknown;
@@ -1996,7 +2632,12 @@ static Type* check_index(Node* node) {
         return check_pos_index(node, lt, it);
     }
     if (lt->kind == TY_CLASS) {
-        Function* method = find_callable(class_of(lt), "__getitem__", 11);
+        Type* margs[1] = { it };
+        bool merr = false;
+        Function* method = resolve_method_soft(node, class_of(lt), "__getitem__", 11, margs, 1, &merr);
+        if (merr) {
+            return &ty_unknown;
+        }
         if (!method) {
             error_node(node, "`%s`型の値に添え字は使えません", type_text(lt));
             return &ty_unknown;
@@ -2103,7 +2744,12 @@ static Type* check_slice(Node* node, Type* expected) {
         return &ty_unknown;
     }
     Class* klass = class_of(lt);
-    Function* fn = klass ? find_callable(klass, "__slice__", 9) : NULL;
+    Type* margs[2] = { &ty_int, &ty_int };
+    bool merr = false;
+    Function* fn = klass ? resolve_method_soft(node, klass, "__slice__", 9, margs, 2, &merr) : NULL;
+    if (merr) {
+        return &ty_unknown;
+    }
     if (!fn) {
         error_node(node, "クラス`%.*s`に`__slice__`は定義されていません", klass->len, klass->name);
         return &ty_unknown;
@@ -2198,7 +2844,7 @@ static Node* boolify(Node* expr, Type* t) {
     }
     if (t->kind == TY_ARRAY || t->kind == TY_CLASS) {
         Class* klass = class_of(t);
-        Function* method = klass ? find_callable(klass, "__bool__", 8) : NULL;
+        Function* method = klass ? find_callable_arity(klass, "__bool__", 8, 1) : NULL;
         if (!method) {
             if (klass) {
                 error_node(expr, "クラス`%.*s`の値は条件に使えません（`__bool__`が定義されていません）", klass->len, klass->name);
@@ -2666,7 +3312,7 @@ static Type* check_for(Node* node) {
     }
     if (protocol_ok) {
         klass = class_of(iterable);
-        iter_fn = klass ? find_callable(klass, "__iter__", 8) : NULL;
+        iter_fn = klass ? find_callable_arity(klass, "__iter__", 8, 1) : NULL;
         if (!iter_fn) {
             error_node(node->init, "`%s`型の値は反復できません", type_text(iterable));
             protocol_ok = false;
@@ -2683,8 +3329,8 @@ static Type* check_for(Node* node) {
         }
     }
     if (protocol_ok) {
-        has_next_fn = find_callable(iklass, "__has_next__", 12);
-        next_fn = find_callable(iklass, "__next__", 8);
+        has_next_fn = find_callable_arity(iklass, "__has_next__", 12, 1);
+        next_fn = find_callable_arity(iklass, "__next__", 8, 1);
         if (!has_next_fn || !next_fn) {
             error_node(node, "クラス`%.*s`には`__has_next__`と`__next__`が必要です", iklass->len, iklass->name);
             protocol_ok = false;
@@ -2702,7 +3348,7 @@ static Type* check_for(Node* node) {
         }
         elem = next_fn->return_type ? next_fn->return_type : &ty_unknown;
         // __set_current__ は任意メソッド（書き戻し用）。あれば署名だけ検査する
-        set_current_fn = find_callable(iklass, "__set_current__", 15);
+        set_current_fn = find_callable_arity(iklass, "__set_current__", 15, 2);
         if (set_current_fn) {
             if (set_current_fn->nparams != 2) {
                 error_node(node, "クラス`%.*s`の`__set_current__`は引数を1つ取る必要があります", iklass->len, iklass->name);
@@ -2935,7 +3581,7 @@ static Type* check_put(Node* node) {
         Function* method = NULL;
         if (at->kind == TY_UNKNOWN) {
             error_node(arg, "型が分からない値は put できません");
-        } else if (!(klass = class_of(at)) || !(method = find_callable(klass, "__str__", 7))) {
+        } else if (!(klass = class_of(at)) || !(method = find_callable_arity(klass, "__str__", 7, 1))) {
             error_node(arg, "`%s`型の値は put できません", type_text(at));
         } else if (method->nparams != 1 || (method->return_type && method->return_type->kind != TY_UNKNOWN && !(method->return_type->kind == TY_CLASS && method->return_type->klass == find_class("str", 3)))) {
             error_node(arg, "クラス`%.*s`の`__str__`は引数を取らず、`str`を返す必要があります", klass->len, klass->name);
@@ -2972,7 +3618,7 @@ static Type* check_node(Node* node) {
     // 期待型は直属のラムダ・配列リテラル・構築（関数呼び出し）だけが
     // 受け取り、それ以外へは漏らさない
     Type* my_expected = NULL;
-    if (node->kind == ND_LAMBDA || node->kind == ND_ARRAY || node->kind == ND_FUNCALL || node->kind == ND_SLICE) {
+    if (node->kind == ND_LAMBDA || node->kind == ND_ARRAY || node->kind == ND_FUNCALL || node->kind == ND_SLICE || node->kind == ND_FUNCREF) {
         my_expected = expected_type;
     }
     expected_type = NULL;
@@ -3018,7 +3664,7 @@ static Type* check_node(Node* node) {
             break;
         }
         case ND_FUNCREF:
-            result = check_funcref(node);
+            result = check_funcref(node, my_expected);
             break;
         case ND_LAMBDA:
             result = check_lambda(node, my_expected);
@@ -3291,6 +3937,9 @@ static void collect_wanted(Node* n) {
 
 void typecheck(Function* prog) {
     functions = prog;
+    // 同名・同じ引数シグネチャの再定義を止める（step 91）。実体化で
+    // 複製が増える前に、連結済みの定義だけを対象に走査する
+    check_redefinitions();
     // 定義収集の状態はコンパイル単位ごとに作り直す（同一プロセスで
     // 複数回コンパイルされても、前のソースの定義が残らないように）
     while (fn_defs_list) {

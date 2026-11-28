@@ -15,6 +15,7 @@ static void gen_rax_num(Node* node);
 static bool fits_imm32(long val);
 static void emit_divmod_adjust(bool is_mod);
 static Function* find_plain_function(char* name, int len);
+static Function* cg_functions;
 
 static int max_label = 0;
 
@@ -158,6 +159,103 @@ static void emit_call_mangled(int label, Class* klass, int len, char* name, bool
 
 static void emit_call(int label, Class* klass, int len, char* name) {
     emit_call_mangled(label, klass, len, name, false);
+}
+
+// ---- step 91: オーバーロード対応のラベル ----
+
+// 同じ所属・同じ名前の定義が他にもあるか。所属はクラスのポインタで
+// 見る: 実体化されたクラスは型引数ごとに別物で、ラベルにも型引数が
+// 入るため、ポインタが違えばラベルは衝突しない
+static bool fn_overloaded(Function* fn) {
+    for (Function* o = cg_functions; o; o = o->next) {
+        if (o != fn && o->klass == fn->klass && o->len == fn->len && !memcmp(o->name, fn->name, fn->len)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// 署名つきラベル用の型表記。print_type_label とほぼ同じだが、関数型と
+// 型変数を unknown に潰すと別シグネチャ同士が衝突するため、ここでは
+// 区別できる形で出す
+static void print_sig_type_label(Type* t) {
+    if (!t) {
+        printf("unknown");
+        return;
+    }
+    switch (t->kind) {
+        case TY_VAR:
+            printf("var$%.*s", t->len, t->name);
+            break;
+        case TY_FUNC:
+            printf("fn");
+            for (int i = 0; i < t->func_nparams; i++) {
+                printf("$");
+                print_sig_type_label(t->func_params[i]);
+            }
+            printf("$");
+            print_sig_type_label(t->func_ret);
+            break;
+        default:
+            print_type_label(t);
+            break;
+    }
+}
+
+// オーバーロードの接尾辞: $<引数の個数>$<型>$<型>...。個数を先に置く
+// ことで、型ラベルの連結が曖昧にならないようにする
+static void print_sig_suffix(Function* fn) {
+    int off = fn->klass ? 1 : 0;
+    printf("$%d", fn->nparams - off);
+    for (int i = off; i < fn->nparams; i++) {
+        printf("$");
+        print_sig_type_label(fn->param_types[i]);
+    }
+}
+
+// 解決済みの関数1件のラベルを出す（定義・呼び出し・関数参照で共用）。
+// 入口シンボル（引数なしの main / __spell_init）は従来どおり裸の名前、
+// オーバーロードグループの関数は署名の接尾辞つき、それ以外は従来の
+// 形のまま（生成コードの無用な差分を避ける）
+static void print_func_label_fn(Function* fn) {
+    if (fn->klass) {
+        print_klass_label(fn->klass);
+        printf(".%.*s", fn->len, fn->name);
+        if (fn_overloaded(fn)) {
+            print_sig_suffix(fn);
+        }
+        return;
+    }
+    if (is_entry_symbol(fn->len, fn->name) && fn->nparams == 0) {
+        printf("%.*s", fn->len, fn->name);
+        return;
+    }
+    printf("spell_f_%.*s", fn->len, fn->name);
+    if (fn_overloaded(fn)) {
+        print_sig_suffix(fn);
+    }
+}
+
+static void print_call_target_fn(Function* fn) {
+    printf("  call ");
+    print_func_label_fn(fn);
+    printf("\n");
+}
+
+// emit_call_mangled の関数渡し版（整列の処理は同じ）
+static void emit_call_func(int label, Function* fn) {
+    printf("  mov rax, rsp\n");
+    printf("  and rax, 15\n");
+    printf("  jnz .Lcall%d\n", label);
+    printf("  mov rax, 0\n");
+    print_call_target_fn(fn);
+    printf("  jmp .Lend%d\n", label);
+    printf(".Lcall%d:\n", label);
+    printf("  sub rsp, 8\n");
+    printf("  mov rax, 0\n");
+    print_call_target_fn(fn);
+    printf("  add rsp, 8\n");
+    printf(".Lend%d:\n", label);
 }
 
 // r11 に入っているコードポインタへの間接呼び出し（値経由の呼び出し用）。
@@ -689,7 +787,7 @@ static void gen_construct(Node* node) {
     }
     printf("  push rdi\n");
     if (node->func && !inlined) {
-        emit_call(new_label(), node->func->klass, node->func->len, node->func->name);
+        emit_call_func(new_label(), node->func);
     }
 }
 
@@ -736,12 +834,18 @@ static void gen_funcall(Node* node) {
         error_plain("関数に渡せる引数は6個までですが、%d個が指定されています", args_cnt);
     }
     gen_call_args(node->args, args_cnt, 0);
-    // プログラム内の素の関数なら接頭辞つきラベルへ、そうでなければ
-    // libc の外部シンボル（getchar 等）としてそのまま呼ぶ（step 78）
-    emit_call_mangled(label, NULL, node->len, node->name,
-                      is_plain_func_name(node->len, node->name));
-    if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
-        printf("  movsxd rax, eax\n");
+    if (node->func) {
+        // 型検査で解決済みの関数（step 91）。オーバーロードされていて
+        // も、解決先のラベルを出す
+        emit_call_func(label, node->func);
+    } else {
+        // プログラム内の素の関数なら接頭辞つきラベルへ、そうでなければ
+        // libc の外部シンボル（getchar 等）としてそのまま呼ぶ（step 78）
+        emit_call_mangled(label, NULL, node->len, node->name,
+                          is_plain_func_name(node->len, node->name));
+        if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
+            printf("  movsxd rax, eax\n");
+        }
     }
     printf("  push rax\n");
 }
@@ -751,7 +855,9 @@ static void gen_funcref(Node* node) {
     printf("  mov rdi, 16\n");
     emit_call(new_label(), NULL, 6, "malloc");
     printf("  lea rcx, [rip + ");
-    if (is_plain_func_name(node->len, node->name)) {
+    if (node->func) {
+        print_func_label_fn(node->func);
+    } else if (is_plain_func_name(node->len, node->name)) {
         print_func_label(node->len, node->name);
     } else {
         printf("%.*s", node->len, node->name);
@@ -776,7 +882,7 @@ static void gen_lambda(Node* node) {
         printf("  mov rdi, 16\n");
         emit_call(new_label(), NULL, 6, "malloc");
         printf("  lea rcx, [rip + ");
-        print_func_label(node->func->len, node->func->name);
+        print_func_label_fn(node->func);
         printf("]\n");
         printf("  mov [rax], rcx\n");
         printf("  mov qword ptr [rax + 8], 0\n");
@@ -786,7 +892,7 @@ static void gen_lambda(Node* node) {
     printf("  mov rdi, %d\n", 16 + 8 * ncaptures);
     emit_call(new_label(), NULL, 6, "malloc");
     printf("  lea rcx, [rip + ");
-    print_func_label(node->func->len, node->func->name);
+    print_func_label_fn(node->func);
     printf("]\n");
     printf("  mov [rax], rcx\n");
     printf("  lea rcx, [rax + 16]\n");
@@ -825,7 +931,7 @@ static void gen_member(Node* node) {
     gen(node->left_child);
     if (node->func) {
         printf("  pop rdi\n");
-        emit_call(new_label(), node->func->klass, node->func->len, node->func->name);
+        emit_call_func(new_label(), node->func);
         printf("  push rax\n");
         return;
     }
@@ -845,7 +951,7 @@ static void gen_mcall(Node* node) {
     }
     gen_call_args(node->args, args_cnt, 1);
     printf("  pop rdi\n");
-    emit_call(new_label(), node->func->klass, node->func->len, node->func->name);
+    emit_call_func(new_label(), node->func);
     printf("  push rax\n");
 }
 
@@ -1608,7 +1714,6 @@ static void emit_runtime_helpers(int used) {
 // 子ノードは Node の全ポインタフィールドを辿る（desugar と同じ集合）。
 // 関数には辿る前に印を付けるので、再帰・相互再帰でも止まる
 
-static Function* cg_functions;
 static int cg_used_builtins;
 static int cg_used_copy_array;
 
@@ -1733,19 +1838,11 @@ void codegen(Function* prog) {
             prog = prog->next;
             continue;
         }
-        if (prog->klass) {
-            printf(".global ");
-            print_klass_label(prog->klass);
-            printf(".%.*s\n", prog->len, prog->name);
-            print_klass_label(prog->klass);
-            printf(".%.*s:\n", prog->len, prog->name);
-        } else {
-            printf(".global ");
-            print_func_label(prog->len, prog->name);
-            printf("\n");
-            print_func_label(prog->len, prog->name);
-            printf(":\n");
-        }
+        printf(".global ");
+        print_func_label_fn(prog);
+        printf("\n");
+        print_func_label_fn(prog);
+        printf(":\n");
         if (!prog->klass && prog->len == 4 && memcmp(prog->name, "main", 4) == 0) {
             // プロセスの入口: argc（rdi）と argv（rsi）を、プリミティブが
             // 読めるよう .bss へ退避する。引数レジスタはこの後も書き換え

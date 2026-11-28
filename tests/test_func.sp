@@ -186,6 +186,31 @@ def yes() -> bool { return T; }
 def no() -> bool { return false; }
 def t043() { if (yes() && !no()) { return 1; } return 0; }
 
+// step 91: オーバーロード（型違い・個数違い・bool と int の区別）
+def ov1(x: int) -> int { return 1; }
+def ov1(x: str) -> int { return 2; }
+def ov1(x: int, y: int) -> int { return 3; }
+def t044() { return ov1(0) * 100 + ov1("a") * 10 + ov1(1, 2); }
+
+def ov2(x: int) -> int { return 10; }
+def ov2(x: bool) -> int { return 20; }
+def t045() { b = 1 < 2; return ov2(0) + ov2(b); }
+
+// step 91: 関数値は注釈の fn 型でオーバーロードを選ぶ
+def t046() { g: fn(int) -> int = ov1; h: fn(str) -> int = ov1; return g(0) + h("a"); }
+
+// step 91: 高階関数の引数位置にある関数参照は、呼び出しの解決後に
+// 候補側の型で選び直される
+def apply91(g: fn(int) -> int, v: int) -> int { return g(v); }
+def apply91(g: fn(str) -> int, v: str) -> int { return g(v); }
+def t047() { return apply91(ov1, 0) * 10 + apply91(ov1, "a"); }
+
+// step 91: 注釈なし引数は緩く合う。個数で1件に絞れれば解決できる
+def ov3(x: int) -> int { return 5; }
+def ov3(x: int, y: int) -> int { return 6; }
+def passthrough91(v) -> int { return ov3(v); }
+def t048() { return passthrough91(0); }
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -245,6 +270,11 @@ def main() {
     mark(44); fails=fails+check(t041(), 1);
     mark(45); fails=fails+check(t042(), 2);
     mark(46); fails=fails+check(t043(), 1);
+    mark(47); fails=fails+check(t044(), 123);
+    mark(48); fails=fails+check(t045(), 30);
+    mark(49); fails=fails+check(t046(), 3);
+    mark(50); fails=fails+check(t047(), 12);
+    mark(51); fails=fails+check(t048(), 5);
 
     print_str("done"); putchar(10);
     return fails > 0;

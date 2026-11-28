@@ -504,17 +504,6 @@ def t101() {
     return s * 10 + i
 }
 
-def mark(n) {
-    print_int(n); putchar(10); fflush(0);
-    return 0;
-}
-
-def check(got, expected) {
-    if (got != expected) return 1;
-    return 0;
-}
-
-
 def main() {
     fails = 0;
 

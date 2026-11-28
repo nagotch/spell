@@ -120,6 +120,15 @@ tests=(
     # step 88: 定義なしで呼べる外部関数（署名表にあるもの）は従来
     # どおり呼べる
     "def main() { putchar(65); return ret3() + add(2, 3) + 34; }|42"
+    # step 91: オーバーロードは引数の型と個数で解決される。bool と
+    # int は別型。prelude 関数にも別署名で追加できる
+    "def f(x: int) -> int { return 1; } def f(x: str) -> int { return 2; } def main() { return f(1) * 10 + f(\"a\"); }|12"
+    "def f(x: int) -> int { return 1; } def f(x: int, y: int) -> int { return 2; } def main() { return f(1) * 10 + f(1, 2); }|12"
+    "def f(x: int) -> int { return 1; } def f(x: bool) -> int { return 2; } def main() { b = 1 < 2; return f(0) * 10 + f(b); }|12"
+    "class C { def m(self, x: int) -> int { return 1; } def m(self, x: str) -> int { return 2; } } def main() { c = C(); return c.m(1) * 10 + c.m(\"a\"); }|12"
+    "def zero_int(x: str) -> int { return 7; } def main() { return zero_int() + zero_int(\"a\"); }|7"
+    # step 91: 引数なしの main が入口になり、同名の別署名は共存できる
+    "def main(x: int) -> int { return 1; } def main() { return 42; }|42"
 )
 
 error_tests=(
@@ -367,6 +376,20 @@ def main():
     "class A88 { v: int; def __init__(self, v: int) { self.v = v; } } def main() { b = A88(1) != \"x\"; return 0; }|\`A88\`型と\`str\`型の値に演算子\`!=\`は使えません"
     # step 88: 連鎖比較の中でも異型の `==` はエラーになる
     "def main() { b = 1 < 2 == \"a\"; return 0; }|\`bool\`型と\`str\`型の値に演算子\`==\`は使えません"
+    # step 91: 同じ名前・同じ引数シグネチャの再定義はエラー（関数・
+    # メソッド・クラス。戻り値型だけの違いも再定義）
+    "def f(x: int) -> int { return 1; } def f(x: int) -> int { return 2; } def main() { return f(1); }|関数\`f(int)\`は既に定義されています"
+    "def f(x: int) -> int { return 1; } def f(x: int) -> str { return \"a\"; } def main() { return f(1); }|関数\`f(int)\`は既に定義されています"
+    "class C { def m(self, x: int) -> int { return 1; } def m(self, x: int) -> int { return 2; } } def main() { return 0; }|メソッド\`m(int)\`は既に定義されています"
+    "class C { x: int; } class C { y: int; } def main() { return 0; }|クラス\`C\`は既に定義されています"
+    "def zero_int() -> int { return 5; } def main() { return zero_int(); }|関数\`zero_int()\`は既に定義されています"
+    # step 91: 曖昧な呼び出しと、合う候補がない呼び出しはエラー
+    "def f(x: int) -> int { return 1; } def f(x: str) -> int { return 2; } def g(v) -> int { return f(v); } def main() { return g(1); }|呼び出しが曖昧です"
+    "def f(x: int) -> int { return 1; } def f(x: str) -> int { return 2; } def main() { return f(true); }|合うオーバーロードがありません"
+    "def f(x: int) -> int { return 1; } def f(x: str) -> int { return 2; } def main() { g = f; return 0; }|型注釈でシグネチャを指定してください"
+    # step 91: ジェネリックの型引数を当てはめると同じ署名になる
+    # メソッドの組は、実体化の時点でエラー（アセンブラエラーにしない）
+    "class Box<T> { def store(self, v: T) -> int { return 1; } def store(self, v: int) -> int { return 2; } } def main() { b: Box<int> = Box(); return b.store(3); }|型引数を当てはめると同じ引数を持つ定義と重なります"
 )
 
 cc -c -o funcs.o funcs.c
@@ -599,6 +622,12 @@ one_driver_test "def foo() { return 1; }" "" "" 0
 # step 88: メソッド名 main は入口と混同されないこと（トップレベル文の
 # 合成関数は main になる）
 one_driver_test "class C { def main(self) -> int { return 5; } } print(42);" "42\n" "" 0
+# step 91: オーバーロードされた関数は署名つきラベルになり、呼ばれた
+# 側だけが出力される
+one_reach_test "def f(x: int) -> int { return 1; } def f(x: str) -> int { return 2; } def main() { return f(1); }" 'spell_f_f$1$int:' 'spell_f_f$1$str:'
+# step 91: ユーザーが定義した getchar は外部シンボルではないので、
+# 32 ビットへの切り詰め（movsxd）を受けない
+one_io_test "def getchar() -> int { return 5000000000; } def main() { print(getchar()); return 0; }" "" "5000000000\n"
 # step 66: 矢印で書く BFS と、メソッド形との等価性
 one_io_test "def main() {
     rows = [\"S..#\", \"##..\", \"...#\", \"..G.\"];
