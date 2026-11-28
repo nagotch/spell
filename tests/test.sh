@@ -81,6 +81,8 @@ tests=(
     # step 85: 注釈つき引数へのスライスと、期待型で対象の型を採る形
     "def f(s: str) -> str { return s[1:3]; } def main() { if (f(\"hello\") == \"el\") { return 42; } return 0; }|42"
     "def f(a) -> int { r: [int] = a[1:3]; return r.len; } def main() { return f([10, 20, 30, 40]) + 40; }|42"
+    # step 85: スライスの評価順は対象→下限→上限（Luna レビューの回帰）
+    "log = \"\"; def tgt() -> str { log = log + \"T\"; return \"abcdef\"; } def lo2() -> int { log = log + \"L\"; return 1; } def hi2() -> int { log = log + \"H\"; return 4; } def main() { s = tgt()[lo2():hi2()]; if (log == \"TLH\" && s == \"bcd\") { return 42; } return 0; }|42"
 )
 
 error_tests=(
@@ -277,6 +279,17 @@ def main():
     "def f(s) { return s[0:2]; } def main() { print(f(\"abc\")); return 0; }|スライスの対象の型が分かりません"
     # step 85: 境界は int でなければならない
     "def main() { s = \"abc\"; t = s[\"a\":2]; return 0; }|スライスの境界には\`int\`が必要です"
+    # step 85: スライスの戻り型は要素型で具体化される（Luna レビューの回帰）
+    "def main() { a = [1, 2, 3]; b: [str] = a[0:2]; return 0; }|変数\`b\`の型は\`\\[str\\]\`ですが、\`\\[int\\]\`が代入されています"
+    # step 85（追加決定）: 長さがリテラルの負数ならコンパイルエラー。
+    # 定数式（0 - 2 の形）も含む。変数経由の負数は実行時に 0 に
+    # 丸められる（t107 が固定）
+    "def main() { a = [5; -2]; return 0; }|長さに負の数は指定できません"
+    "def main() { a = [5; 0 - 2]; return 0; }|長さに負の数は指定できません"
+    # step 85（追加決定）: 個数形の個数がリテラルの負数でもエラー
+    "def main() { >> a[-2]; return 0; }|個数に負の数は指定できません"
+    "def main() { >> a[2][-1]; return 0; }|個数に負の数は指定できません"
+    "def main() { >>> s[-1]; return 0; }|個数に負の数は指定できません"
 )
 
 cc -c -o funcs.o funcs.c

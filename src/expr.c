@@ -73,6 +73,36 @@ bool input_target_is_count_form() {
     return !ident_is_bound(token);
 }
 
+// 長さ・個数として書かれた式が、リテラルだけからなる定数形か
+// どうかを判定し、定数形なら値を返す（step 85 の追加決定:
+// 負の長さのリテラルはコンパイルエラーにするための判定）。
+// 整数リテラルと、リテラル同士の + - *（単項マイナスは 0 - x の
+// 形なので二項に含まれる）を畳み込む。それ以外（変数・呼び出し
+// など）は定数形ではない
+bool const_int_value(Node* node, long* out) {
+    if (!node) {
+        return false;
+    }
+    if (node->kind == ND_NUM) {
+        *out = node->val;
+        return true;
+    }
+    if (node->kind == ND_BINOP) {
+        long l;
+        long r;
+        if (!const_int_value(node->left_child, &l) || !const_int_value(node->right_child, &r)) {
+            return false;
+        }
+        switch (node->op.binop) {
+            case OP_ADD: return !__builtin_add_overflow(l, r, out);
+            case OP_SUB: return !__builtin_sub_overflow(l, r, out);
+            case OP_MUL: return !__builtin_mul_overflow(l, r, out);
+            default: return false;
+        }
+    }
+    return false;
+}
+
 // 個数形の対象 `名前[個数式][個数式]...` を読み、基底名トークンと、
 // 個数式の並び（next で連結）を返す（step 75: n 次元への一般化。
 // 角括弧の並びは全て個数として読む）。角括弧の継続は、空白区切りの
@@ -90,9 +120,16 @@ Node* parse_input_count(Token** name_out) {
         bool saved = suppress_multi;
         suppress_multi = true;
         expr_depth++;
+        Token* count_tok = token;
         cur->next = expr();
         expr_depth--;
         suppress_multi = saved;
+        // 個数がリテラルの負数ならコンパイルエラー（step 85 の
+        // 追加決定）。実行時に決まる負数は展開先で 0 に丸められる
+        long cv;
+        if (const_int_value(cur->next, &cv) && cv < 0) {
+            error_at(token_start(count_tok), token_end(count_tok), "個数に負の数は指定できません");
+        }
         cur = cur->next;
         expect("]");
     } while (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '['
@@ -1084,7 +1121,14 @@ static Node* array_literal() {
     suppress_multi = true;
     Node* first_expr = expr();
     if (consume(";")) {
+        Token* len_tok = token;
         Node* len_expr = expr();
+        // 長さがリテラルの負数ならコンパイルエラー（step 85 の
+        // 追加決定）。実行時に決まる負数は 0 に丸められる（step 82）
+        long lv;
+        if (const_int_value(len_expr, &lv) && lv < 0) {
+            error_at(token_start(len_tok), token_end(len_tok), "長さに負の数は指定できません");
+        }
         node = create_node(ND_NEWARRAY);
         node->left_child = first_expr;
         node->right_child = len_expr;

@@ -162,7 +162,7 @@ def t103() { a = [[[1; 2]; 3]; 4]; a[2][1][0] = 9; return a[2][1][0] * 10 + a[0]
 def t104() { a = [[1, 2]; 3]; a[1][0] = 9; return a[0][0] + a[1][0] + a[2][0]; }
 def t105() { a = [[]; 3]; a[0].append(5); return a[0].len * 10 + a[1].len; }
 def t106() { row = [-1; 2]; a = [row; 2]; a[1][0] = 7; return a[0][0]; }
-def t107() { a = [[1; 2]; 0 - 1]; b = [5; 0 - 2]; return a.len + b.len; }
+def t107() { n = 0 - 1; a = [[1; 2]; n]; m = 0 - 2; b = [5; m]; return a.len + b.len; }
 def t108() { s = "hello world"; r = 0; if (s[0:5] == "hello") { r = r + 1; } if (s[6:11] == "world") { r = r + 2; } if (s[0:5].len == 5) { r = r + 4; } return r; }
 def t109() { a = [10, 20, 30, 40, 50]; b = a[1:3]; r = b[0] * 100 + b[1]; b[0] = 99; return r * 1000 + a[1]; }
 def t110() { s = "abcdef"; r = 0; if (s[:] == s) { r = r + 1; } if (s[2:] == "cdef") { r = r + 2; } if (s[:2] == "ab") { r = r + 4; } if (s[-2:] == "ef") { r = r + 8; } if (s[:-2] == "abcd") { r = r + 16; } if (s[3:2] == "") { r = r + 32; } if (s[0:100] == s) { r = r + 64; } if (s[-100:2] == "ab") { r = r + 128; } return r; }

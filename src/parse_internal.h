@@ -15,6 +15,7 @@ void register_any();
 
 // expr.c
 Node* expr();
+bool const_int_value(Node* node, long* out);
 Node* parse_put_args();
 Node* parse_input_target();
 bool input_target_is_count_form();
