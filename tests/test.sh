@@ -1122,6 +1122,48 @@ one_io_test "def main() { a = [[1, 2], [3, 4]]; print(a?[0][1]); print(a?[2][0])
 # str の要素の値そのもの（int か str か）は固定せず、範囲チェックの
 # bool 形と、範囲外で比較が false になる形だけで確認する
 one_io_test "def main() { g = [\"ab\", \"cd\"]; print(g?[(0, 0)]); print(g?[(1, 1)]); print(g?[(1, 2)]); print(g?[(2, 0)]); s = \"xyz\"; print(s?[2]); print(s?[-1]); print(s?[1] == s[1]); print(s?[3] == s[0]); return 0; }" "" "true\ntrue\nfalse\nfalse\ntrue\nfalse\ntrue\nfalse\n"
+# step 82: 利用者の書き方そのままの BFS（step 81/84 の持ち越し）。
+# dist は [[-1; w]; h] で作り、隣接マスの判定は s?[np] == '.' の
+# 値比較つき安全添え字で行う。ゴールは添え字糖衣の成分順
+# （a[p] = a[p[0]][p[1]]、第0成分が行）で (h - 1, w - 1)
+one_io_test "
+def main() {
+    >> h, w
+    >>> s[h]
+    dist = [[-1; w]; h]
+    start = (0, 0)
+    goal = (h - 1, w - 1)
+    dist[start] = 0
+    q = Deque(Pos2)
+    q <- start
+    @? q:
+        p <- q
+        d@[(1, 0), (0, 1), (-1, 0), (0, -1)]:
+            np = p + d
+            ? dist?[np] == -1 && s?[np] == '.':
+                dist[np] = dist[p] + 1
+                q <- np
+    print(dist[goal])
+    return 0
+}
+" "3 4\n....\n.##.\n....\n" "5\n"
+# step 82: while + for の入れ子の中での比較形の安全添え字の数え上げ。
+# 開始セルはいずれも盤内（(0, 3) は0行3列）で、有効な隣接は各2つ
+one_io_test "
+s = [\"....\", \".##.\", \"....\"]
+dist = [[-1; 4]; 3]
+starts = [(0, 0), (0, 3)]
+n = 0
+si = 0
+while si < 2:
+    p = starts[si]
+    si = si + 1
+    d@[(1, 0), (0, 1), (-1, 0), (0, -1)]:
+        np = p + d
+        ? dist?[np] == -1 && s?[np] == '.':
+            n = n + 1
+print(n)
+" "" "4\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

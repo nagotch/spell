@@ -157,6 +157,12 @@ def t098() { a = 'hello'; b = "hello"; if (a == b && a.len == 5) { return 1; } r
 def t099() { a = 'it\'s'; if (a == "it's" && a.len == 4) { return 1; } return 0; }
 def t100() { a = 'say "hi"'; b = 'x' + "y"; if (a == "say \"hi\"" && b == "xy") { return 1; } return 0; }
 def t101() { s = "abc"; if (s[1] == 'b' && s[0] == 'a') { return 1; } return 0; }
+def t102() { a = [[-1; 4]; 3]; a[1][0] = 7; return a[0][0] + a[2][0] + a[1][0]; }
+def t103() { a = [[[1; 2]; 3]; 4]; a[2][1][0] = 9; return a[2][1][0] * 10 + a[0][1][0] + a[2][0][0]; }
+def t104() { a = [[1, 2]; 3]; a[1][0] = 9; return a[0][0] + a[1][0] + a[2][0]; }
+def t105() { a = [[]; 3]; a[0].append(5); return a[0].len * 10 + a[1].len; }
+def t106() { row = [-1; 2]; a = [row; 2]; a[1][0] = 7; return a[0][0]; }
+def t107() { a = [[1; 2]; 0 - 1]; b = [5; 0 - 2]; return a.len + b.len; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -272,6 +278,12 @@ def main() {
     mark(99); fails=fails+check(t099(), 1);
     mark(100); fails=fails+check(t100(), 1);
     mark(101); fails=fails+check(t101(), 1);
+    mark(102); fails=fails+check(t102(), 5);
+    mark(103); fails=fails+check(t103(), 92);
+    mark(104); fails=fails+check(t104(), 11);
+    mark(105); fails=fails+check(t105(), 10);
+    mark(106); fails=fails+check(t106(), 7);
+    mark(107); fails=fails+check(t107(), 0);
 
     print_str("done"); putchar(10);
     return fails > 0;

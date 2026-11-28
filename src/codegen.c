@@ -388,11 +388,88 @@ static void gen_len(Node* node) {
     printf("  push rax\n");
 }
 
+// [fill; n] の fill が配列リテラルの形（ND_ARRAY / ND_NEWARRAY）の
+// 場合の生成（step 82）。fill を1回だけ評価し、各スロットへは
+// __rt_spell_copy_array で構造の複製を入れる。リテラルは「値の雛形」
+// であって1つの配列オブジェクトの名前ではないため、`[[-1; w]; h]`
+// のようなグリッド構築で行同士が同じ配列を共有すると、書き込みが
+// 全行へ伝播して静かに壊れる（step 75 の個数形が小配列を共有しない
+// のと同じ線引き）。リテラルでない fill（変数や呼び出しの結果）は
+// 従来どおり、評価した1つの値を全スロットへ入れる
+static void gen_newarray_fresh(Node* node) {
+    // 複製の深さ: fill の型の配列の入れ子段数 - 1（fill の値そのものの
+    // ブロックは常時複製し、内側の配列を何段まで複製するか）
+    int depth = 0;
+    for (Type* t = node->left_child->type; t && t->kind == TY_ARRAY; t = t->elem) {
+        depth++;
+    }
+    if (depth > 0) {
+        depth--;
+    }
+    printf("  push rbx\n");
+    printf("  push r12\n");
+    printf("  push r13\n");
+    printf("  push r14\n");
+    gen(node->left_child);
+    gen(node->right_child);
+    printf("  pop rax\n");
+    // 負の長さは空配列として扱う（そのまま確保サイズの計算へ入れると
+    // ヘッダの書き込みが確保領域を超えるため。step 82 で追加）
+    int clamp_label = new_label();
+    printf("  cmp rax, 0\n");
+    printf("  jge .Lend%d\n", clamp_label);
+    printf("  mov rax, 0\n");
+    printf(".Lend%d:\n", clamp_label);
+    printf("  push rax\n");
+    printf("  add rax, 2\n");
+    printf("  imul rax, 8\n");
+    printf("  mov rdi, rax\n");
+    int label = new_label();
+    emit_call(label, NULL, 6, "malloc");
+    printf("  pop r12\n");
+    // ブロックは [cap][len][要素...]（step 65）。生成時は cap = len
+    printf("  mov [rax], r12\n");
+    printf("  mov [rax+8], r12\n");
+    printf("  pop rbx\n");
+    printf("  add rax, 16\n");
+    printf("  mov r13, rax\n");
+    printf("  mov r14, rax\n");
+    label = new_label();
+    printf(".Lbegin%d:\n", label);
+    printf("  cmp r12, 0\n");
+    printf("  jle .Lend%d\n", label);
+    printf("  mov rdi, rbx\n");
+    printf("  mov rsi, %d\n", depth);
+    int call_label = new_label();
+    emit_call(call_label, NULL, 21, "__rt_spell_copy_array");
+    printf("  mov [r13], rax\n");
+    printf("  add r13, 8\n");
+    printf("  sub r12, 1\n");
+    printf("  jmp .Lbegin%d\n", label);
+    printf(".Lend%d:\n", label);
+    printf("  mov rax, r14\n");
+    printf("  pop r14\n");
+    printf("  pop r13\n");
+    printf("  pop r12\n");
+    printf("  pop rbx\n");
+    printf("  push rax\n");
+}
+
 static void gen_newarray(Node* node) {
+    if (node->left_child->kind == ND_ARRAY || node->left_child->kind == ND_NEWARRAY) {
+        gen_newarray_fresh(node);
+        return;
+    }
     int label = new_label();
     gen(node->left_child);
     gen(node->right_child);
     printf("  pop rax\n");
+    // 負の長さは空配列として扱う（gen_newarray_fresh と同じ。step 82）
+    printf("  cmp rax, 0\n");
+    printf("  jge .Lend%d\n", label);
+    printf("  mov rax, 0\n");
+    printf(".Lend%d:\n", label);
+    label = new_label();
     printf("  push rax\n");
     printf("  add rax, 2\n");
     printf("  imul rax, 8\n");
@@ -1387,6 +1464,64 @@ static void emit_rt_exit() {
 // used は SpellBuiltin を添字とする使用ビット（到達可能性の走査で集める）。
 // chars_to_bytes は3つのヘルパから呼ばれる部品で、それ自体は
 // プリミティブではないため、呼び手の使用ビットから出すかどうかを決める
+// 配列ブロックの構造複製（step 82）: rdi = 要素0の位置、
+// rsi = 内側の配列をあと何段複製するか。新しいブロック
+// （cap = len）を malloc して要素を写し、深さが残っていれば
+// 要素の配列も再帰的に複製する。[fill; n] でリテラルな fill を
+// 各スロットへ独立に入れるために使う
+static void emit_rt_copy_array() {
+    printf("__rt_spell_copy_array:\n");
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    printf("  push rbx\n");
+    printf("  push r12\n");
+    printf("  push r13\n");
+    printf("  push r14\n");
+    printf("  push r15\n");
+    printf("  sub rsp, 8\n");
+    printf("  mov rbx, rdi\n");
+    printf("  mov r15, rsi\n");
+    printf("  mov r12, [rdi-8]\n");
+    printf("  lea rdi, [r12+2]\n");
+    printf("  imul rdi, 8\n");
+    printf("  call malloc\n");
+    printf("  mov r13, rax\n");
+    printf("  mov [r13], r12\n");
+    printf("  mov [r13+8], r12\n");
+    printf("  xor rcx, rcx\n");
+    printf(".Lrt_copy_elems:\n");
+    printf("  cmp rcx, r12\n");
+    printf("  jae .Lrt_copy_recurse\n");
+    printf("  mov rdx, [rbx+rcx*8]\n");
+    printf("  mov [r13+rcx*8+16], rdx\n");
+    printf("  inc rcx\n");
+    printf("  jmp .Lrt_copy_elems\n");
+    printf(".Lrt_copy_recurse:\n");
+    printf("  cmp r15, 0\n");
+    printf("  je .Lrt_copy_done\n");
+    printf("  xor r14, r14\n");
+    printf(".Lrt_copy_loop:\n");
+    printf("  cmp r14, r12\n");
+    printf("  jae .Lrt_copy_done\n");
+    printf("  mov rdi, [r13+r14*8+16]\n");
+    printf("  mov rsi, r15\n");
+    printf("  sub rsi, 1\n");
+    printf("  call __rt_spell_copy_array\n");
+    printf("  mov [r13+r14*8+16], rax\n");
+    printf("  inc r14\n");
+    printf("  jmp .Lrt_copy_loop\n");
+    printf(".Lrt_copy_done:\n");
+    printf("  lea rax, [r13+16]\n");
+    printf("  add rsp, 8\n");
+    printf("  pop r15\n");
+    printf("  pop r14\n");
+    printf("  pop r13\n");
+    printf("  pop r12\n");
+    printf("  pop rbx\n");
+    printf("  pop rbp\n");
+    printf("  ret\n");
+}
+
 static void emit_runtime_helpers(int used) {
     if (used & ((1 << BUILTIN_READ_FILE_CHARS) | (1 << BUILTIN_WRITE_FILE_CHARS) | (1 << BUILTIN_STDERR_CHARS))) {
         emit_rt_chars_to_bytes();
@@ -1433,6 +1568,7 @@ static void emit_runtime_helpers(int used) {
 
 static Function* cg_functions;
 static int cg_used_builtins;
+static int cg_used_copy_array;
 
 static Function* find_plain_function(char* name, int len) {
     for (Function* fn = cg_functions; fn; fn = fn->next) {
@@ -1447,6 +1583,11 @@ static void mark_function(Function* fn);
 
 static void walk_reachable(Node* node) {
     for (Node* n = node; n; n = n->next) {
+        if (n->kind == ND_NEWARRAY && n->left_child
+                && (n->left_child->kind == ND_ARRAY || n->left_child->kind == ND_NEWARRAY)) {
+            // リテラルな fill の [fill; n] は構造複製のヘルパが要る
+            cg_used_copy_array = 1;
+        }
         if (n->kind == ND_FUNCALL) {
             if (n->builtin) {
                 cg_used_builtins |= 1 << n->builtin;
@@ -1504,6 +1645,7 @@ static void mark_function(Function* fn) {
 static void mark_reachable(Function* prog) {
     cg_functions = prog;
     cg_used_builtins = 0;
+    cg_used_copy_array = 0;
     for (Function* fn = prog; fn; fn = fn->next) {
         if (fn->klass) {
             continue;
@@ -1599,4 +1741,7 @@ void codegen(Function* prog) {
         prog = prog->next;
     }
     emit_runtime_helpers(cg_used_builtins);
+    if (cg_used_copy_array) {
+        emit_rt_copy_array();
+    }
 }
