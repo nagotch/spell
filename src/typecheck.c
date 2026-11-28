@@ -4474,6 +4474,14 @@ void typecheck(Function* prog) {
         if (fn->klass && fn->klass->tparam_count > 0) {
             continue;
         }
+        // 実体化クローンのうち一度も呼ばれず本体が検査されなかった
+        // `__init__` は対象外（step 83 の遅延検査の割り切りと同じ。
+        // 未検査の本体では ND_MEMBER の offset が確定しておらず、
+        // 流れ解析が代入を見落として誤った未初期化エラーになる。
+        // step 99 で発見）
+        if (fn->klass && fn->klass->origin && !fn->tc_done) {
+            continue;
+        }
         if (fn->klass && fn->len == 8 && !memcmp(fn->name, "__init__", 8)) {
             check_init(fn);
         }

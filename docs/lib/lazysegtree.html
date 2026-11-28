@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LazySegTree&lt;T, F&gt; — spell ライブラリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <a class="brand" href="../index.html">spell<span class="dot">.</span></a>
+  <nav>
+    <a href="../index.html">概要</a>
+    <a href="../guide.html">言語ツアー</a>
+    <a href="../reference.html">リファレンス</a>
+    <a href="index.html" class="here">ライブラリ</a>
+    <a href="../sugar.html">糖衣集</a>
+    <a href="../editor.html">エディタ連携</a>
+    <a href="https://github.com/nagotch/spell">GitHub</a>
+  </nav>
+</header>
+<div class="layout">
+<aside class="side">
+<div class="lib-search" data-lib-search>
+  <input type="search" placeholder="名前・メソッド・キーワードで検索" aria-label="ライブラリ内検索">
+  <ul class="lib-search-results"></ul>
+</div>
+  <p class="side-h">基本の型</p>
+  <ul class="side-list">
+    <li><a href="str.html">str</a></li>
+    <li><a href="int.html">int</a></li>
+    <li><a href="bool.html">bool</a></li>
+    <li><a href="array.html">array&lt;T&gt;</a></li>
+  </ul>
+  <p class="side-h">コレクション</p>
+  <ul class="side-list">
+    <li><a href="dict.html">Dict&lt;K, V&gt;</a></li>
+    <li><a href="vec.html">Vec&lt;T&gt;</a></li>
+    <li><a href="deque.html">Deque&lt;T&gt;</a></li>
+    <li><a href="segtree.html">SegTree&lt;T&gt;</a></li>
+    <li><a href="lazysegtree.html" class="here">LazySegTree&lt;T, F&gt;</a></li>
+  </ul>
+  <p class="side-h">座標と範囲</p>
+  <ul class="side-list">
+    <li><a href="pos2.html">Pos2</a></li>
+    <li><a href="pos3.html">Pos3</a></li>
+    <li><a href="range.html">Range</a></li>
+  </ul>
+  <p class="side-h">組み込み</p>
+  <ul class="side-list">
+    <li><a href="print.html">print</a></li>
+    <li><a href="eprint.html">eprint</a></li>
+    <li><a href="exit.html">exit</a></li>
+    <li><a href="min.html">min</a></li>
+    <li><a href="max.html">max</a></li>
+    <li><a href="abs.html">abs</a></li>
+  </ul>
+  <p class="side-h">入力</p>
+  <ul class="side-list">
+    <li><a href="read_int.html">read_int</a></li>
+    <li><a href="read_ints.html">read_ints</a></li>
+    <li><a href="read_ints2.html">read_ints2</a></li>
+    <li><a href="read_ints_dec.html">read_ints_dec</a></li>
+    <li><a href="read_token.html">read_token</a></li>
+    <li><a href="read_tokens.html">read_tokens</a></li>
+    <li><a href="read_line.html">read_line</a></li>
+    <li><a href="read_str.html">read_str</a></li>
+  </ul>
+  <p class="side-h">出力</p>
+  <ul class="side-list">
+    <li><a href="print_int.html">print_int</a></li>
+    <li><a href="print_str.html">print_str</a></li>
+    <li><a href="print_yn.html">print_yn</a></li>
+  </ul>
+  <p class="side-h">引数とファイル</p>
+  <ul class="side-list">
+    <li><a href="filedata.html">FileData</a></li>
+    <li><a href="args.html">args</a></li>
+    <li><a href="read_file.html">read_file</a></li>
+    <li><a href="write_file.html">write_file</a></li>
+  </ul>
+  <p class="side-h">文字</p>
+  <ul class="side-list">
+    <li><a href="chr.html">chr</a></li>
+  </ul>
+  <p class="side-h">初期値ファクトリ</p>
+  <ul class="side-list">
+    <li><a href="zero_int.html">zero_int</a></li>
+    <li><a href="zero_bool.html">zero_bool</a></li>
+    <li><a href="zero_str.html">zero_str</a></li>
+    <li><a href="zero_pos2.html">zero_pos2</a></li>
+    <li><a href="zero_pos3.html">zero_pos3</a></li>
+    <li><a href="zero_array.html">zero_array</a></li>
+  </ul>
+  <p class="side-h">ドキュメント</p>
+  <ul class="side-list">
+    <li><a href="../index.html">概要</a></li>
+    <li><a href="../guide.html">言語ツアー</a></li>
+    <li><a href="../reference.html">リファレンス</a></li>
+    <li><a href="../sugar.html">糖衣集</a></li>
+    <li><a href="../editor.html">エディタ連携</a></li>
+  </ul>
+</aside>
+<main class="main">
+<p class="eyebrow">ライブラリ — クラス</p>
+<h1 class="page">LazySegTree&lt;T, F&gt;</h1>
+<p class="lede">遅延セグメント木。区間への作用の適用と区間の積がどちらも O(log n)</p>
+<figure class="code">
+  <figcaption>シグネチャ</figcaption>
+<pre>class LazySegTree&lt;T, F&gt;</pre>
+</figure>
+<p>遅延評価つきのセグメント木です。<code>SegTree</code> の演算 <code>op</code> / 単位元 <code>e</code> に加えて、区間への作用（型 <code>F</code>）を扱い、区間への作用の適用と区間の積をどちらも O(log n) で行います。</p>
+<p>作用まわりの3点セット（作用の単位元 <code>idf</code>、作用を要素へ適用する <code>mapping</code>、作用同士の合成 <code>composition</code>）は <code>Act&lt;T, F&gt;</code> にまとめて渡します。spell の引数は <code>self</code> を含めて6個までという制限があり、必要な6点をそのままでは渡せないため、この形になっています。<code>Act</code> は注釈つきの変数に入れてから渡すのが確実です（<code>act: Act&lt;int, int&gt; = Act(0, add_map, add)</code> のように）。</p>
+<p><code>composition(f, g)</code> は「<code>g</code> を適用した後に <code>f</code> を適用する」合成を返します（AtCoder Library と同じ規約）。<code>op</code> / <code>mapping</code> / <code>composition</code> には、名前付き関数か <code>fn</code> 型の注釈つき変数へ入れたラムダを渡してください。</p>
+<h2>Act<T, F> — 作用の3点セット</h2>
+<table>
+  <tr><th>シグネチャ</th><th>内容</th></tr>
+  <tr id="m-act_init"><td><code>Act(idf: F, mapping: fn(F, T) -&gt; T, composition: fn(F, F) -&gt; F)</code></td><td>作用の単位元、要素への適用、作用同士の合成をまとめる</td></tr>
+  <tr id="m-act_idf"><td><code>idf</code></td><td>作用の単位元。<code>mapping(idf, x) == x</code> が必要</td></tr>
+  <tr id="m-act_mapping"><td><code>mapping</code></td><td><code>mapping(f, x)</code> は要素 <code>x</code> へ作用 <code>f</code> を適用した値</td></tr>
+  <tr id="m-act_composition"><td><code>composition</code></td><td><code>composition(f, g)</code> は「<code>g</code> の後に <code>f</code>」の合成</td></tr>
+</table>
+<h2>メソッドと演算</h2>
+<table>
+  <tr><th>シグネチャ</th><th>内容</th></tr>
+  <tr id="m-init"><td><code>LazySegTree(n: int, e: T, op: fn(T, T) -&gt; T, act: Act&lt;T, F&gt;)</code></td><td>長さ <code>n</code>、全要素 <code>e</code> で構築する</td></tr>
+  <tr id="m-init_array"><td><code>LazySegTree(a: [T], e: T, op: fn(T, T) -&gt; T, act: Act&lt;T, F&gt;)</code></td><td>配列 <code>a</code> の内容で構築する</td></tr>
+  <tr id="m-set"><td><code>set(i: int, x: T)</code></td><td>位置 <code>i</code> の要素を <code>x</code> に置き換える（積まれた作用は押し下げてから置く）</td></tr>
+  <tr id="m-get"><td><code>get(i: int) -&gt; T</code></td><td>位置 <code>i</code> の要素を返す</td></tr>
+  <tr id="m-prod"><td><code>prod(l: int, r: int) -&gt; T</code></td><td>半開区間 <code>[l, r)</code> の積。空区間は <code>e</code></td></tr>
+  <tr id="m-all_prod"><td><code>all_prod() -&gt; T</code></td><td>全区間の積</td></tr>
+  <tr id="m-apply"><td><code>apply(i: int, f: F)</code></td><td>位置 <code>i</code> の1点へ作用 <code>f</code> を適用する</td></tr>
+  <tr id="m-apply_range"><td><code>apply(l: int, r: int, f: F)</code></td><td>半開区間 <code>[l, r)</code> へ作用 <code>f</code> を適用する</td></tr>
+  <tr id="m-len"><td><code>len</code></td><td>要素数（プロパティとして <code>t.len</code> と書く）</td></tr>
+</table>
+<h2>注意</h2>
+<ul>
+  <li><strong>添字・区間の範囲外アクセスは未定義です</strong>（検査はしません）</li>
+  <li><code>mapping(f, x)</code> は、作用後のノード値が作用前のノード値 <code>x</code> だけから決まるものでなければなりません。例えば区間代入で区間和を取りたい場合は、要素を (合計, 長さ) の組で持ち、<code>mapping</code> が長さを使える形にします（下の「区間代入＋区間和」の例）</li>
+  <li><code>mapping(idf, x) == x</code> と <code>composition(idf, f) == f</code> の成立が前提で、遅延の押し下げはこの前提のもとで無条件に行われます</li>
+</ul>
+<figure class="code">
+  <figcaption>例 — 区間 add＋区間和</figcaption>
+<pre>def add(a: int, b: int) -&gt; int:
+    return a + b
+def psum(a: Pos2, b: Pos2) -&gt; Pos2:
+    return Pos2(a.x + b.x, a.y + b.y)
+def psum_map(f: int, x: Pos2) -&gt; Pos2:
+    return Pos2(x.x + f * x.y, x.y)
+act: Act&lt;Pos2, int&gt; = Act(0, psum_map, add)
+a: [Pos2] = [Pos2(1, 1), Pos2(2, 1), Pos2(3, 1), Pos2(4, 1), Pos2(5, 1)]
+t = LazySegTree(a, Pos2(0, 0), psum, act)
+&lt;&lt; t.prod(0, 5).x
+t.apply(1, 4, 10)
+&lt;&lt; t.prod(0, 5).x
+&lt;&lt; t.prod(1, 4).x
+&lt;&lt; t.get(2).x
+t.apply(2, 100)
+&lt;&lt; t.all_prod().x</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>15
+45
+39
+13
+145</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 区間 add＋区間 max</figcaption>
+<pre>def imax(a: int, b: int) -&gt; int:
+    if a &gt; b:
+        return a
+    return b
+def add_map(f: int, x: int) -&gt; int:
+    return x + f
+def add(a: int, b: int) -&gt; int:
+    return a + b
+act: Act&lt;int, int&gt; = Act(0, add_map, add)
+t = LazySegTree([3, 1, 4, 1, 5], -1000000000, imax, act)
+&lt;&lt; t.all_prod()
+t.apply(0, 3, 10)
+&lt;&lt; t.all_prod()
+&lt;&lt; t.prod(3, 5)
+&lt;&lt; t.get(1)</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>5
+14
+5
+11</pre>
+</figure>
+<figure class="code">
+  <figcaption>例 — 区間代入＋区間和</figcaption>
+<pre>def psum(a: Pos2, b: Pos2) -&gt; Pos2:
+    return Pos2(a.x + b.x, a.y + b.y)
+def asg_map(f: int, x: Pos2) -&gt; Pos2:
+    if f &lt; 0:
+        return x
+    return Pos2(f * x.y, x.y)
+def asg_comp(f: int, g: int) -&gt; int:
+    if f &lt; 0:
+        return g
+    return f
+act: Act&lt;Pos2, int&gt; = Act(-1, asg_map, asg_comp)
+a: [Pos2] = [Pos2(1, 1), Pos2(2, 1), Pos2(3, 1), Pos2(4, 1)]
+t = LazySegTree(a, Pos2(0, 0), psum, act)
+t.apply(0, 4, 7)
+&lt;&lt; t.all_prod().x
+t.apply(1, 3, 2)
+&lt;&lt; t.prod(0, 4).x
+&lt;&lt; t.get(0).x
+&lt;&lt; t.get(1).x</pre>
+</figure>
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>28
+18
+7
+2</pre>
+</figure>
+<p>代入の例では、作用 <code>F</code> を「代入する値そのもの」とし、単位元を <code>-1</code> で表しています（代入する値は 0 以上だけ、という約束のもと）。<code>mapping</code> は要素の長さ <code>x.y</code> を使って区間の合計を計算し直します。</p>
+<h2>関連項目</h2>
+<ul>
+  <li><a href="segtree.html">SegTree&lt;T&gt;</a> — セグメント木。点更新と区間への二項演算がどちらも O(log n)</li>
+  <li><a href="pos2.html">Pos2</a> — 二次元座標。リテラル (1, 2) が作る</li>
+  <li><a href="array.html">array&lt;T&gt;</a> — 配列。リテラル [1, 2, 3] が作る、要素型 T の列</li>
+</ul>
+</main>
+</div>
+<footer>
+  <span>spell — <a href="https://github.com/nagotch/spell">github.com/nagotch/spell</a></span>
+  <span>ドキュメントは <a href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC BY 4.0</a> で公開しています</span>
+</footer>
+<script src="search.js"></script>
+</div>
+</body>
+</html>

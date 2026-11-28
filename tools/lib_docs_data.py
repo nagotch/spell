@@ -531,6 +531,136 @@ PAGES = [
     "related": ["vec", "array", "pos2", "zero_int"],
 },
 
+# ---------------------------------------------------------------- SegTree
+{
+    "slug": "segtree",
+    "name": "SegTree<T>",
+    "kind": "クラス",
+    "group": "コレクション",
+    "summary": "セグメント木。点更新と区間への二項演算がどちらも O(log n)",
+    "keywords": ["セグメント木", "区間和", "区間最小", "区間最大", "RMQ", "gcd", "segment tree"],
+    "signature": "class SegTree<T>",
+    "intro": [
+        "セグメント木です。区間への二項演算 <code>op</code> とその単位元 <code>e</code> を持ち、"
+        "1点の更新と、半開区間 <code>[l, r)</code> への演算（積）をどちらも O(log n) で行います。"
+        "演算は要素型では決められない（同じ <code>int</code> でも和・最小・最大・gcd と変わる）ため、"
+        "コンストラクタで関数値として受け取ります（AtCoder Library と同じ方式）。",
+        "構築は <code>t = SegTree(n, e, op)</code>（長さ <code>n</code>、全要素 <code>e</code>）と、"
+        "<code>t = SegTree(a, e, op)</code>（配列 <code>a</code> から構築）の2通りです。"
+        "<code>op</code> には名前付き関数か、<code>fn</code> 型の注釈つき変数へ入れたラムダを渡してください。"
+        "型変数を含む引数型へラムダを直接渡す書き方は、型検査の制限で通りません。",
+    ],
+    "sections": [
+        ("h2", "メソッドと演算"),
+        ("methods", [
+            ("SegTree(n: int, e: T, op: fn(T, T) -> T)", "長さ <code>n</code>、全要素 <code>e</code> で構築する", "init"),
+            ("SegTree(a: [T], e: T, op: fn(T, T) -> T)", "配列 <code>a</code> の内容で構築する", "init_array"),
+            ("set(i: int, x: T)", "位置 <code>i</code> の要素を <code>x</code> に置き換える", "set"),
+            ("get(i: int) -> T", "位置 <code>i</code> の要素を返す", "get"),
+            ("prod(l: int, r: int) -> T", "半開区間 <code>[l, r)</code> の積 <code>op(a[l], ..., a[r-1])</code>。空区間は <code>e</code>", "prod"),
+            ("all_prod() -> T", "全区間の積", "all_prod"),
+            ("len", "要素数（プロパティとして <code>t.len</code> と書く）", "len"),
+        ]),
+        ("h2", "注意"),
+        ("ul", [
+            "<strong>添字・区間の範囲外アクセスは未定義です</strong>（他のコンテナと同様、検査はしません）。"
+            "<code>0 &lt;= l &lt;= r &lt;= len</code> の範囲で使ってください",
+            "<code>op</code> は結合法則を満たし、<code>e</code> がその単位元であることが前提です"
+            "（<code>op(e, x) == op(x, e) == x</code>）。交換法則は不要で、左から右への順序が保たれます",
+            "要素型 <code>T</code> が配列の場合、要素は値セマンティクスで複製されます",
+        ]),
+        ("example", {
+            "title": "区間和",
+            "code": "def add(a: int, b: int) -> int:\n    return a + b\nt = SegTree([3, 1, 4, 1, 5, 9, 2, 6], 0, add)\n<< t.prod(0, 8)\n<< t.prod(2, 5)\nt.set(4, 10)\n<< t.prod(2, 5)\n<< t.all_prod()\n<< t.get(7)",
+            "stdout": "31\n10\n15\n36\n6\n",
+        }),
+        ("example", {
+            "title": "区間 min",
+            "code": "def imin(a: int, b: int) -> int:\n    if a < b:\n        return a\n    return b\nt = SegTree(6, 1000000000, imin)\nt.set(0, 5)\nt.set(1, 2)\nt.set(2, 8)\nt.set(3, 1)\nt.set(4, 9)\nt.set(5, 3)\n<< t.prod(0, 6)\n<< t.prod(0, 3)\n<< t.prod(3, 6)",
+            "stdout": "1\n2\n1\n",
+        }),
+        ("example", {
+            "title": "区間 gcd",
+            "code": "def gcd(a: int, b: int) -> int:\n    while b != 0:\n        tmp = a % b\n        a = b\n        b = tmp\n    return a\nt = SegTree([12, 18, 30, 7], 0, gcd)\n<< t.all_prod()\n<< t.prod(0, 3)\n<< t.prod(3, 4)",
+            "stdout": "1\n6\n7\n",
+        }),
+    ],
+    "related": ["lazysegtree", "array", "vec"],
+},
+
+# ---------------------------------------------------------------- LazySegTree
+{
+    "slug": "lazysegtree",
+    "name": "LazySegTree<T, F>",
+    "kind": "クラス",
+    "group": "コレクション",
+    "summary": "遅延セグメント木。区間への作用の適用と区間の積がどちらも O(log n)",
+    "keywords": ["遅延セグメント木", "遅延評価", "区間加算", "区間代入", "lazy segment tree", "Act"],
+    "signature": "class LazySegTree<T, F>",
+    "intro": [
+        "遅延評価つきのセグメント木です。<code>SegTree</code> の演算 <code>op</code> / 単位元 <code>e</code> に加えて、"
+        "区間への作用（型 <code>F</code>）を扱い、区間への作用の適用と区間の積をどちらも O(log n) で行います。",
+        "作用まわりの3点セット（作用の単位元 <code>idf</code>、作用を要素へ適用する <code>mapping</code>、"
+        "作用同士の合成 <code>composition</code>）は <code>Act&lt;T, F&gt;</code> にまとめて渡します。"
+        "spell の引数は <code>self</code> を含めて6個までという制限があり、必要な6点をそのままでは渡せないため、この形になっています。"
+        "<code>Act</code> は注釈つきの変数に入れてから渡すのが確実です"
+        "（<code>act: Act&lt;int, int&gt; = Act(0, add_map, add)</code> のように）。",
+        "<code>composition(f, g)</code> は「<code>g</code> を適用した後に <code>f</code> を適用する」合成を返します"
+        "（AtCoder Library と同じ規約）。<code>op</code> / <code>mapping</code> / <code>composition</code> には、"
+        "名前付き関数か <code>fn</code> 型の注釈つき変数へ入れたラムダを渡してください。",
+    ],
+    "sections": [
+        ("h2", "Act<T, F> — 作用の3点セット"),
+        ("methods", [
+            ("Act(idf: F, mapping: fn(F, T) -> T, composition: fn(F, F) -> F)",
+             "作用の単位元、要素への適用、作用同士の合成をまとめる", "act_init"),
+            ("idf", "作用の単位元。<code>mapping(idf, x) == x</code> が必要", "act_idf"),
+            ("mapping", "<code>mapping(f, x)</code> は要素 <code>x</code> へ作用 <code>f</code> を適用した値", "act_mapping"),
+            ("composition", "<code>composition(f, g)</code> は「<code>g</code> の後に <code>f</code>」の合成", "act_composition"),
+        ]),
+        ("h2", "メソッドと演算"),
+        ("methods", [
+            ("LazySegTree(n: int, e: T, op: fn(T, T) -> T, act: Act<T, F>)", "長さ <code>n</code>、全要素 <code>e</code> で構築する", "init"),
+            ("LazySegTree(a: [T], e: T, op: fn(T, T) -> T, act: Act<T, F>)", "配列 <code>a</code> の内容で構築する", "init_array"),
+            ("set(i: int, x: T)", "位置 <code>i</code> の要素を <code>x</code> に置き換える（積まれた作用は押し下げてから置く）", "set"),
+            ("get(i: int) -> T", "位置 <code>i</code> の要素を返す", "get"),
+            ("prod(l: int, r: int) -> T", "半開区間 <code>[l, r)</code> の積。空区間は <code>e</code>", "prod"),
+            ("all_prod() -> T", "全区間の積", "all_prod"),
+            ("apply(i: int, f: F)", "位置 <code>i</code> の1点へ作用 <code>f</code> を適用する", "apply"),
+            ("apply(l: int, r: int, f: F)", "半開区間 <code>[l, r)</code> へ作用 <code>f</code> を適用する", "apply_range"),
+            ("len", "要素数（プロパティとして <code>t.len</code> と書く）", "len"),
+        ]),
+        ("h2", "注意"),
+        ("ul", [
+            "<strong>添字・区間の範囲外アクセスは未定義です</strong>（検査はしません）",
+            "<code>mapping(f, x)</code> は、作用後のノード値が作用前のノード値 <code>x</code> だけから決まるものでなければなりません。"
+            "例えば区間代入で区間和を取りたい場合は、要素を (合計, 長さ) の組で持ち、<code>mapping</code> が長さを使える形にします"
+            "（下の「区間代入＋区間和」の例）",
+            "<code>mapping(idf, x) == x</code> と <code>composition(idf, f) == f</code> の成立が前提で、"
+            "遅延の押し下げはこの前提のもとで無条件に行われます",
+        ]),
+        ("example", {
+            "title": "区間 add＋区間和",
+            "code": "def add(a: int, b: int) -> int:\n    return a + b\ndef psum(a: Pos2, b: Pos2) -> Pos2:\n    return Pos2(a.x + b.x, a.y + b.y)\ndef psum_map(f: int, x: Pos2) -> Pos2:\n    return Pos2(x.x + f * x.y, x.y)\nact: Act<Pos2, int> = Act(0, psum_map, add)\na: [Pos2] = [Pos2(1, 1), Pos2(2, 1), Pos2(3, 1), Pos2(4, 1), Pos2(5, 1)]\nt = LazySegTree(a, Pos2(0, 0), psum, act)\n<< t.prod(0, 5).x\nt.apply(1, 4, 10)\n<< t.prod(0, 5).x\n<< t.prod(1, 4).x\n<< t.get(2).x\nt.apply(2, 100)\n<< t.all_prod().x",
+            "stdout": "15\n45\n39\n13\n145\n",
+        }),
+        ("example", {
+            "title": "区間 add＋区間 max",
+            "code": "def imax(a: int, b: int) -> int:\n    if a > b:\n        return a\n    return b\ndef add_map(f: int, x: int) -> int:\n    return x + f\ndef add(a: int, b: int) -> int:\n    return a + b\nact: Act<int, int> = Act(0, add_map, add)\nt = LazySegTree([3, 1, 4, 1, 5], -1000000000, imax, act)\n<< t.all_prod()\nt.apply(0, 3, 10)\n<< t.all_prod()\n<< t.prod(3, 5)\n<< t.get(1)",
+            "stdout": "5\n14\n5\n11\n",
+        }),
+        ("example", {
+            "title": "区間代入＋区間和",
+            "code": "def psum(a: Pos2, b: Pos2) -> Pos2:\n    return Pos2(a.x + b.x, a.y + b.y)\ndef asg_map(f: int, x: Pos2) -> Pos2:\n    if f < 0:\n        return x\n    return Pos2(f * x.y, x.y)\ndef asg_comp(f: int, g: int) -> int:\n    if f < 0:\n        return g\n    return f\nact: Act<Pos2, int> = Act(-1, asg_map, asg_comp)\na: [Pos2] = [Pos2(1, 1), Pos2(2, 1), Pos2(3, 1), Pos2(4, 1)]\nt = LazySegTree(a, Pos2(0, 0), psum, act)\nt.apply(0, 4, 7)\n<< t.all_prod().x\nt.apply(1, 3, 2)\n<< t.prod(0, 4).x\n<< t.get(0).x\n<< t.get(1).x",
+            "stdout": "28\n18\n7\n2\n",
+        }),
+        ("p", "代入の例では、作用 <code>F</code> を「代入する値そのもの」とし、単位元を <code>-1</code> で表しています"
+              "（代入する値は 0 以上だけ、という約束のもと）。<code>mapping</code> は要素の長さ <code>x.y</code> を使って"
+              "区間の合計を計算し直します。"),
+    ],
+    "related": ["segtree", "pos2", "array"],
+},
+
 # ---------------------------------------------------------------- Pos2
 {
     "slug": "pos2",

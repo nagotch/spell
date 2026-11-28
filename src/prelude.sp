@@ -1174,6 +1174,283 @@ class Deque<T> {
     }
 }
 
+// セグメント木（step 99）。区間への二項演算 op と単位元 e で、点更新と
+// 区間積をどちらも O(log n) で行う。演算は要素型の dunder では決められ
+// ない（同じ int でも和・最小・最大・gcd と変わる）ため、コンストラクタ
+// で関数値として受け取る（AtCoder Library と同じ方式）。op には名前付き
+// 関数か、fn 型の注釈つき変数へ入れたラムダを渡すこと。型変数を含む
+// 引数型へラムダを直接渡す書き方は、型検査の制限で通らない。
+// 区間は半開区間 [l, r)。添字・区間の範囲外アクセスは他のコンテナと
+// 同様に未定義で、検査はしない。実装はボトムアップ（長さを 2 の冪に
+// 切り上げ、葉を後半に並べる）
+class SegTree<T> {
+    n: int;
+    size: int;
+    d: [T];
+    e: T;
+    op: fn(T, T) -> T;
+
+    def __init__(self, n: int, e: T, op: fn(T, T) -> T) {
+        self.n = n;
+        self.size = 1;
+        while (self.size < n) { self.size = self.size * 2; }
+        self.d = [e; self.size * 2];
+        self.e = e;
+        self.op = op;
+    }
+
+    def __init__(self, a: [T], e: T, op: fn(T, T) -> T) {
+        self.n = a.len;
+        self.size = 1;
+        while (self.size < self.n) { self.size = self.size * 2; }
+        self.d = [e; self.size * 2];
+        self.e = e;
+        self.op = op;
+        i = 0;
+        while (i < self.n) {
+            self.d[self.size + i] = a[i];
+            i = i + 1;
+        }
+        i = self.size - 1;
+        while (i >= 1) {
+            self.d[i] = self.op(self.d[i * 2], self.d[i * 2 + 1]);
+            i = i - 1;
+        }
+    }
+
+    def len(self) -> int {
+        return self.n;
+    }
+
+    def set(self, i: int, x: T) {
+        p = i + self.size;
+        self.d[p] = x;
+        p = p / 2;
+        while (p >= 1) {
+            self.d[p] = self.op(self.d[p * 2], self.d[p * 2 + 1]);
+            p = p / 2;
+        }
+    }
+
+    def get(self, i: int) -> T {
+        return self.d[i + self.size];
+    }
+
+    def prod(self, l: int, r: int) -> T {
+        sml = self.e;
+        smr = self.e;
+        l = l + self.size;
+        r = r + self.size;
+        while (l < r) {
+            if (l % 2 == 1) {
+                sml = self.op(sml, self.d[l]);
+                l = l + 1;
+            }
+            if (r % 2 == 1) {
+                r = r - 1;
+                smr = self.op(self.d[r], smr);
+            }
+            l = l / 2;
+            r = r / 2;
+        }
+        return self.op(sml, smr);
+    }
+
+    def all_prod(self) -> T {
+        return self.d[1];
+    }
+}
+
+// 遅延セグメント木の「作用」の3点セット（step 99）。作用の単位元 idf、
+// 作用を要素へ適用する mapping、作用同士の合成 composition をまとめた
+// もので、LazySegTree のコンストラクタへ1つにまとめて渡す。spell の
+// 引数は self を含めて6個までという制限があり、LazySegTree に必要な
+// 6点（長さ・単位元・演算・単位元・適用・合成）がそのままでは渡せない
+// ため、この形にしている。composition(f, g) は「g を適用した後に f を
+// 適用する」合成を返す（AtCoder Library と同じ規約）。mapping(idf, x)
+// == x と composition(idf, f) == f の成立が前提。もう1つの前提として、
+// mapping(f, x) は作用後のノード値が作用前のノード値 x だけから決まる
+// ものでなければならない。例えば区間代入で区間和を取りたい場合は、
+// 要素を (合計, 長さ) の組（Pos2 等）で持ち、mapping が長さを使える
+// 形にする
+class Act<T, F> {
+    idf: F;
+    mapping: fn(F, T) -> T;
+    composition: fn(F, F) -> F;
+
+    def __init__(self, idf: F, mapping: fn(F, T) -> T, composition: fn(F, F) -> F) {
+        self.idf = idf;
+        self.mapping = mapping;
+        self.composition = composition;
+    }
+}
+
+// 遅延セグメント木（step 99）。SegTree の演算 op / 単位元 e に加えて、
+// 区間への作用を Act<T, F> として受け取る。遅延の押し下げは
+// mapping(idf, x) == x の前提のもとで無条件に行う。
+// 区間は半開区間 [l, r)。範囲外アクセスは未定義で、検査はしない。
+// 実装は SegTree と同じ 2 の冪の配置の上での再帰
+class LazySegTree<T, F> {
+    n: int;
+    size: int;
+    d: [T];
+    lz: [F];
+    e: T;
+    op: fn(T, T) -> T;
+    idf: F;
+    mapping: fn(F, T) -> T;
+    composition: fn(F, F) -> F;
+    // apply の再帰が引数上限（self 込み6個）に当たるため、問い合わせ
+    // 範囲と作用は一時フィールド経由で渡す（再入は想定しない）
+    tmp_l: int;
+    tmp_r: int;
+    tmp_f: F;
+
+    def __init__(self, n: int, e: T, op: fn(T, T) -> T, act: Act<T, F>) {
+        self.n = n;
+        self.size = 1;
+        while (self.size < n) { self.size = self.size * 2; }
+        self.d = [e; self.size * 2];
+        self.lz = [act.idf; self.size * 2];
+        self.e = e;
+        self.op = op;
+        self.idf = act.idf;
+        self.mapping = act.mapping;
+        self.composition = act.composition;
+        self.tmp_l = 0;
+        self.tmp_r = 0;
+        self.tmp_f = act.idf;
+    }
+
+    def __init__(self, a: [T], e: T, op: fn(T, T) -> T, act: Act<T, F>) {
+        self.n = a.len;
+        self.size = 1;
+        while (self.size < self.n) { self.size = self.size * 2; }
+        self.d = [e; self.size * 2];
+        self.lz = [act.idf; self.size * 2];
+        self.e = e;
+        self.op = op;
+        self.idf = act.idf;
+        self.mapping = act.mapping;
+        self.composition = act.composition;
+        self.tmp_l = 0;
+        self.tmp_r = 0;
+        self.tmp_f = act.idf;
+        i = 0;
+        while (i < self.n) {
+            self.d[self.size + i] = a[i];
+            i = i + 1;
+        }
+        i = self.size - 1;
+        while (i >= 1) {
+            self.d[i] = self.op(self.d[i * 2], self.d[i * 2 + 1]);
+            i = i - 1;
+        }
+    }
+
+    def len(self) -> int {
+        return self.n;
+    }
+
+    // ノード k へ作用 f を適用する（d へ反映し、内部ノードなら遅延にも積む）
+    def apply_node(self, k: int, f: F) {
+        self.d[k] = self.mapping(f, self.d[k]);
+        if (k < self.size) {
+            self.lz[k] = self.composition(f, self.lz[k]);
+        }
+    }
+
+    // ノード k に積まれた遅延を子へ押し下げて消す
+    def push(self, k: int) {
+        if (k < self.size) {
+            self.apply_node(k * 2, self.lz[k]);
+            self.apply_node(k * 2 + 1, self.lz[k]);
+            self.lz[k] = self.idf;
+        }
+    }
+
+    def set(self, i: int, x: T) {
+        self.set_rec(1, 0, self.size, i, x);
+    }
+
+    def set_rec(self, k: int, l: int, r: int, i: int, x: T) {
+        if (r - l == 1) {
+            self.d[k] = x;
+        } else {
+            self.push(k);
+            m = (l + r) / 2;
+            if (i < m) {
+                self.set_rec(k * 2, l, m, i, x);
+            } else {
+                self.set_rec(k * 2 + 1, m, r, i, x);
+            }
+            self.d[k] = self.op(self.d[k * 2], self.d[k * 2 + 1]);
+        }
+    }
+
+    def get(self, i: int) -> T {
+        return self.get_rec(1, 0, self.size, i);
+    }
+
+    def get_rec(self, k: int, l: int, r: int, i: int) -> T {
+        if (r - l == 1) {
+            return self.d[k];
+        }
+        self.push(k);
+        m = (l + r) / 2;
+        if (i < m) {
+            return self.get_rec(k * 2, l, m, i);
+        }
+        return self.get_rec(k * 2 + 1, m, r, i);
+    }
+
+    def prod(self, l: int, r: int) -> T {
+        return self.prod_rec(1, 0, self.size, l, r);
+    }
+
+    def prod_rec(self, k: int, l: int, r: int, ql: int, qr: int) -> T {
+        if (qr <= l || r <= ql) {
+            return self.e;
+        }
+        if (ql <= l && r <= qr) {
+            return self.d[k];
+        }
+        self.push(k);
+        m = (l + r) / 2;
+        return self.op(self.prod_rec(k * 2, l, m, ql, qr),
+                       self.prod_rec(k * 2 + 1, m, r, ql, qr));
+    }
+
+    def apply(self, i: int, f: F) {
+        self.apply(i, i + 1, f);
+    }
+
+    def apply(self, l: int, r: int, f: F) {
+        self.tmp_l = l;
+        self.tmp_r = r;
+        self.tmp_f = f;
+        self.apply_rec(1, 0, self.size);
+    }
+
+    def apply_rec(self, k: int, l: int, r: int) {
+        if (self.tmp_r <= l || r <= self.tmp_l) {
+            // 問い合わせ範囲の外。何もしない
+        } else if (self.tmp_l <= l && r <= self.tmp_r) {
+            self.apply_node(k, self.tmp_f);
+        } else {
+            self.push(k);
+            m = (l + r) / 2;
+            self.apply_rec(k * 2, l, m);
+            self.apply_rec(k * 2 + 1, m, r);
+            self.d[k] = self.op(self.d[k * 2], self.d[k * 2 + 1]);
+        }
+    }
+
+    def all_prod(self) -> T {
+        return self.d[1];
+    }
+}
+
 // 2次元の座標（step 77）。リテラル `(x, y)` はこのクラスの構築への糖衣。
 // 演算は要素ごとで、`__eq__` / `__hash__` があるため Dict のキーにも
 // 使える。添字 `p[0]` / `p[1]` は x / y に対応する。グリッド配列への

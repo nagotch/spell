@@ -462,6 +462,160 @@
   "w": "to_array to_array() -> [T] 先頭から末尾の順の通常配列のコピー Deque<T>"
  },
  {
+  "t": "SegTree<T>",
+  "u": "segtree.html",
+  "k": "クラス",
+  "s": "セグメント木。点更新と区間への二項演算がどちらも O(log n)",
+  "w": "SegTree<T> セグメント木。点更新と区間への二項演算がどちらも O(log n) セグメント木 区間和 区間最小 区間最大 RMQ gcd segment tree"
+ },
+ {
+  "t": "SegTree<T>.init",
+  "u": "segtree.html#m-init",
+  "k": "メソッド",
+  "s": "長さ n、全要素 e で構築する",
+  "w": "init SegTree(n: int, e: T, op: fn(T, T) -> T) 長さ n、全要素 e で構築する SegTree<T>"
+ },
+ {
+  "t": "SegTree<T>.init_array",
+  "u": "segtree.html#m-init_array",
+  "k": "メソッド",
+  "s": "配列 a の内容で構築する",
+  "w": "init_array SegTree(a: [T], e: T, op: fn(T, T) -> T) 配列 a の内容で構築する SegTree<T>"
+ },
+ {
+  "t": "SegTree<T>.set",
+  "u": "segtree.html#m-set",
+  "k": "メソッド",
+  "s": "位置 i の要素を x に置き換える",
+  "w": "set set(i: int, x: T) 位置 i の要素を x に置き換える SegTree<T>"
+ },
+ {
+  "t": "SegTree<T>.get",
+  "u": "segtree.html#m-get",
+  "k": "メソッド",
+  "s": "位置 i の要素を返す",
+  "w": "get get(i: int) -> T 位置 i の要素を返す SegTree<T>"
+ },
+ {
+  "t": "SegTree<T>.prod",
+  "u": "segtree.html#m-prod",
+  "k": "メソッド",
+  "s": "半開区間 [l, r) の積 op(a[l], ..., a[r-1])。空区間は e",
+  "w": "prod prod(l: int, r: int) -> T 半開区間 [l, r) の積 op(a[l], ..., a[r-1])。空区間は e SegTree<T>"
+ },
+ {
+  "t": "SegTree<T>.all_prod",
+  "u": "segtree.html#m-all_prod",
+  "k": "メソッド",
+  "s": "全区間の積",
+  "w": "all_prod all_prod() -> T 全区間の積 SegTree<T>"
+ },
+ {
+  "t": "SegTree<T>.len",
+  "u": "segtree.html#m-len",
+  "k": "メソッド",
+  "s": "要素数（プロパティとして t.len と書く）",
+  "w": "len len 要素数（プロパティとして t.len と書く） SegTree<T>"
+ },
+ {
+  "t": "LazySegTree<T, F>",
+  "u": "lazysegtree.html",
+  "k": "クラス",
+  "s": "遅延セグメント木。区間への作用の適用と区間の積がどちらも O(log n)",
+  "w": "LazySegTree<T, F> 遅延セグメント木。区間への作用の適用と区間の積がどちらも O(log n) 遅延セグメント木 遅延評価 区間加算 区間代入 lazy segment tree Act"
+ },
+ {
+  "t": "LazySegTree<T, F>.act_init",
+  "u": "lazysegtree.html#m-act_init",
+  "k": "メソッド",
+  "s": "作用の単位元、要素への適用、作用同士の合成をまとめる",
+  "w": "act_init Act(idf: F, mapping: fn(F, T) -> T, composition: fn(F, F) -> F) 作用の単位元、要素への適用、作用同士の合成をまとめる LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.act_idf",
+  "u": "lazysegtree.html#m-act_idf",
+  "k": "メソッド",
+  "s": "作用の単位元。mapping(idf, x) == x が必要",
+  "w": "act_idf idf 作用の単位元。mapping(idf, x) == x が必要 LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.act_mapping",
+  "u": "lazysegtree.html#m-act_mapping",
+  "k": "メソッド",
+  "s": "mapping(f, x) は要素 x へ作用 f を適用した値",
+  "w": "act_mapping mapping mapping(f, x) は要素 x へ作用 f を適用した値 LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.act_composition",
+  "u": "lazysegtree.html#m-act_composition",
+  "k": "メソッド",
+  "s": "composition(f, g) は「g の後に f」の合成",
+  "w": "act_composition composition composition(f, g) は「g の後に f」の合成 LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.init",
+  "u": "lazysegtree.html#m-init",
+  "k": "メソッド",
+  "s": "長さ n、全要素 e で構築する",
+  "w": "init LazySegTree(n: int, e: T, op: fn(T, T) -> T, act: Act<T, F>) 長さ n、全要素 e で構築する LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.init_array",
+  "u": "lazysegtree.html#m-init_array",
+  "k": "メソッド",
+  "s": "配列 a の内容で構築する",
+  "w": "init_array LazySegTree(a: [T], e: T, op: fn(T, T) -> T, act: Act<T, F>) 配列 a の内容で構築する LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.set",
+  "u": "lazysegtree.html#m-set",
+  "k": "メソッド",
+  "s": "位置 i の要素を x に置き換える（積まれた作用は押し下げてから置く）",
+  "w": "set set(i: int, x: T) 位置 i の要素を x に置き換える（積まれた作用は押し下げてから置く） LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.get",
+  "u": "lazysegtree.html#m-get",
+  "k": "メソッド",
+  "s": "位置 i の要素を返す",
+  "w": "get get(i: int) -> T 位置 i の要素を返す LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.prod",
+  "u": "lazysegtree.html#m-prod",
+  "k": "メソッド",
+  "s": "半開区間 [l, r) の積。空区間は e",
+  "w": "prod prod(l: int, r: int) -> T 半開区間 [l, r) の積。空区間は e LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.all_prod",
+  "u": "lazysegtree.html#m-all_prod",
+  "k": "メソッド",
+  "s": "全区間の積",
+  "w": "all_prod all_prod() -> T 全区間の積 LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.apply",
+  "u": "lazysegtree.html#m-apply",
+  "k": "メソッド",
+  "s": "位置 i の1点へ作用 f を適用する",
+  "w": "apply apply(i: int, f: F) 位置 i の1点へ作用 f を適用する LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.apply_range",
+  "u": "lazysegtree.html#m-apply_range",
+  "k": "メソッド",
+  "s": "半開区間 [l, r) へ作用 f を適用する",
+  "w": "apply_range apply(l: int, r: int, f: F) 半開区間 [l, r) へ作用 f を適用する LazySegTree<T, F>"
+ },
+ {
+  "t": "LazySegTree<T, F>.len",
+  "u": "lazysegtree.html#m-len",
+  "k": "メソッド",
+  "s": "要素数（プロパティとして t.len と書く）",
+  "w": "len len 要素数（プロパティとして t.len と書く） LazySegTree<T, F>"
+ },
+ {
   "t": "Pos2",
   "u": "pos2.html",
   "k": "クラス",
