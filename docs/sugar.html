@@ -230,6 +230,7 @@ put a</pre>
   <tr><td><code>x@a ブロック</code></td><td><code>for x in a ブロック</code>（反復対象の要素走査）</td></tr>
   <tr><td><code>@n ブロック</code></td><td><code>for _ in n ブロック</code>（回数だけの繰り返し）</td></tr>
   <tr><td><code>@{}</code> / <code>@:</code></td><td><code>while (1 == 1) { }</code>（無限ループ）</td></tr>
+  <tr><td><code>@? 条件 ブロック</code></td><td><code>while 条件 ブロック</code>（<code>@ 式</code> は回数の形なので、条件の印 <code>?</code> を足して区別する。条件には <code>__bool__</code> も効く）</td></tr>
 </table>
 <p>
   ブロックは <code>{ }</code> 形式でも <code>:</code> 形式でも書けます（§05）。
@@ -258,6 +259,27 @@ put n</pre>
 7
 8
 3</pre>
+</figure>
+
+<figure class="code">
+  <figcaption>例 — <code>@?</code></figcaption>
+<pre>q = Deque()
+q.push_back(1)
+q.push_back(2)
+@? q:
+    v &lt;- q
+    put v
+n = 3
+@? n &gt; 0:
+    n = n - 1
+put n</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1
+2
+0</pre>
 </figure>
 
 <h3><code>!;</code> と <code>^;</code></h3>
