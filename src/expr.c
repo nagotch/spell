@@ -415,6 +415,18 @@ static Node* parse_fstring(Token* ftok) {
     return node;
 }
 
+// スカラー min / max の組み込み（step 100）の一時スロット。名前が
+// min / max の呼び出しに2枠を投機的に確保しておく（組み込みとして
+// 書き換えるかどうかは typecheck が決める。ユーザ定義の同名関数が
+// あれば使われないまま残る。ND_OPASSIGN の一時置き場と同じ方式）
+static void reserve_minmax_slots(Node* node) {
+    if (node->len == 3 && (!memcmp(node->name, "min", 3) || !memcmp(node->name, "max", 3))) {
+        register_any();
+        node->offset = locals->offset;
+        register_any();
+    }
+}
+
 static Node* primary() {
     Node* node;
     if (token->kind == TK_KEYWORD && token->keyword == KW_FN) {
@@ -497,6 +509,7 @@ static Node* primary() {
         expect_type_end();
         expect("(");
         node->args = parse_args();
+        reserve_minmax_slots(node);
     } else if (ident_token && typearg_ctor_ahead(ident_token)) {
         // 型を引数に渡す構築（step 77）: `Deque(int)` のように、引数が
         // 型1つだけなら「要素型の指定＋ゼロ値ファクトリの自動生成」
@@ -511,12 +524,14 @@ static Node* primary() {
         node->ctor_targ_count = 1;
         node->ctor_type_arg = true;
         expect(")");
+        reserve_minmax_slots(node);
     } else if (ident_token && consume("(")) {
         node = create_node(ND_FUNCALL);
         node->name = ident_token->str;
         node->len = ident_token->len;
         node->tok = ident_token;
         node->args = parse_args();
+        reserve_minmax_slots(node);
     } else if (ident_token) {
         node = create_ident_node(ident_token);
     } else if (consume("(")) {

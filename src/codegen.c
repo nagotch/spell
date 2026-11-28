@@ -1040,6 +1040,47 @@ static void gen_rax_copy(Node* node) {
     emit_call(new_label(), NULL, 21, "__rt_spell_copy_array");
 }
 
+// スカラーの min / max（step 100）: 引数を左から1回ずつ評価して
+// 一時スロット（offset = 現在値、offset + 8 = 候補）に受け、畳み
+// 込む。値の選択は分岐でなく cmov で行い、配列は作らない。
+// ネイティブ経路（int・アドレス・関数値・型不明）は cmp + cmovl /
+// cmovg で直接選ぶ。クラス経路は解決済みの `__lt__`（node->func）を
+// 呼び、その bool 結果で cmov により選ぶ: min は「候補 < 現在値」
+// （__lt__(候補, 現在値)）、max は「現在値 < 候補」（__lt__(現在値,
+// 候補)）のときに候補へ切り替える
+static void gen_rax_minmax(Node* node) {
+    int cur = node->offset;
+    int tmp = node->offset + 8;
+    Node* arg = node->args;
+    gen_rax(arg);
+    printf("  mov [rbp-%d], rax\n", cur);
+    for (arg = arg->next; arg; arg = arg->next) {
+        gen_rax(arg);
+        printf("  mov [rbp-%d], rax\n", tmp);
+        if (node->func) {
+            if (node->val) {
+                printf("  mov rdi, [rbp-%d]\n", tmp);
+                printf("  mov rsi, [rbp-%d]\n", cur);
+            } else {
+                printf("  mov rdi, [rbp-%d]\n", cur);
+                printf("  mov rsi, [rbp-%d]\n", tmp);
+            }
+            emit_call_func(new_label(), node->func);
+            printf("  test rax, rax\n");
+            printf("  mov rax, [rbp-%d]\n", cur);
+            printf("  cmovne rax, [rbp-%d]\n", tmp);
+            printf("  mov [rbp-%d], rax\n", cur);
+        } else {
+            printf("  mov rax, [rbp-%d]\n", cur);
+            printf("  mov rcx, [rbp-%d]\n", tmp);
+            printf("  cmp rcx, rax\n");
+            printf(node->val ? "  cmovl rax, rcx\n" : "  cmovg rax, rcx\n");
+            printf("  mov [rbp-%d], rax\n", cur);
+        }
+    }
+    printf("  mov rax, [rbp-%d]\n", cur);
+}
+
 static void gen_rax_assign(Node* node) {
     Node* left = node->left_child;
     if (left->kind == ND_LVAR) {
@@ -1246,6 +1287,7 @@ static void gen_rax(Node* node) {
         case ND_CAPVAR: gen_rax_var(node); break;
         case ND_ASSIGN: gen_rax_assign(node); break;
         case ND_COPY: gen_rax_copy(node); break;
+        case ND_MINMAX: gen_rax_minmax(node); break;
         case ND_RETURN: gen_rax_return(node); break;
         case ND_IF: gen_rax_if(node); break;
         case ND_WHILE: gen_rax_while(node); break;
@@ -1280,6 +1322,7 @@ static void gen(Node* node) {
         case ND_CAPVAR:
         case ND_ASSIGN:
         case ND_COPY:
+        case ND_MINMAX:
         case ND_IF:
         case ND_WHILE:
         case ND_BLOCK:
@@ -1743,6 +1786,7 @@ static void emit_runtime_helpers(int used) {
 //     名前で出すので、関数一覧から名前で引く（getchar のような libc 側
 //     の名前は一覧に無いので辺にならない）
 //   ND_MCALL / ND_MEMBER（func 付き）… node->func への辺
+//   ND_MINMAX … クラス経路の `__lt__`（node->func）への辺
 //   ND_FUNCREF … 関数値として使われるので、指す関数への辺
 //   ND_LAMBDA … node->func（ラムダ本体）への辺。値はどこからでも
 //     呼ばれうるが、辺はラムダ式のある場所からだけ張る
@@ -1783,6 +1827,9 @@ static void walk_reachable(Node* node) {
                 mark_function(find_plain_function(n->name, n->len));
             }
         } else if (n->kind == ND_MCALL) {
+            mark_function(n->func);
+        } else if (n->kind == ND_MINMAX) {
+            // クラス経路の `__lt__`（ネイティブ経路では NULL）
             mark_function(n->func);
         } else if (n->kind == ND_MEMBER) {
             if (n->func) {

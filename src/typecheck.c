@@ -1808,15 +1808,16 @@ static Function* resolve_overloaded_call(Node* node, Class* klass, char* name, i
 }
 
 // 可変引数の min / max（step 92）。spell には可変引数の構文が無い
-// ため、print / exit と同じく型検査で扱う組み込みにする。書き換え先
-// は配列リテラルへの `.min()` / `.max()` で、意味論は配列メソッドと
-// 正確に一致する（`__lt__` で順序が決まる型に使える、要素型が揃わな
-// ければ位置つきエラー、型不明が絡めば緩く通す）。配列リテラルは
-// 要素を左から右へちょうど1回ずつ評価するため、「各引数は1回だけ
-// 左から右へ」の要件もそのまま満たされる。引数の個数に上限は設け
-// ない。通常の関数呼び出しの6個上限は ABI のレジスタ渡しに由来し、
-// リテラル経由のこの形には当てはまらない（配列リテラル自体に個数の
-// 上限が無い）
+// ため、print / exit と同じく型検査で扱う組み込みにする。意味論は
+// 配列メソッドと正確に一致する（`__lt__` で順序が決まる型に使える、
+// 要素型が揃わなければ位置つきエラー、型不明が絡めば緩く通す）。
+// 引数の個数に上限は設けない。通常の関数呼び出しの6個上限は ABI の
+// レジスタ渡しに由来し、この形には当てはまらない。
+// step 100: 書き換え先は専用ノード ND_MINMAX（codegen が一時
+// スロット上で畳み込み、cmov で選ぶ。割り当てなし）。ただし検証は
+// 従来どおり配列リテラルへの `.min()` / `.max()` の形で行い、受理
+// 範囲と診断を step 92 と正確に一致させる。評価は「各引数は1回だけ
+// 左から右へ」で、ND_MINMAX の生成もその順序を守る
 static Type* check_minmax(Node* node, bool is_min, Type* expected) {
     int nargs = 0;
     for (Node* a = node->args; a; a = a->next) {
@@ -1839,11 +1840,14 @@ static Type* check_minmax(Node* node, bool is_min, Type* expected) {
         node->next = nxt;
         return t;
     }
-    // 2個以上は [引数...].min() / .max() へ書き換える。引数の検査は
-    // 配列リテラルの検査（要素型の統一）が担う。呼び出し側の期待型
-    // （= 要素の型）は要素へ伝播しないため、型の手がかりの無いラムダ
-    // や曖昧な関数参照を引数にするときは注釈が要る（メソッド呼び出し
-    // の検査が期待型を受け取らないための制限）
+    // 2個以上は専用ノード ND_MINMAX へ書き換える（step 100）。検証は
+    // [引数...].min() / .max() の形で行う: 引数の検査は配列リテラル
+    // の検査（要素型の統一）が担い、要素型の `__lt__` の要否は配列
+    // メソッド本体の検査が担う。呼び出し側の期待型（= 要素の型）は
+    // 要素へ伝播しないため、型の手がかりの無いラムダや曖昧な関数
+    // 参照を引数にするときは注釈が要る（メソッド呼び出しの検査が
+    // 期待型を受け取らないための制限）。検査済みの引数はそのまま
+    // ND_MINMAX へ引き継ぐ
     Node* arr = create_node(ND_ARRAY);
     arr->tok = node->tok;
     arr->body = node->args;
@@ -1851,8 +1855,36 @@ static Type* check_minmax(Node* node, bool is_min, Type* expected) {
     Node* call = make_mcall(arr, NULL, NULL, is_min ? "min" : "max", 3);
     call->tok = node->tok;
     Type* t = check_node(call);
+    // 要素型の `__lt__` の要否は、配列メソッド本体の遅延検査が担って
+    // いた（例: bool 要素なら本体の `<` がエラーになる）。書き換えで
+    // ND_MCALL が本体に残らなくなるため、解決済みのメソッドへ直接
+    // 印を立てて、旧経路と同じ本体検査が走るようにする
+    if (call->func) {
+        call->func->tc_wanted = true;
+    }
+    // クラス型の要素は、通常の `<` と同じ解決で `__lt__` を引いて
+    // おく（codegen がその bool 結果で cmov により選ぶ）。検証で
+    // エラーになった場合は NULL のまま（通常モードではここへ来ない。
+    // キャプチャ中は codegen へ進まない）
+    Function* lt_fn = NULL;
+    if (t->kind == TY_CLASS) {
+        Type* margs[1] = { t };
+        bool merr = false;
+        lt_fn = resolve_method_soft(node, class_of(t), "__lt__", 6, margs, 1, &merr);
+        if (merr) {
+            lt_fn = NULL;
+        }
+    }
+    Node* mm = create_node(ND_MINMAX);
+    mm->tok = node->tok;
+    mm->args = node->args;
+    mm->array_len = nargs;
+    mm->offset = node->offset;
+    mm->val = is_min ? 1 : 0;
+    mm->func = lt_fn;
+    mm->type = t;
     Node* nxt = node->next;
-    *node = *call;
+    *node = *mm;
     node->next = nxt;
     return t;
 }
@@ -4385,6 +4417,12 @@ static Type* check_node(Node* node) {
             // 束縛コピーは束縛地点の検査の最後に挿入されるため、通常は
             // ここへ来ない。再検査の経路でも子の型をそのまま返す
             result = check_node(node->left_child);
+            break;
+        case ND_MINMAX:
+            // 専用ノードは check_minmax の書き換えで生まれ、通常は
+            // ここへ来ない。再検査の経路でも確定済みの要素型を
+            // そのまま返す
+            result = node->type ? node->type : &ty_unknown;
             break;
         case ND_INDEX:
             result = check_index(node);

@@ -248,6 +248,43 @@ def t059() { g = [[1]]; stomp96(g); return g[0][0]; }
 def t060() { a = maker96(); a[0][0] = 9; b = maker96(); return a[0][0] * 10 + b[0][0]; }
 def t061() { g = [[3]]; h = ident96(g); h[0][0] = 8; return g[0][0] * 10 + h[0][0]; }
 
+// step 100: min / max の専用ノード＋cmov 化。クラス経路（str）でも
+// 引数は左から右へちょうど1回ずつ評価される（cnt=6, log=cabcab）
+mm2_cnt = 0;
+mm2_log = "";
+def mm2_nxt(v: str) -> str { mm2_cnt = mm2_cnt + 1; mm2_log = mm2_log + v; return v; }
+def t062() {
+    a = min(mm2_nxt("c"), mm2_nxt("a"), mm2_nxt("b"));
+    b = max(mm2_nxt("c"), mm2_nxt("a"), mm2_nxt("b"));
+    if (a == "a" && b == "c" && mm2_cnt == 6 && mm2_log == "cabcab") { return 1; }
+    return 0;
+}
+// step 100: 同じ呼び出し地点を通る再帰と、ループでのスロット再利用
+def rec100(n: int) -> int { if (n <= 1) { return 1; } return min(rec100(n - 1) + 1, 100); }
+def t063() {
+    s = 0;
+    i = 0;
+    while (i < 5) { s = s + min(i, 3); i = i + 1; }
+    return rec100(5) * 100 + s;
+}
+// step 100: 最初の引数の値は、後の引数が評価されるより前に確定する
+gx100 = 10;
+def ch100() -> int { gx100 = 1; return 50; }
+def t064() { return min(gx100, ch100()) * 10 + gx100; }
+// step 100: ユーザ定義クラス（`__lt__`）と Pos3 のクラス経路
+class W100 {
+    v: int;
+    def __init__(self, v: int) { self.v = v; }
+    def __lt__(self, o: W100) -> bool { return self.v < o.v; }
+}
+def t065() {
+    a = min(W100(7), W100(2), W100(9));
+    b = max(W100(7), W100(2), W100(9));
+    p = min((1, 2, 3), (1, 2, 2));
+    q = max((1, 2, 3), (1, 2, 2));
+    return a.v * 1000 + b.v * 100 + p.z * 10 + q.z;
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -325,6 +362,10 @@ def main() {
     mark(62); fails=fails+check(t059(), 1);
     mark(63); fails=fails+check(t060(), 95);
     mark(64); fails=fails+check(t061(), 38);
+    mark(65); fails=fails+check(t062(), 1);
+    mark(66); fails=fails+check(t063(), 509);
+    mark(67); fails=fails+check(t064(), 101);
+    mark(68); fails=fails+check(t065(), 2923);
 
     print_str("done"); putchar(10);
     return fails > 0;
