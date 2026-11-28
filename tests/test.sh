@@ -375,6 +375,7 @@ def main():
     "def main() { s = \"a\\qb\"; return 0; }|文字列ではエスケープ"
     "def main() { s = \"\\xzz\"; return 0; }|16進数2桁が必要です"
     "def main() { s = \"\\x4\"; return 0; }|16進数2桁が必要です"
+    "def main() { s = \"\\x\"; return 0; }|16進数2桁が必要です"
     # step 90: 文字列の繰り返しは str * int の向きだけ。逆向きは
     # 反射演算子の仕組みが無いため異型エラーになる
     "def main() { s = 3 * \"ab\"; return 0; }|\`int\`型と\`str\`型の値に演算子\`\*\`は使えません"

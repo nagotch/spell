@@ -268,12 +268,14 @@ static Token* tokenize_str_literal(char** endptr, Token* last_token_ptr) {
                 // [2] が終端なら [3] は読みに行かない
                 int lo = (*endptr)[2] ? hex_digit_value((*endptr)[3]) : -1;
                 if (hi < 0 || lo < 0) {
+                    // 不正な場合は16進2桁分を読み進めない（直後の
+                    // 閉じ引用符や終端を越えて進まないため）
                     error_at(*endptr - src, *endptr - src + 2, "`\\x`の後には16進数2桁が必要です");
                     buf[len] = 0;
                 } else {
                     buf[len] = hi * 16 + lo;
+                    *endptr += 2;
                 }
-                *endptr += 2;
             } else if (e == '\0') {
                 // バックスラッシュの直後で入力が尽きた。通常の
                 // 未終了エラーとして扱う
