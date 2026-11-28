@@ -214,6 +214,9 @@ def t071() {
     return t * 10 + n
 }
 
+// step 96: 配列の反復ではイテレータがスナップショットを持つため、
+// ループ変数への代入の書き戻し（step 58）は元の配列へ届かない。
+// 書き戻し自体はスナップショットへ効く（str では従来どおり届く）
 def t072() { a = [1, 2, 3]; x@a { x = x * 2; } return a[0] * 100 + a[1] * 10 + a[2]; }
 
 def t073() { a = [1, 2, 3, 4]; for x in a { x = x * 10; if (x == 20) { break; } } return a[0] * 1000 + a[1] * 100 + a[2] * 10 + a[3]; }
@@ -221,6 +224,7 @@ def t073() { a = [1, 2, 3, 4]; for x in a { x = x * 10; if (x == 20) { break; } 
 def t074() { a = [1, 2, 3]; for x in a { x = x + 1; if (x == 3) { continue; } x = x * 10; } return a[0] * 10000 + a[1] * 100 + a[2]; }
 
 def t075() { a = [1, 2]; b = [10, 20]; for x in a { for y in b { y = y + 1; } } return a[0] * 1000 + a[1] * 100 + b[0] * 10 + b[1]; }
+def t105() { g = [[1, 2], [3, 4]]; for row in g { row[0] = 99; } return g[0][0] * 10 + g[1][0]; }
 
 def t076() { s = "ABCA"; for x in s { if (x != "A") { x = "."; } } if (s == "A..A") { return 1; } return 0; }
 
@@ -606,10 +610,10 @@ def main() {
     mark(69); fails=fails+check(t069(), 15);
     mark(70); fails=fails+check(t070(), 16);
     mark(71); fails=fails+check(t071(), 33);
-    mark(72); fails=fails+check(t072(), 246);
-    mark(73); fails=fails+check(t073(), 12034);
-    mark(74); fails=fails+check(t074(), 200340);
-    mark(75); fails=fails+check(t075(), 1342);
+    mark(72); fails=fails+check(t072(), 123);
+    mark(73); fails=fails+check(t073(), 1234);
+    mark(74); fails=fails+check(t074(), 10203);
+    mark(75); fails=fails+check(t075(), 1320);
     mark(76); fails=fails+check(t076(), 1);
     mark(77); fails=fails+check(t077(), 3);
     mark(78); fails=fails+check(t078(), 12);
@@ -639,6 +643,7 @@ def main() {
     mark(102); fails=fails+check(t102(), 1);
     mark(103); fails=fails+check(t103(), 43);
     mark(104); fails=fails+check(t104(), 12);
+    mark(105); fails=fails+check(t105(), 13);
 
     print_str("done"); putchar(10);
     return fails > 0;

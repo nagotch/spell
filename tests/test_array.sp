@@ -54,15 +54,21 @@ def t042() { a = [0; 2]; a.append(5); return a.len * 10 + a[2]; }
 def t043() { a: [int] = []; i = 0; while (i < 1000) { a.append(i); i = i + 1; } s = 0; for x in a { s = s + x; } return s + a[999]; }
 def t044() { a = ["a", "b"]; a.append("c"); return a.len * 10 + a[2].len; }
 def t045() { a = [1, 2, 3]; b = a; a.append(4); return b.len * 10 + a.len; }
-def t046() { a = [1, 2, 3]; a.append(4); b = a; a.append(5); return b.len * 10 + b[4]; }
-def t047() { a = [1]; a.append(2); addit(a, 3); return a.len * 10 + a[2]; }
+// step 96: b = a はディープコピー。a への append も要素の書き換えも
+// b へ届かない（step 65 の別名意味論は廃止）
+def t046() { a = [1, 2, 3]; a.append(4); b = a; a.append(5); a[0] = 99; return b.len * 100 + b[0] * 10 + b[3]; }
+// step 96: 引数の配列はコピーされる。addit の append は引数の複製に
+// だけ効き、呼び出し側の a は変わらない
+def t047() { a = [1]; a.append(2); addit(a, 3); return a.len * 10 + a[1]; }
 def t048() { a = [1, 2, 3]; r = addlen(a, 4); return r * 10 + a.len; }
 def t049() { rows = [[1, 2], [3]]; rows[0].append(9); return rows[0].len * 100 + rows[0][2]; }
 def t050() { a = [1]; n = a.append(2); return n * 10 + a.len; }
 def t051() { a = [1, 2, 3]; a.append(g100(a)); return a.len * 1000 + a[3]; }
 def t052() { rows = [[1, 2], [3, 4]]; rows[nexti()].append(9); return icnt * 100 + rows[0].len; }
 def t053() { a = [1, 2, 3]; s = 0; n = 0; for x in a { s = s + x; n = n + 1; a.append(10 + n); } return s * 1000 + n * 100 + a.len; }
-def t054() { b = [1, 2, 3]; b.append(4); s = 0; n = 0; for x in b { s = s + x; n = n + 1; if (n < 4) { b.append(100); } } return s * 10 + n; }
+// step 96: 反復はイテレータが受け取った時点のスナップショットを
+// 回る。ループ中の append は b を伸ばすが、反復には増えない
+def t054() { b = [1, 2, 3]; b.append(4); s = 0; n = 0; for x in b { s = s + x; n = n + 1; if (n < 4) { b.append(100); } } return s * 1000 + n * 10 + b.len; }
 def t055() { a = [1, 2, 3]; f = fn() -> int { a.append(4); return a.len; }; r = f(); return r * 10 + a.len; }
 def t056() { a: [int] = []; return a.append(10) * 100 + a.append(20) * 10 + a.len; }
 def t057() { a = [0; 1]; i = 0; while (i < 100) { a.append(i * i); i = i + 1; } return a[51] + a.len; }
@@ -161,6 +167,9 @@ def t102() { a = [[-1; 4]; 3]; a[1][0] = 7; return a[0][0] + a[2][0] + a[1][0]; 
 def t103() { a = [[[1; 2]; 3]; 4]; a[2][1][0] = 9; return a[2][1][0] * 10 + a[0][1][0] + a[2][0][0]; }
 def t104() { a = [[1, 2]; 3]; a[1][0] = 9; return a[0][0] + a[1][0] + a[2][0]; }
 def t105() { a = [[]; 3]; a[0].append(5); return a[0].len * 10 + a[1].len; }
+// step 96: [fill; n] は fill の型が配列なら、リテラルでなくても各
+// スロットが独立（step 82 ではリテラル形だけだった）。a[1] への
+// 書き込みは a[0] にも row にも届かない
 def t106() { row = [-1; 2]; a = [row; 2]; a[1][0] = 7; return a[0][0]; }
 def t107() { n = 0 - 1; a = [[1; 2]; n]; m = 0 - 2; b = [5; m]; return a.len + b.len; }
 def t108() { s = "hello world"; r = 0; if (s[0:5] == "hello") { r = r + 1; } if (s[6:11] == "world") { r = r + 2; } if (s[0:5].len == 5) { r = r + 4; } return r; }
@@ -196,6 +205,16 @@ def t137() { r = 0; if ("aBc9z".upper() == "ABC9Z") { r = r + 1; } if ("AbC9Z".l
 def t138() { r = 0; if (chr(65) == "A") { r = r + 1; } if (chr(97) + chr(98) == "ab") { r = r + 2; } if (chr(10) == "\n") { r = r + 4; } if (chr("A".chars[0]) == "A") { r = r + 8; } if (chr(48 + 5) == "5") { r = r + 16; } return r; }
 def t139() { r = 0; if ("\r".chars[0] == 13) { r = r + 1; } if ("\r".len == 1) { r = r + 2; } if ('\r'.chars[0] == 13) { r = r + 4; } if ("\x41" == "A") { r = r + 8; } if ("\x61\x62" == "ab") { r = r + 16; } if ('\x41' == "A") { r = r + 32; } if ("\x4a" == "J") { r = r + 64; } if ("\n".chars[0] == 10) { r = r + 128; } if ("\t".chars[0] == 9) { r = r + 256; } if ("\\".chars[0] == 92) { r = r + 512; } if ("\"".chars[0] == 34) { r = r + 1024; } if ('\''.chars[0] == 39) { r = r + 2048; } if ("\0".chars[0] == 0) { r = r + 4096; } if ("\0".len == 1) { r = r + 8192; } return r; }
 def t140() { r = 0; if ("ab" * 3 == "ababab") { r = r + 1; } if ("ab" * 1 == "ab") { r = r + 2; } if ("ab" * 0 == "") { r = r + 4; } if ("ab" * -2 == "") { r = r + 8; } if ("" * 5 == "") { r = r + 16; } if ("a" * 5 == "aaaaa") { r = r + 32; } s = "xy"; if (s * 2 == "xyxy") { r = r + 64; } if (("ab" * 2).len == 4) { r = r + 128; } if ("ab" * 3 + "c" == "abababc") { r = r + 256; } return r; }
+def t141() { w = 3; h = 2; d = [[-1] * w] * h; d[0][0] = 5; return d[1][0] * 10 + d[0][1]; }
+def t142() { a = [[[7] * 2] * 2] * 2; a[0][0][0] = 1; return a[1][1][1] * 100 + a[0][1][0] * 10 + a[0][0][1]; }
+def t143() { a = [[1, 2]]; b = a * 3; b[0][0] = 9; b[2][1] = 8; return a[0][0] * 1000 + b[1][0] * 100 + b[2][1] * 10 + b[0][1]; }
+def t144() { r = [2, 1]; a = [r.sorted(); 2]; a[0][0] = 7; return a[1][0] * 10 + a[1][1]; }
+def t145() { a = [[[1]]]; b = a; b[0][0][0] = 9; return a[0][0][0]; }
+def t146() { x = [1, 2]; a = [x, x]; a[0][0] = 9; return x[0] * 100 + a[1][0] * 10 + a[0][1]; }
+def t147() { v = [1]; a: [[int]] = []; a.append(v); v[0] = 9; a[0][0] = 5; return v[0] * 10 + a[0][0]; }
+def t148() { src = [7, 8]; dst = [[0, 0]]; dst[0] = src; src[0] = 1; return dst[0][0] * 10 + dst[0][1]; }
+def t149() { a = [1, 2] * 3; a[0] = 9; return a[3] * 100 + a[4] * 10 + a[5]; }
+def t150() { a = [[1]]; b = [[2]]; a, b = b, a; a[0][0] = 9; return b[0][0] * 10 + a[0][0]; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -255,15 +274,15 @@ def main() {
     mark(43); fails=fails+check(t043(), 500499);
     mark(44); fails=fails+check(t044(), 31);
     mark(45); fails=fails+check(t045(), 34);
-    mark(46); fails=fails+check(t046(), 55);
-    mark(47); fails=fails+check(t047(), 33);
+    mark(46); fails=fails+check(t046(), 414);
+    mark(47); fails=fails+check(t047(), 22);
     mark(48); fails=fails+check(t048(), 43);
     mark(49); fails=fails+check(t049(), 309);
     mark(50); fails=fails+check(t050(), 22);
     mark(51); fails=fails+check(t051(), 4007);
     mark(52); fails=fails+check(t052(), 103);
     mark(53); fails=fails+check(t053(), 6306);
-    mark(54); fails=fails+check(t054(), 3107);
+    mark(54); fails=fails+check(t054(), 10047);
     mark(55); fails=fails+check(t055(), 43);
     mark(56); fails=fails+check(t056(), 122);
     mark(57); fails=fails+check(t057(), 2601);
@@ -315,7 +334,7 @@ def main() {
     mark(103); fails=fails+check(t103(), 92);
     mark(104); fails=fails+check(t104(), 11);
     mark(105); fails=fails+check(t105(), 10);
-    mark(106); fails=fails+check(t106(), 7);
+    mark(106); fails=fails+check(t106(), -1);
     mark(107); fails=fails+check(t107(), 0);
     mark(108); fails=fails+check(t108(), 7);
     mark(109); fails=fails+check(t109(), 2030020);
@@ -350,6 +369,16 @@ def main() {
     mark(138); fails=fails+check(t138(), 31);
     mark(139); fails=fails+check(t139(), 16383);
     mark(140); fails=fails+check(t140(), 511);
+    mark(141); fails=fails+check(t141(), -11);
+    mark(142); fails=fails+check(t142(), 777);
+    mark(143); fails=fails+check(t143(), 1182);
+    mark(144); fails=fails+check(t144(), 12);
+    mark(145); fails=fails+check(t145(), 1);
+    mark(146); fails=fails+check(t146(), 112);
+    mark(147); fails=fails+check(t147(), 95);
+    mark(148); fails=fails+check(t148(), 78);
+    mark(149); fails=fails+check(t149(), 212);
+    mark(150); fails=fails+check(t150(), 19);
 
     print_str("done"); putchar(10);
     return fails > 0;

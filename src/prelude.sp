@@ -2,12 +2,9 @@ class str {
     chars: [int];
 
     def __init__(self, chars: [int]) {
-        self.chars = [0] * chars.len;
-        i = 0;
-        while (i < chars.len) {
-            self.chars[i] = chars[i];
-            i += 1;
-        }
+        // step 96: 引数の配列はプロローグで複製済みで、フィールド
+        // への代入でも複製される。要素ごとの移し替えは不要
+        self.chars = chars;
     }
 
     def len(self) -> int {
@@ -936,19 +933,15 @@ class Dict<K, V> {
         // エントリ配列の容量が一杯なら、今の cap まで広げる。埋め草は
         // 挿入するキー・値・ハッシュ自身で、count の範囲外は読まれない
         if (self.count == self.ks.len) {
-            nk = [key; self.cap];
-            nv = [v; self.cap];
-            nh = [h; self.cap];
-            i = 0;
-            while (i < self.count) {
-                nk[i] = self.ks[i];
-                nv[i] = self.vs[i];
-                nh[i] = self.hs[i];
-                i = i + 1;
-            }
-            self.ks = nk;
-            self.vs = nv;
-            self.hs = nh;
+            // step 96: 新しい配列へ移し替えてフィールドへ代入すると、
+            // 束縛のコピーで全体がもう一度複製されてしまう。代わり
+            // にフィールドの配列を append で直接伸ばす（既存の要素は
+            // そのまま残る）。この呼び出しで増えるエントリは1つなの
+            // で、埋め草も1つずつで足りる。埋め草は挿入するキー・
+            // 値・ハッシュ自身で、count の範囲外は読まれない
+            self.ks.append(key);
+            self.vs.append(v);
+            self.hs.append(h);
         }
         s = self.find_slot(key, h);
         self.ks[self.count] = key;
@@ -960,18 +953,19 @@ class Dict<K, V> {
 
     def grow_table(self) {
         ncap = __dict_next_cap(self.cap);
-        nslots = [0; ncap];
+        // step 96: ローカル変数経由でフィールドへ代入すると束縛の
+        // コピーがかかる。self.slots へ直接新しいテーブルを置く
+        self.slots = [0; ncap];
         e = 0;
         while (e < self.count) {
             i = self.hs[e] % ncap;
-            while (nslots[i] != 0) {
+            while (self.slots[i] != 0) {
                 i = i + 1;
                 if (i == ncap) { i = 0; }
             }
-            nslots[i] = e + 1;
+            self.slots[i] = e + 1;
             e = e + 1;
         }
-        self.slots = nslots;
         self.cap = ncap;
     }
 }
@@ -1027,13 +1021,10 @@ class Vec<T> {
         if (self.n == self.buf.len) {
             cap = self.buf.len * 2;
             if (cap == 0) { cap = 8; }
-            nb = [self.factory(); cap];
-            i = 0;
-            while (i < self.n) {
-                nb[i] = self.buf[i];
-                i = i + 1;
-            }
-            self.buf = nb;
+            // step 96: 新しい配列へ移し替えて代入すると束縛のコピー
+            // がかかる。buf を append で直接伸ばす（既存の要素はその
+            // まま残る）。n 以降の埋め草は読まれない
+            while (self.buf.len < cap) { self.buf.append(self.factory()); }
         }
         self.buf[self.n] = v;
         self.n = self.n + 1;
