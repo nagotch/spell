@@ -18,12 +18,24 @@ static bool type_cmp(Type* a, Type* b, bool strict) {
         if (a->kind == TY_UNKNOWN || b->kind == TY_UNKNOWN) {
             return true;
         }
+        // アドレスの実体は int なので、緩い比較では int と互換とする
+        // （step 97）。`int` の変数へアドレスを代入する・その逆を許し、
+        // 判定は変数に記録された型の側で行う
+        if ((a->kind == TY_ADDR && b->kind == TY_INT)
+                || (a->kind == TY_INT && b->kind == TY_ADDR)) {
+            return true;
+        }
     }
     if (a->kind != b->kind) {
         return false;
     }
     if (a->kind == TY_ARRAY) {
         return type_cmp(a->elem, b->elem, strict);
+    }
+    if (a->kind == TY_ADDR) {
+        Type* ea = a->elem ? a->elem : &ty_unknown;
+        Type* eb = b->elem ? b->elem : &ty_unknown;
+        return type_cmp(ea, eb, strict);
     }
     if (a->kind == TY_CLASS) {
         Class* ka = a->klass->origin ? a->klass->origin : a->klass;
@@ -99,6 +111,10 @@ static char* type_text_write(Type* type, char* p) {
         case TY_VAR:
             p += sprintf(p, "%.*s", type->len, type->name);
             break;
+        case TY_ADDR:
+            p += sprintf(p, "&");
+            p = type_text_write(type->elem ? type->elem : &ty_unknown, p);
+            break;
         case TY_FUNC:
             p += sprintf(p, "fn(");
             for (int i = 0; i < type->func_nparams; i++) {
@@ -165,6 +181,14 @@ Type* array_type(Type* elem) {
     return t;
 }
 
+// `&` の結果の型（step 97）。elem は指す先の型、不明なら NULL
+Type* addr_type(Type* elem) {
+    Type* t = calloc(1, sizeof(Type));
+    t->kind = TY_ADDR;
+    t->elem = elem;
+    return t;
+}
+
 Type* func_type(Type* params[], int nparams, Type* ret) {
     Type* t = calloc(1, sizeof(Type));
     t->kind = TY_FUNC;
@@ -191,6 +215,8 @@ Type* subst_type(Type* t, Class* tmpl, Type* targs[]) {
             return t;
         case TY_ARRAY:
             return array_type(subst_type(t->elem, tmpl, targs));
+        case TY_ADDR:
+            return addr_type(subst_type(t->elem, tmpl, targs));
         case TY_CLASS:
             if (t->targ_count > 0) {
                 Type* nt = calloc(1, sizeof(Type));
@@ -227,6 +253,8 @@ bool type_has_unknown(Type* t) {
             return true;
         case TY_ARRAY:
             return type_has_unknown(t->elem);
+        case TY_ADDR:
+            return !t->elem || type_has_unknown(t->elem);
         case TY_CLASS:
             for (int i = 0; i < t->targ_count; i++) {
                 if (type_has_unknown(t->targs[i])) {

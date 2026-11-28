@@ -92,6 +92,10 @@ typedef enum {
     TY_CLASS,
     TY_VAR,
     TY_FUNC,
+    // `&` が生む「アドレス」の味付け（step 97）。型注釈や構文には
+    // 現れず、typecheck の内部だけで使う。elem が指す先の型
+    // （不明なら NULL）。実行時の実体は int と同じ
+    TY_ADDR,
 } TypeKind;
 typedef struct Type Type;
 struct Type {
@@ -344,6 +348,7 @@ Class* find_class(char* name, int len);
 
 Type* array_type(Type* elem);
 Type* func_type(Type* params[], int nparams, Type* ret);
+Type* addr_type(Type* elem);
 
 void error_at(long start, long end, char* fmt, ...);
 void error_at_v(long start, long end, char* fmt, va_list ap);

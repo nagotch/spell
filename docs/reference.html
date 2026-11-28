@@ -206,6 +206,7 @@ a! b!</pre>
   <tr><td>範囲</td><td><code>..</code> <code>..=</code></td><td><code>a..b</code> は半開、<code>a..=b</code> は終端を含む。降順も可（<a href="#s10">§10</a>）</td></tr>
   <tr><td>添字・メンバ</td><td><code>a[i]</code> <code>a?[i]</code> <code>a[i:j]</code> <code>a.x</code> <code>a.m()</code></td><td>添字は <code>__getitem__</code> / <code>__setitem__</code> へ展開。<code>a?[i]</code> は範囲チェックつきの安全添え字、<code>a[i:j]</code> は部分を取り出すスライス（どちらも配列の節を参照）。0引数メソッドは括弧を省略できる</td></tr>
   <tr><td>矢印</td><td><code>&lt;-</code> <code>-&gt;</code></td><td>型で解決される（下記）。連鎖はエラー</td></tr>
+  <tr><td>アドレス</td><td><code>&amp;x</code> <code>*p</code></td><td><code>&amp;</code> は変数・要素・フィールドのアドレスを取り、<code>*</code> はアドレス経由で読み書きする。配列のコピーを避けて関数に書き換えさせたいときの逃げ道。型が確定していてアドレスでない値への <code>*</code> はコンパイルエラー</td></tr>
   <tr><td>関数値</td><td><code>x -&gt; 式</code>、<code>fn(...) { }</code></td><td>矢印形は式1つの無名関数。<code>fn</code> 形は本体がブロック（<a href="#s06">§06</a>）</td></tr>
 </table>
 
@@ -255,7 +256,7 @@ put a &lt;- b, a -&gt; b, a &lt; -b, a &gt; -b</pre>
 <table>
   <tr><th>順位</th><th>演算子</th></tr>
   <tr><td>1</td><td>後置: 呼び出し <code>()</code>、添字 <code>[]</code>、メンバ <code>.</code>、<code>++</code> <code>--</code></td></tr>
-  <tr><td>2</td><td>単項: <code>-</code> <code>+</code> <code>!</code></td></tr>
+  <tr><td>2</td><td>単項: <code>-</code> <code>+</code> <code>!</code> <code>&amp;</code> <code>*</code></td></tr>
   <tr><td>3</td><td><code>*</code> <code>/</code> <code>%</code></td></tr>
   <tr><td>4</td><td><code>+</code> <code>-</code></td></tr>
   <tr><td>5</td><td>関係: <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code>（連鎖可）</td></tr>
