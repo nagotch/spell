@@ -439,16 +439,20 @@ static Node* make_zero_factory(Node* node, Type* elem) {
 }
 
 // 型のゼロ値を作る式を合成する（step 77 の型を引数に渡す構築用）。
-// リテラルノードは一切作らない: 文字列は prelude の zero_str 呼び出し、
-// 配列は zero_array 呼び出し（どちらも prelude 側で通常に解析された
-// リテラルを返す）で代用し、クラスは __init__ の引数を再帰的にゼロで
-// 埋めた構築にする。型検査の段階で配列リテラルを合成すると、置き場所
-// （offset）が割り当てられず壊れるため（step 76 の知見）。
+// 配列・文字列のリテラルノードは合成しない: 文字列は prelude の
+// zero_str 呼び出し、配列は zero_array 呼び出し（どちらも prelude 側で
+// 通常に解析されたリテラルを返す）で代用し、クラスは __init__ の
+// 引数を再帰的にゼロで埋めた構築にする。型検査の段階で配列リテラルを
+// 合成すると、置き場所（offset）が割り当てられず壊れるため
+// （step 76 の知見）。数値・真理値の葉ノードは置き場所を必要とせず、
+// 既存の書き換え（check_for など）と同じく合成してよい。
 // ゼロ化できない型（関数型・型変数・型不明、注釈のない引数を持つ
-// __init__ など）では NULL を返す。depth は自己参照クラスでの
-// 無限再帰を止めるための上限
-static Node* build_zero_expr(Node* node, Type* type, int depth) {
-    if (depth > 16) {
+// __init__ など）では NULL を返す。自己参照クラスは有限の構築では
+// ゼロ化できないため、展開中のクラス型の並び（path）に同じ型が
+// 再び現れたら NULL を返す（配列は空配列で循環を断てるので、
+// path にはクラス型だけを積む）。depth は保険の上限
+static Node* build_zero_expr(Node* node, Type* type, Type* path[], int path_len, int depth) {
+    if (depth > 64) {
         return NULL;
     }
     switch (type->kind) {
@@ -487,6 +491,12 @@ static Node* build_zero_expr(Node* node, Type* type, int depth) {
                 call->tok = node->tok;
                 return call;
             }
+            for (int i = 0; i < path_len; i++) {
+                if (path[i]->kind == TY_CLASS && type_strict_equals(path[i], type)) {
+                    return NULL;
+                }
+            }
+            path[path_len] = type;
             Function* init = find_callable(klass, "__init__", 8);
             Node* call = create_node(ND_FUNCALL);
             call->name = origin->name;
@@ -513,7 +523,7 @@ static Node* build_zero_expr(Node* node, Type* type, int depth) {
                 if (!pt) {
                     return NULL;
                 }
-                Node* arg = build_zero_expr(node, pt, depth + 1);
+                Node* arg = build_zero_expr(node, pt, path, path_len + 1, depth + 1);
                 if (!arg) {
                     return NULL;
                 }
@@ -537,7 +547,8 @@ static Node* make_zero_value_factory(Node* node, Type* elem) {
     if (fref) {
         return fref;
     }
-    Node* zero = build_zero_expr(node, elem, 0);
+    Type* path[66];
+    Node* zero = build_zero_expr(node, elem, path, 0, 0);
     if (!zero) {
         return NULL;
     }

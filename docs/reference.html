@@ -830,6 +830,7 @@ put y, q.to_array()</pre>
   式の位置で <code>(1, 2)</code> と書くと <code>Pos2</code>、<code>(1, 2, 3)</code> と書くと <code>Pos3</code> のリテラルになります（糖衣集の「式の糖衣」参照）。
   要素ごとの <code>+</code> / <code>-</code>、<code>int</code> とのスカラー倍 <code>*</code>、等価性 <code>==</code> / <code>!=</code>、添字 <code>p[0]</code>（x が 0）を備え、
   <code>__hash__</code> があるため <code>Dict</code> のキーにできます。文字列化は空白区切り（<code>"1 2"</code> / <code>"1 2 3"</code>）です。
+  添字の範囲外は他の添字アクセスと同じく検査されません。
   入れ子配列への添字としても使えます（<code>a[p]</code> は <code>a[p[0]][p[1]]</code> と同じ。糖衣集の「式の糖衣」参照）。
   ゼロ値は <code>zero_pos2()</code> / <code>zero_pos3()</code> で、<code>Deque&lt;Pos2&gt;()</code> のような引数なし構築の埋め草にも自動で使われます。
 </p>
