@@ -2423,6 +2423,50 @@ static bool check_init_stmts(Node* stmt, Class* klass, bool* assigned, int nfiel
     return false;
 }
 
+// 関数本体を検査する（typecheck の各段で共通の手順）
+static void check_function_body(Function* fn) {
+    memset(local_types, 0, sizeof(local_types));
+    ensure_defs(fn);
+    current_fn = fn;
+    current_return = fn->return_type;
+    for (int i = 0; i < fn->nparams && i < 6; i++) {
+        if (fn->param_types[i]) {
+            local_types[i + 1] = fn->param_types[i];
+        }
+    }
+    for (Node* stmt = fn->body; stmt; stmt = stmt->next) {
+        check_node(stmt);
+    }
+    fn->tc_done = true;
+}
+
+// 検査済みの本体を辿り、実体化メソッドへの呼び出しに印（tc_wanted）を
+// 付ける。型検査の書き換え（for の反復プロトコル、dunder 書き換え、
+// print の変換など）は全て func を設定した MCALL を本体へ残すため、
+// 検査後の本体を辿れば呼び出しは漏れなく拾える。ラムダの本体は、
+// そのラムダが検査済みなら中まで辿る
+static void collect_wanted(Node* n) {
+    if (!n) {
+        return;
+    }
+    if (n->func && n->func->klass && n->func->klass->origin) {
+        n->func->tc_wanted = true;
+    }
+    if (n->kind == ND_LAMBDA && n->func) {
+        collect_wanted(n->func->body);
+    }
+    collect_wanted(n->left_child);
+    collect_wanted(n->right_child);
+    collect_wanted(n->cond);
+    collect_wanted(n->then);
+    collect_wanted(n->els);
+    collect_wanted(n->init);
+    collect_wanted(n->inc);
+    collect_wanted(n->body);
+    collect_wanted(n->args);
+    collect_wanted(n->next);
+}
+
 void typecheck(Function* prog) {
     functions = prog;
     // 定義収集の状態はコンパイル単位ごとに作り直す（同一プロセスで
@@ -2455,17 +2499,32 @@ void typecheck(Function* prog) {
             // ラムダ本体は、使われている場所で期待型と一緒に検査する
             continue;
         }
-        memset(local_types, 0, sizeof(local_types));
-        ensure_defs(fn);
-        current_fn = fn;
-        current_return = fn->return_type;
-        for (int i = 0; i < fn->nparams && i < 6; i++) {
-            if (fn->param_types[i]) {
-                local_types[i + 1] = fn->param_types[i];
-            }
+        if (fn->klass && fn->klass->origin) {
+            // ジェネリクスの実体化メソッドは後段で、呼び出されたもの
+            // だけを検査する（step 83）。実体化したクラスの全メソッドを
+            // 一律に検査すると、使わないメソッドが要求する dunder
+            // （例: 配列の sort が要求する要素型の `__lt__`）の不足が、
+            // 無関係なメソッドの呼び出しまで失敗させてしまうため
+            continue;
         }
-        for (Node* stmt = fn->body; stmt; stmt = stmt->next) {
-            check_node(stmt);
+        check_function_body(fn);
+        collect_wanted(fn->body);
+    }
+    // 実体化メソッドの遅延検査。検査が進むと新たな呼び出しが見つかる
+    // ため、進展が無くなるまで繰り返す
+    bool progress = true;
+    while (progress) {
+        progress = false;
+        for (Function* fn = prog; fn; fn = fn->next) {
+            if (!fn->klass || !fn->klass->origin || fn->is_lambda) {
+                continue;
+            }
+            if (!fn->tc_wanted || fn->tc_done) {
+                continue;
+            }
+            check_function_body(fn);
+            collect_wanted(fn->body);
+            progress = true;
         }
     }
 

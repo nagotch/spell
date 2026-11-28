@@ -566,7 +566,8 @@ a 7
   <tr><td><code>len</code></td><td>文字数（バイト数ではなく文字コードの個数）</td></tr>
   <tr><td><code>s[i]</code>（<code>__getitem__</code>）</td><td>i 番目の文字コード（<code>int</code>）を返す。添字への代入はできない（<code>__setitem__</code> は無い）</td></tr>
   <tr><td><code>__add__</code></td><td>連結</td></tr>
-  <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較。<code>&lt;</code> 系の順序比較はない</td></tr>
+  <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較</td></tr>
+  <tr><td><code>__lt__</code> / <code>__le__</code></td><td>辞書順（文字コードの列としての大小）。共通部分が等しければ短い方が小さい</td></tr>
   <tr><td><code>__hash__</code></td><td>文字コード列からのハッシュ</td></tr>
   <tr><td><code>__bool__</code></td><td>空でなければ真（条件での判定）</td></tr>
   <tr><td><code>__iter__</code></td><td>1文字ずつの <code>str</code> を返す（<code>StrIter</code>）。ループ変数への代入は元の文字列へ書き戻される</td></tr>
@@ -608,6 +609,11 @@ cba</pre>
   <tr><td><code>__bool__</code></td><td>空でなければ真（条件での判定）</td></tr>
   <tr><td><code>__iter__</code></td><td>要素の走査（<code>ArrayIter</code>）。配列そのものへの反復で、ループ変数への代入は要素へ書き戻される</td></tr>
   <tr><td><code>rev</code></td><td>逆順にした新しい配列（元の配列は変わらない）</td></tr>
+  <tr><td><code>sort()</code></td><td>昇順に並べ替える（インプレース）。安定ソートではない（等しい要素の前後関係は保たれない）。要素型に <code>__lt__</code> が必要</td></tr>
+  <tr><td><code>sorted()</code></td><td>並べ替えた新しい配列（元の配列は変わらない）。要素型に <code>__lt__</code> が必要</td></tr>
+  <tr><td><code>sum()</code></td><td>全要素を先頭から <code>+</code> で畳み込んだ値（戻り値は要素型）。要素型に <code>__add__</code> が必要。空の配列では結果は不定</td></tr>
+  <tr><td><code>min()</code> / <code>max()</code></td><td>最小・最大の要素。要素型に <code>__lt__</code> が必要。空の配列では結果は不定</td></tr>
+  <tr><td><code>count(v)</code></td><td><code>v</code> と等しい要素の個数。等しさは要素型の <code>==</code>（<code>__eq__</code> があればそれ、無ければ同一性）で判定する</td></tr>
   <tr><td><code>__str__</code></td><td>要素を空白区切りで並べた文字列。入れ子の配列も平らに並ぶ</td></tr>
   <tr><td><code>append(v)</code></td><td>末尾に要素を足す（下記）。戻り値は新しい要素数</td></tr>
 </table>
@@ -637,6 +643,31 @@ put e.len</pre>
 <pre>1 2 3 4 4
 5 5
 20</pre>
+</figure>
+
+<figure class="code">
+  <figcaption>例 — sort / sum / min / max / count</figcaption>
+<pre>a = [5, 2, 9, 1, 7]
+put a.sum(), a.min(), a.max(), a.count(2)
+a.sort()
+put a
+b = [3, 1, 2]
+put b.sorted()
+put b
+w = ["banana", "apple", "cherry"]
+w.sort()
+put w
+put w.sum()</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>24 1 9 1
+1 2 5 7 9
+1 2 3
+3 1 2
+apple banana cherry
+applebananacherry</pre>
 </figure>
 
 <h2 id="s10"><span class="no">10</span>範囲と反復プロトコル</h2>
@@ -836,7 +867,7 @@ put y, q.to_array()</pre>
 <p>
   グリッド上の座標を表すクラスです。<code>Pos2</code> はフィールド <code>x: int</code>、<code>y: int</code>、<code>Pos3</code> はそれに <code>z: int</code> を加えたものを持ちます。
   式の位置で <code>(1, 2)</code> と書くと <code>Pos2</code>、<code>(1, 2, 3)</code> と書くと <code>Pos3</code> のリテラルになります（糖衣集の「式の糖衣」参照）。
-  要素ごとの <code>+</code> / <code>-</code>、<code>int</code> とのスカラー倍 <code>*</code>、等価性 <code>==</code> / <code>!=</code>、添字 <code>p[0]</code>（x が 0）を備え、
+  要素ごとの <code>+</code> / <code>-</code>、<code>int</code> とのスカラー倍 <code>*</code>、等価性 <code>==</code> / <code>!=</code>、辞書順の <code>&lt;</code> / <code>&lt;=</code>（x、次に y、次に z の順で比較）、添字 <code>p[0]</code>（x が 0）を備え、
   <code>__hash__</code> があるため <code>Dict</code> のキーにできます。文字列化は空白区切り（<code>"1 2"</code> / <code>"1 2 3"</code>）です。
   添字の範囲外は他の添字アクセスと同じく検査されません。
   入れ子配列への添字としても使えます（<code>a[p]</code> は <code>a[p[0]][p[1]]</code> と同じ。糖衣集の「式の糖衣」参照）。
@@ -1079,7 +1110,7 @@ false 0</pre>
   <tr><td><code>int</code></td><td>整数</td><td><a href="#s09">§09</a></td></tr>
   <tr><td><code>bool</code></td><td>真偽値</td><td><a href="#s09">§09</a></td></tr>
   <tr><td><code>str</code></td><td>文字列</td><td><a href="#s09">§09</a></td></tr>
-  <tr><td><code>array&lt;T&gt;</code></td><td>配列</td><td><a href="#s09">§09</a></td></tr>
+  <tr><td><code>array&lt;T&gt;</code></td><td>配列（<code>sort</code> / <code>sorted</code> / <code>sum</code> / <code>min</code> / <code>max</code> / <code>count</code> などのメソッドを持つ）</td><td><a href="#s09">§09</a></td></tr>
   <tr><td><code>Range</code></td><td>範囲（<code>a..b</code> / <code>a..=b</code> が作る）</td><td><a href="#s10">§10</a></td></tr>
   <tr><td><code>RangeIter</code></td><td><code>Range</code> の反復子</td><td><a href="#s10">§10</a></td></tr>
   <tr><td><code>StrIter</code></td><td><code>str</code> の反復子（1文字ずつの <code>str</code> を返す）</td><td><a href="#s10">§10</a></td></tr>

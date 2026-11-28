@@ -236,6 +236,11 @@ struct Function {
     // 到達可能性（step 63）: codegen が入口から辿って印を付ける。
     // 印の無い関数はアセンブリへ出さない
     bool reachable;
+    // ジェネリクス実体化メソッドの遅延検査（step 83）: 実体化された
+    // メソッドは、検査済みの本体から呼び出されているもの（tc_wanted）
+    // だけを typecheck が検査する。tc_done は検査済みの印
+    bool tc_wanted;
+    bool tc_done;
 };
 
 typedef struct LVar LVar;
