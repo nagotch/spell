@@ -342,6 +342,51 @@ static Node* primary() {
             node = assign_node;
             continue;
         }
+        if (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '?'
+                && token->next && token->next->kind == TK_SYMBOL && token->next->len == 1 && token->next->str[0] == '['
+                && (expr_depth > 0 || token->next->line == token->line)) {
+            // 安全添え字（step 81）: 対象の直後の `?` と、それに続く
+            // 添え字の連鎖 `[i][j]...`。`?` の直後に `[` が続く場合
+            // だけ式として読み、それ以外の `?` は従来どおり式を
+            // 終端させる（文頭の if 糖衣や、条件の直後の `?` の
+            // エラー判定は parse.c 側の担当）。改行が文終端になる
+            // 文脈（入れ子の外）では、角括弧の継続は個数形の入力
+            // 対象と同じく同じ行の中だけとする。括弧の中では通常の
+            // 添え字と同じく行をまたげる
+            Token* q_tok = token;
+            token = token->next;
+            Node* snode = create_node(ND_SAFEIDX);
+            snode->tok = q_tok;
+            snode->left_child = node;
+            Node head;
+            head.next = NULL;
+            Node* cur = &head;
+            int nb = 0;
+            while (token->kind == TK_SYMBOL && token->len == 1 && token->str[0] == '['
+                    && (expr_depth > 0 || nb == 0 || token->line == token->prev->line)) {
+                consume("[");
+                expr_depth++;
+                cur->next = expr();
+                expr_depth--;
+                cur = cur->next;
+                expect("]");
+                nb++;
+            }
+            snode->args = head.next;
+            snode->array_len = nb;
+            // 一時スロット: 先頭が対象の退避先、以降は段ごとの
+            // （長さ・添え字・中間値）と Pos の退避先。角括弧1つは
+            // 最大で Pos3 の3段に展開されるため、1つにつき10枠を
+            // 確保する（使うかどうかは型検査が決める。Pos 添字の
+            // 一時置き場と同じ方式）
+            register_any();
+            snode->offset = locals->offset;
+            for (int i = 0; i < nb * 10; i++) {
+                register_any();
+            }
+            node = snode;
+            continue;
+        }
         if (consume("[")) {
             expr_depth++;
             Node* right_child = expr();

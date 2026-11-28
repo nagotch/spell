@@ -175,6 +175,12 @@ typedef enum {
     // をパーサがこの種別に変換する。val が 1（真）か 0（偽）で、型は
     // prelude の bool クラス。型の位置やメンバ名は対象外
     ND_BOOL,
+    // 安全添え字（step 81）。`対象?[添え字][添え字]...` をパーサが
+    // この種別で運ぶ。left_child が対象、args が添え字の並び、
+    // array_len が角括弧の個数、offset が型検査の書き換えで使う
+    // 一時スロット列の先頭。typecheck が範囲チェック（bool）と
+    // 通常の添え字・論理演算へ書き換えるため、codegen には残らない
+    ND_SAFEIDX,
 } NodeKind;
 typedef struct Node Node;
 struct Node {

@@ -567,6 +567,40 @@ put a[(1, 0)], a[0][1]</pre>
 3 9</pre>
 </figure>
 
+<h3>安全添え字 <code>a?[i][j]</code></h3>
+<table>
+  <tr><th>記号形</th><th>意味</th></tr>
+  <tr><td><code>a?[i][j]...</code>（単独）</td><td>全段とも範囲内なら <code>true</code></td></tr>
+  <tr><td><code>a?[i][j]... == 式</code> などの比較</td><td>どこかの段で範囲外なら比較全体が <code>false</code>、全段範囲内なら要素の通常の比較</td></tr>
+</table>
+<p>
+  対象の直後に <code>?</code> を1回だけ置き、後ろは通常の添え字の連鎖を続ける形です（段ごとに <code>?</code> は繰り返しません）。
+  対象にできるのは配列と <code>str</code> だけで、対象と各添え字はちょうど1回だけ評価され、範囲チェックは浅い段から順に短絡します。
+  座標添字と組み合わせることもでき、要素が <code>str</code> の配列では末尾の文字列も1段と数えるため、グリッドの隣接マスを盤外チェックなしに調べられます。
+  代入先と連鎖比較の中では使えません（コンパイルエラー）。
+</p>
+
+<figure class="code">
+  <figcaption>例 — 安全添え字</figcaption>
+<pre>a = [[1, 2], [3, 4]]
+put a?[1][0] == 3
+put a?[2][0] == 3
+put a?[0][1]
+g = ["ab", "cd"]
+p = (1, 0)
+put g?[p]
+put g?[(0, 2)]</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>true
+false
+true
+true
+false</pre>
+</figure>
+
 <h2 id="s05"><span class="no">05</span>文とブロックの糖衣</h2>
 
 <h3>セミコロンの省略</h3>

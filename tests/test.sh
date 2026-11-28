@@ -58,6 +58,22 @@ tests=(
     "def main() { n = 5; s = 0; @? n > 0 { s = s + n; n = n - 1; } return s; }|15"
     # step 80: `@?` の条件でもユーザー定義 __bool__ が効く
     "class Box { n: int; def __init__(self, n: int) { self.n = n; } def __bool__(self) -> bool { return self.n > 0; } def dec(self) -> int { self.n = self.n - 1; return self.n; } } def main() { b = Box(3); c = 0; @? b { b.dec(); c = c + 1; } return c; }|3"
+    # step 81: 安全添え字 a?[i][j]。単独は bool、比較では範囲外が
+    # 比較全体を偽にする。step 78 でエラーだった if の形が通る回帰
+    "def main() { a = [10, 20]; r = 0; if a?[0] == 10: r = 42; return r; }|42"
+    "def main() { a = [1, 2]; if (a?[2]) { return 1; } if (a?[1]) { return 42; } return 0; }|42"
+    "def main() { a = [1]; if (a?[5] != 1) { return 1; } if (a?[0] != 2) { return 42; } return 0; }|42"
+    "def main() { a = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]; if (a?[1][0][1] == 6) { return 42; } return 0; }|42"
+    "def main() { a = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]; if (a?[1][2][0] == 7) { return 1; } if (a?[0][1][5] == 4) { return 1; } return 42; }|42"
+    "def main() { a = [1]; if (a?[-1] == 1) { return 1; } return 42; }|42"
+    "def main() { s = \"abc\"; if (s?[1]) { return 42; } return 0; }|42"
+    "def main() { s = \"abc\"; if (s?[3] == \"x\") { return 1; } if (s?[-1] == \"x\") { return 1; } return 42; }|42"
+    "def main() { g = [\"ab\", \"cd\"]; c = g[(0, 1)]; if (g?[(1, 0)] && g?[(0, 1)]) { return 42; } return 0; }|42"
+    "def main() { g = [\"ab\", \"cd\"]; if (g?[(0, 2)] == \"x\") { return 1; } if (g?[(2, 0)] == \"x\") { return 1; } return 42; }|42"
+    "def main() { a = [5]; if (5 == a?[0] && 6 == a?[1]) { return 1; } return 42; }|42"
+    "cnt = 0; def idx() -> int { cnt = cnt + 1; return 5; } def main() { a = [1, 2]; r = 0; if (a?[idx()] == 1) { r = 1; } return cnt * 10 + r; }|10"
+    "def main() { a = [10, 20]; if (a?[1] > 15 && a?[1] >= 20) { return 42; } return 0; }|42"
+    "def main() { a = [10, 20]; if (a?[5] > 1) { return 1; } if (a?[5] >= 0) { return 1; } return 42; }|42"
 )
 
 error_tests=(
@@ -194,13 +210,15 @@ def main():
     "def main() { a = [1, 2]; print(a[(0, 1)]); return 0; }|は2次元ですが、配列の入れ子は1段です"
     # step 77: ゼロ化できない要素型への型渡しは、ファクトリを促すエラー
     "class Wrap { f: fn() -> int; def __init__(self, f: fn() -> int) { self.f = f; } } def main() { q = Deque(Wrap); return 0; }|ゼロ値は自動で作れないため、ファクトリを渡してください"
-    # step 78: 条件の直後の `?` は、安全添字の誤記を静かに飲み込まないよう
-    # 位置つきエラーにする（if / while / elif）
-    "def main() { a = [10, 20]; if a?[0] == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
-    "def main() { a = [10, 20]; while a?[0] == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
+    # step 78: 条件の直後の `?` は、静かに飲み込まないよう位置つき
+    # エラーにする（if / while / elif）。step 81 で安全添え字
+    # `a?[0] == 10` が有効な形になったため、ここでは `[` を伴わない
+    # `?`（a? == 10）で拒否そのものを固定する
+    "def main() { a = [10, 20]; if a? == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
+    "def main() { a = [10, 20]; while a? == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
     # step 80: `@?` の条件直後の `?` も同じくエラー
-    "def main() { a = [10, 20]; @? a?[0] == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
-    "def main() { a = [10, 20]; if a[0] == 1: print(1); elif a?[0] == 10: print(2); return 0; }|条件の直後に\`?\`は書けません"
+    "def main() { a = [10, 20]; @? a? == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
+    "def main() { a = [10, 20]; if a[0] == 1: print(1); elif a? == 10: print(2); return 0; }|条件の直後に\`?\`は書けません"
     # step 79: 未定義変数の読み取りはエラー
     "def main() { return j; }|変数\`j\`は定義されていません"
     "def main() { x = y + 1; return x; }|変数\`y\`は定義されていません"
@@ -217,6 +235,26 @@ def main():
     "class Box<T> { v: T; def __init__(self, v: T) { self.v = v + \"x\"; } } def main() { b = Box<int>(3); return 0; }|演算子\`+\`は使えません"
     # step 83: 要素型に __add__ が無い配列の sum は実体化時の型エラー
     "class NoAdd { v: int; def __init__(self, v: int) { self.v = v; } def __lt__(self, o: NoAdd) -> bool { return self.v < o.v; } def __le__(self, o: NoAdd) -> bool { return self.v <= o.v; } def __eq__(self, o: NoAdd) -> bool { return self.v == o.v; } def __ne__(self, o: NoAdd) -> bool { return !(self == o); } def __hash__(self) -> int { return self.v; } def __str__(self) -> str { return self.v.__str__(); } } def main() { a = [NoAdd(2), NoAdd(1)]; print(a.sum()); return 0; }|クラス\`NoAdd\`に演算子\`+\`は定義されていません"
+    # step 81: 安全添え字は読み取り専用。代入・複合代入はエラー
+    "def main() { a = [10, 20]; a?[0] = 5; return 0; }|安全添え字には代入できません"
+    "def main() { a = [10, 20]; a?[0] += 5; return 0; }|安全添え字には代入できません"
+    # step 81: Dict は安全添え字の対象外（長さの契約が無いため）
+    "def main() { d: Dict<str, int> = Dict(zero_int); if (d?[\"a\"] == 1) { return 1; } return 0; }|安全添え字は配列と文字列にだけ使えます"
+    # step 81: 配列でも文字列でもない値には安全添え字は使えない
+    "def main() { x = 5; if (x?[0] == 5) { return 1; } return 0; }|型の値に安全添え字は使えません"
+    # step 81: 連鎖比較の中では安全添え字は使えない
+    "def main() { a = [1, 2]; if (0 < a?[0] < 3) { return 1; } return 0; }|連鎖比較の中では安全添え字は使えません"
+    "def main() { a = [1, 2]; if (0 < 1 < a?[0]) { return 1; } return 0; }|連鎖比較の中では安全添え字は使えません"
+    # step 81: Pos の次元と深さの不一致（安全形・通常形とも）
+    "def main() { a = [1, 2]; if (a?[(0, 1)] == 1) { return 1; } return 0; }|は2次元ですが、配列の入れ子は1段です"
+    "def main() { g = [\"ab\"]; print(g[(0, 1, 2)]); return 0; }|は3次元ですが、配列の入れ子は2段です"
+    # step 81: for のヘッダの直後の `?` は入れ子の if として
+    # 飲み込まずエラーにする（step 78 の残件）
+    "def main() { a = [1, 2]; x@a ? x == 1: print(1); return 0; }|for のヘッダの直後に\`?\`は書けません"
+    "def main() { a = [1, 2]; for x in a ? x == 1 { print(1); } return 0; }|for のヘッダの直後に\`?\`は書けません"
+    "def main() { a = [1, 2]; @a ? print(1); return 0; }|for のヘッダの直後に\`?\`は書けません"
+    # step 81: 安全添え字の反復は bool を回すことになり型エラー
+    "def main() { a = [1, 2]; x@a?[0] { print(x); } return 0; }|型の値は反復できません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -1039,6 +1077,50 @@ print(order)
 one_io_test "def main() { v = Vec(); if (v) { print(1); } else { print(0); } v.append(1); if (v) { print(1); } else { print(0); } s = \"\"; if (s) { print(1); } else { print(0); } s = \"x\"; if (s) { print(1); } else { print(0); } d: Dict<str, int> = Dict(zero_int); if (d) { print(1); } else { print(0); } d[\"a\"] = 1; if (d) { print(1); } else { print(0); } a = [0; 0]; if (a) { print(1); } else { print(0); } a = [7]; if (a) { print(1); } else { print(0); } return 0; }" "" "0\n1\n0\n1\n0\n1\n0\n1\n"
 # step 79: && の短絡と ! でも __bool__ が効く（空の間は pop_front を呼ばない）
 one_io_test "def main() { q = Deque(); x = 0; if (q && q.pop_front()) { x = 1; } print(x); q.push_back(5); if (q && q.pop_front() == 5) { x = 2; } print(x); if (!q) { print(9); } return 0; }" "" "0\n2\n9\n"
+# step 81: 利用者のグリッド BFS の形。隣接マスの判定を安全添え字
+# （dist?[np] == -1 の値比較と、s?[np] の単独 bool 形）だけで行い、
+# 盤外の隣接は範囲チェックが弾く。最短路は 8。壁つきグリッドでの
+# s?[np] == "." の値比較つきの形は、s[i] が1文字 str を返すように
+# なる後続 step で追加する
+one_io_test "
+def main() {
+    >> h, w
+    >>> s[h]
+    row0 = [-1] * w
+    dist = [row0]
+    i = 1
+    while i < h:
+        dist.append([-1] * w)
+        i += 1
+    q = Deque(Pos2)
+    start = (0, 0)
+    goal = (w - 1, h - 1)
+    dist[start] = 0
+    q <- start
+    dirs = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+    while q:
+        p <- q
+        for d in dirs:
+            np = p + d
+            if dist?[np] == -1 && s?[np]:
+                dist[np] = dist[p] + 1
+                q <- np
+    print(dist[goal])
+    return 0
+}
+" "5 5
+.....
+.....
+.....
+.....
+.....
+" "8\n"
+# step 81: 単独形（bool）と多段の比較、!= で範囲外が偽になること
+one_io_test "def main() { a = [[1, 2], [3, 4]]; print(a?[0][1]); print(a?[2][0]); print(a?[1][1] == 4); print(a?[1][2] == 4); print(a?[0][0] != 9); print(a?[9][0] != 9); return 0; }" "" "true\nfalse\ntrue\nfalse\ntrue\nfalse\n"
+# step 81: [str] への Pos 安全添え字と、str 対象の安全添え字。
+# str の要素の値そのもの（int か str か）は固定せず、範囲チェックの
+# bool 形と、範囲外で比較が false になる形だけで確認する
+one_io_test "def main() { g = [\"ab\", \"cd\"]; print(g?[(0, 0)]); print(g?[(1, 1)]); print(g?[(1, 2)]); print(g?[(2, 0)]); s = \"xyz\"; print(s?[2]); print(s?[-1]); print(s?[1] == s[1]); print(s?[3] == s[0]); return 0; }" "" "true\ntrue\nfalse\nfalse\ntrue\nfalse\ntrue\nfalse\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
