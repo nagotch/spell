@@ -66,8 +66,10 @@ def t050() { a = [1]; n = a.append(2); return n * 10 + a.len; }
 def t051() { a = [1, 2, 3]; a.append(g100(a)); return a.len * 1000 + a[3]; }
 def t052() { rows = [[1, 2], [3, 4]]; rows[nexti()].append(9); return icnt * 100 + rows[0].len; }
 def t053() { a = [1, 2, 3]; s = 0; n = 0; for x in a { s = s + x; n = n + 1; a.append(10 + n); } return s * 1000 + n * 100 + a.len; }
-// step 96: 反復はイテレータが受け取った時点のスナップショットを
-// 回る。ループ中の append は b を伸ばすが、反復には増えない
+// step 98: 左辺値の配列は借用モード。反復は開始時点のブロックを
+// 見て長さを読み直すので、容量内の append は反復に増える（step 65
+// のイテレータと同じ意味論。容量を超えて伸びると変数は新しい
+// ブロックへ付け替わり、反復は追随しない）
 def t054() { b = [1, 2, 3]; b.append(4); s = 0; n = 0; for x in b { s = s + x; n = n + 1; if (n < 4) { b.append(100); } } return s * 1000 + n * 10 + b.len; }
 def t055() { a = [1, 2, 3]; f = fn() -> int { a.append(4); return a.len; }; r = f(); return r * 10 + a.len; }
 def t056() { a: [int] = []; return a.append(10) * 100 + a.append(20) * 10 + a.len; }
@@ -233,6 +235,10 @@ def t161() { src = [7, 8]; dst = [[0, 0]]; dst[0] = src; src[0] = 1; return dst[
 def t162() { a = [1, 2] * 3; a[0] = 9; return a[3] * 100 + a[4] * 10 + a[5]; }
 def t163() { a = [[1]]; b = [[2]]; a, b = b, a; a[0][0] = 9; return b[0][0] * 10 + a[0][0]; }
 
+// step 98: 内包表記は借用の対象外（step 95 のまま）。要素は複製
+// されて新しい配列に入るので、結果への書き換えは元へ届かない
+def t164() { a = [[1], [2]]; b = [r for r in a]; b[0][0] = 99; return a[0][0] * 10 + b[0][0]; }
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -299,7 +305,7 @@ def main() {
     mark(51); fails=fails+check(t051(), 4007);
     mark(52); fails=fails+check(t052(), 103);
     mark(53); fails=fails+check(t053(), 6306);
-    mark(54); fails=fails+check(t054(), 10047);
+    mark(54); fails=fails+check(t054(), 310077);
     mark(55); fails=fails+check(t055(), 43);
     mark(56); fails=fails+check(t056(), 122);
     mark(57); fails=fails+check(t057(), 2601);
@@ -409,6 +415,7 @@ def main() {
     mark(161); fails=fails+check(t161(), 78);
     mark(162); fails=fails+check(t162(), 212);
     mark(163); fails=fails+check(t163(), 19);
+    mark(164); fails=fails+check(t164(), 109);
 
     print_str("done"); putchar(10);
     return fails > 0;

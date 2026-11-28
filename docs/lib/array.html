@@ -244,9 +244,9 @@ b = [3, 1, 2]
 3 2 1</pre>
 </figure>
 <h2>ArrayIter — 配列の反復子</h2>
-<p><code>a.__iter__()</code> が返す反復子で、<code>Vec</code> と <code>Deque</code> の反復にも使われます。反復はイテレータが受け取った時点のスナップショットを回ります。ループ変数への代入の書き戻し（<code>__set_current__</code>）はスナップショットに効くため、ループ内では更新後の値が見えますが、元の配列へは届きません。反復中に元の配列へ <code>append</code> しても、反復の要素は増えません。</p>
+<p><code>a.__iter__()</code> が返す反復子で、<code>Vec</code> と <code>Deque</code> の反復にも使われます。ただし <code>for</code> の対象が変数・フィールド・添え字で辿れる配列のときは、反復子を介さず元の配列そのものを回ります（借用モード）。その場合、ループ変数への代入は元の配列へ書き戻され、要素経由の書き換えも届き、容量内の <code>append</code> は反復にも増えます。<code>ArrayIter</code> 自体は受け取った時点のスナップショットを回るため、一時値の配列の反復では書き戻しはスナップショットに効きます。</p>
 <figure class="code">
-  <figcaption>例 — 反復とスナップショット</figcaption>
+  <figcaption>例 — 反復と書き戻し（借用モード）</figcaption>
 <pre>a = [1, 2, 3]
 s = 0
 for x in a:
@@ -258,7 +258,7 @@ for x in a:
 <figure class="out">
   <figcaption>出力</figcaption>
 <pre>60
-1 2 3</pre>
+10 20 30</pre>
 </figure>
 <h2>関係する糖衣構文</h2>
 <ul>

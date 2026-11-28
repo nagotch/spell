@@ -3455,6 +3455,107 @@ static void wrap_loop_exits(Node* node, Node* for_node, Class* iklass, Function*
     }
 }
 
+// 借用モード（step 98）: 反復対象が「実在の格納場所から辿れる配列」
+// かどうかを、検査後の init ノードで判定する。根はローカル/グロー
+// バル変数で、実フィールド（func の付いたプロパティ参照は除く）と
+// 配列の添え字だけを辿る。根が呼び出し結果などの一時値なら、末端が
+// フィールドや添え字でも借用しない。Dict の要素は __getitem__ 呼び
+// 出し（ND_MCALL）へ書き換わるので、自然に対象から外れる
+static bool is_borrowable_place(Node* node) {
+    switch (node->kind) {
+        case ND_LVAR:
+        case ND_GVAR:
+            return true;
+        case ND_MEMBER:
+            return !node->func && is_borrowable_place(node->left_child);
+        case ND_INDEX:
+            return is_borrowable_place(node->left_child);
+        default:
+            return false;
+    }
+}
+
+// 借用スロット（配列スロット = for の offset、添え字スロット =
+// idx_offset）の読み取りノードを作る
+static Node* borrow_slot_node(Node* for_node, int offset) {
+    Node* slot = create_node(ND_LVAR);
+    slot->offset = offset;
+    slot->tok = for_node->tok;
+    return slot;
+}
+
+// 借用モードの書き戻し文 `arr[idx - 1] = var` を作る（添え字は本体
+// の前に進めてあるので、現在の要素は idx - 1）。右辺は束縛の原則
+// どおり bind_copy で包む（要素が配列なら複製して格納する）。
+// 本体の末尾に足す分は再検査されない（step 58 の末尾 set_current と
+// 同じ位置）ため完成した形で作る。break / continue の直前へ差し込む
+// 分は check_node（本体）で通常の check_assign を通るが、ND_COPY は
+// expr_is_fresh なので二重コピーにはならない
+static Node* make_borrow_writeback(Node* for_node, Type* elem) {
+    Node* var = for_node->left_child;
+    Node* var_read = create_node(var->kind);
+    var_read->offset = var->offset;
+    var_read->name = var->name;
+    var_read->len = var->len;
+    var_read->tok = var->tok;
+
+    Node* sub = create_node(ND_BINOP);
+    sub->op.binop = OP_SUB;
+    sub->left_child = borrow_slot_node(for_node, for_node->idx_offset);
+    Node* one = create_node(ND_NUM);
+    one->val = 1;
+    sub->right_child = one;
+    sub->tok = for_node->tok;
+
+    Node* lhs = create_node(ND_INDEX);
+    lhs->left_child = borrow_slot_node(for_node, for_node->offset);
+    lhs->right_child = sub;
+    lhs->tok = for_node->tok;
+
+    Node* assign = create_node(ND_ASSIGN);
+    assign->left_child = lhs;
+    assign->right_child = bind_copy(var_read, elem);
+    assign->tok = for_node->tok;
+    return assign;
+}
+
+// 借用モード版の wrap_loop_exits: このループ宛の break / continue を
+// 「書き戻してから break / continue」に書き換える。歩き方は
+// wrap_loop_exits と同じ（入れ子のループ本体には入らない）
+static void wrap_loop_exits_borrow(Node* node, Node* for_node, Type* elem) {
+    if (!node) {
+        return;
+    }
+    switch (node->kind) {
+        case ND_BREAK:
+        case ND_CONTINUE: {
+            Node* wb = make_borrow_writeback(for_node, elem);
+            Node* orig = create_node(node->kind);
+            orig->tok = node->tok;
+            wb->next = orig;
+            node->kind = ND_BLOCK;
+            node->body = wb;
+            return;
+        }
+        case ND_WHILE:
+            return;
+        case ND_FOR:
+            wrap_loop_exits_borrow(node->els, for_node, elem);
+            return;
+        case ND_BLOCK:
+            for (Node* s = node->body; s; s = s->next) {
+                wrap_loop_exits_borrow(s, for_node, elem);
+            }
+            return;
+        case ND_IF:
+            wrap_loop_exits_borrow(node->then, for_node, elem);
+            wrap_loop_exits_borrow(node->els, for_node, elem);
+            return;
+        default:
+            return;
+    }
+}
+
 // for 文を「イテレータ取得 → while (__has_next__) { 変数 = __next__(); 本体 }」に書き換える。
 // プロトコルは Java 式（__iter__ / __has_next__ / __next__）。
 // for...else 用: この for 宛の break を「フラグを倒してから break」に書き換える。
@@ -3623,6 +3724,114 @@ static Type* check_for(Node* node) {
             record_global_type(var, elem);
         }
         var->type = find_global_type(var);
+    }
+    // 借用モード（step 98）: 対象が左辺値の配列なら、プロトコル経由の
+    // スナップショットではなく、元の配列そのものを添え字で反復する
+    //   arr = 対象; idx = 0;
+    //   while (idx < arr.len) { var = arr[idx]; idx = idx + 1; 本体 }
+    // ループ変数への代入は step 58 と同じ出口（本体の末尾と、この
+    // ループ宛の break / continue の直前）で arr[idx - 1] へ書き戻す。
+    // 要素の束縛はコピーしないので、要素が配列なら要素経由の書き換え
+    // （row[0] = 9 など）も元の配列へ届く。対象が一時値なら従来どおり
+    // プロトコル経由のスナップショットにする
+    bool borrow = protocol_ok && iterable->kind == TY_ARRAY
+            && is_borrowable_place(node->init);
+    if (borrow) {
+        // 書き戻し文が check_node（本体）で check_assign を通るとき、
+        // 左辺の添え字が配列として解決できるよう、借用スロットの型を
+        // 先に記録しておく
+        local_types[node->offset / 8] = iterable;
+        local_types[node->idx_offset / 8] = &ty_int;
+        if (var->kind == ND_LVAR || var->kind == ND_GVAR) {
+            Node* assign = find_var_assign(node->then, var);
+            if (assign) {
+                wrap_loop_exits_borrow(node->then, node, elem);
+                Node* tail = node->then;
+                while (tail->next) {
+                    tail = tail->next;
+                }
+                tail->next = make_borrow_writeback(node, elem);
+            }
+        }
+        if (node->els) {
+            rewrite_breaks_stmt(node->then, (int)node->val);
+        }
+        check_node(node->then);
+        if (node->els) {
+            check_node(node->els);
+        }
+        node->kind = ND_BLOCK;
+        Node* arr_assign = create_node(ND_ASSIGN);
+        arr_assign->left_child = borrow_slot_node(node, node->offset);
+        arr_assign->right_child = node->init;
+        arr_assign->tok = node->tok;
+        Node* idx_assign = create_node(ND_ASSIGN);
+        idx_assign->left_child = borrow_slot_node(node, node->idx_offset);
+        Node* zero = create_node(ND_NUM);
+        zero->val = 0;
+        idx_assign->right_child = zero;
+        idx_assign->tok = node->tok;
+        Node* set_var = create_node(ND_ASSIGN);
+        set_var->left_child = node->left_child;
+        Node* elem_read = create_node(ND_INDEX);
+        elem_read->left_child = borrow_slot_node(node, node->offset);
+        elem_read->right_child = borrow_slot_node(node, node->idx_offset);
+        elem_read->tok = node->tok;
+        set_var->right_child = elem_read;
+        set_var->tok = node->tok;
+        Node* incr = create_node(ND_ASSIGN);
+        incr->left_child = borrow_slot_node(node, node->idx_offset);
+        Node* add = create_node(ND_BINOP);
+        add->op.binop = OP_ADD;
+        add->left_child = borrow_slot_node(node, node->idx_offset);
+        Node* one = create_node(ND_NUM);
+        one->val = 1;
+        add->right_child = one;
+        add->tok = node->tok;
+        incr->right_child = add;
+        incr->tok = node->tok;
+        Node* loop_body = create_node(ND_BLOCK);
+        loop_body->body = set_var;
+        set_var->next = incr;
+        incr->next = node->then;
+        Node* cond = create_node(ND_BINOP);
+        cond->op.binop = OP_LT;
+        cond->left_child = borrow_slot_node(node, node->idx_offset);
+        Node* len_node = create_node(ND_LEN);
+        len_node->left_child = borrow_slot_node(node, node->offset);
+        len_node->tok = node->tok;
+        cond->right_child = len_node;
+        cond->tok = node->tok;
+        Node* loop = create_node(ND_WHILE);
+        loop->cond = cond;
+        loop->then = loop_body;
+        loop->tok = node->tok;
+        if (node->els) {
+            // break しなかったときだけ else 節が動く（プロトコル経路
+            // と同じフラグ機構）
+            Node* flag_init = create_node(ND_ASSIGN);
+            Node* flag_var = create_node(ND_LVAR);
+            flag_var->offset = (int)node->val;
+            flag_init->left_child = flag_var;
+            Node* flag_one = create_node(ND_NUM);
+            flag_one->val = 1;
+            flag_init->right_child = flag_one;
+            Node* if_node = create_node(ND_IF);
+            Node* flag_cond = create_node(ND_LVAR);
+            flag_cond->offset = (int)node->val;
+            if_node->cond = flag_cond;
+            if_node->then = node->els;
+            node->body = flag_init;
+            flag_init->next = arr_assign;
+            arr_assign->next = idx_assign;
+            idx_assign->next = loop;
+            loop->next = if_node;
+        } else {
+            node->body = arr_assign;
+            arr_assign->next = idx_assign;
+            idx_assign->next = loop;
+        }
+        return &ty_unknown;
     }
     // ループ変数への代入があれば、その結果を現在の要素へ書き戻す（step 58）。
     // 書き戻しはイテレータの任意メソッド __set_current__ で行い、本体の末尾と、
@@ -4472,6 +4681,15 @@ void typecheck(Function* prog) {
 
     for (Function* fn = prog; fn; fn = fn->next) {
         if (fn->klass && fn->klass->tparam_count > 0) {
+            continue;
+        }
+        // 実体化されたクラスの __init__ は、実際に検査されたものだけを
+        // 完全性検査の対象にする。未検査の本体はフィールドのオフセット
+        // が未解決（parse 時点の 0）で、検査の前提を満たさない。呼ばれ
+        // ていない __init__ は遅延検査（step 83）で未検査のまま残り
+        // うる（step 98: 借用モードで配列の __iter__ への需要が減り、
+        // 未検査の ArrayIter 実体化が残るようになって表面化した）
+        if (fn->klass && fn->klass->origin && !fn->tc_done) {
             continue;
         }
         if (fn->klass && fn->len == 8 && !memcmp(fn->name, "__init__", 8)) {

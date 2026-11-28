@@ -45,6 +45,9 @@ def t044() { r = 0; for i in 3..0 { r = r * 10 + i; } q = 0; for i in 5..=2 { q 
 def t045() { c = 0; @-2 { c++; } for -3 { c++; } return c; }
 def t046() { m = 1; for i in 62 { m = m * 2; } m = m * 2 - 1; c = 0; for i in m..=m { c++; } d = 0; for i in m..=(m - 2) { d++; } return c * 10 + d; }
 cnt = 0;
+g98 = [1, 2, 3];
+def get98() -> [int] { return g98; }
+def bump98(a: [int]) -> int { for x in a { x = x + 1; } return a[0] * 100 + a[1] * 10 + a[2]; }
 def bump() { cnt = cnt + 1; return cnt; }
 def sum2(a, b) { return a + b; }
 def t047() { a = 1; b = 2; a, b = b, a; x = 0; y = 0; x, y = 5, x + 10; return a * 1000 + b * 100 + x * 10 + y; }
@@ -214,9 +217,9 @@ def t071() {
     return t * 10 + n
 }
 
-// step 96: 配列の反復ではイテレータがスナップショットを持つため、
-// ループ変数への代入の書き戻し（step 58）は元の配列へ届かない。
-// 書き戻し自体はスナップショットへ効く（str では従来どおり届く）
+// step 98: 左辺値の配列を回す for は借用モードになり、step 58 の
+// 書き戻しが元の配列へ届く（t072〜t075 は step 58 時代の期待値に
+// 戻した）。対象が一時値のときは step 96 のスナップショットのまま
 def t072() { a = [1, 2, 3]; x@a { x = x * 2; } return a[0] * 100 + a[1] * 10 + a[2]; }
 
 def t073() { a = [1, 2, 3, 4]; for x in a { x = x * 10; if (x == 20) { break; } } return a[0] * 1000 + a[1] * 100 + a[2] * 10 + a[3]; }
@@ -225,6 +228,26 @@ def t074() { a = [1, 2, 3]; for x in a { x = x + 1; if (x == 3) { continue; } x 
 
 def t075() { a = [1, 2]; b = [10, 20]; for x in a { for y in b { y = y + 1; } } return a[0] * 1000 + a[1] * 100 + b[0] * 10 + b[1]; }
 def t105() { g = [[1, 2], [3, 4]]; for row in g { row[0] = 99; } return g[0][0] * 10 + g[1][0]; }
+
+// step 98: 借用モードと for...else（break で else は抑えられ、
+// break 直前の書き戻しも効く）
+def t106() { a = [1, 2, 3]; r = 0; for x in a { x = x * 10; if (x == 20) { break; } } else { r = 1000; } return r + a[0] * 100 + a[1] * 10 + a[2]; }
+def t107() { a = [1, 2, 3]; r = 0; for x in a { x = x + 1; } else { r = 7; } return r * 1000 + a[0] * 100 + a[1] * 10 + a[2]; }
+// step 98: 対象が呼び出し結果（一時値）ならスナップショットのまま
+// で、書き戻しはどこにも届かない（t109 より先に走る前提）
+def t108() { for x in get98() { x = 99; } return g98[0] * 100 + g98[1] * 10 + g98[2]; }
+// step 98: グローバル配列は借用でき、書き戻しが届く
+def t109() { for x in g98 { x = x + 1; } return g98[0] * 100 + g98[1] * 10 + g98[2]; }
+// step 98: 添え字で辿れる配列も借用できる
+def t110() { g = [[1, 2], [3, 4]]; for x in g[0] { x = x + 1; } return g[0][0] * 100 + g[0][1] * 10 + g[1][0]; }
+// step 98: 書き戻しの格納は束縛の原則どおり複製する（書き戻した
+// 行が元の x と別物になる）
+def t111() { x = [9]; g = [[1], [2]]; for row in g { row = x; } x[0] = 77; return g[0][0] * 10 + g[1][0]; }
+// step 98: 引数の配列は関数内の借用で書き換わり、呼び出し側の
+// 配列（step 96 の引数コピー）には届かない
+def t112() { v = [1, 2, 3]; r = bump98(v); return r * 1000 + v[0]; }
+// step 98: リテラル（一時値）の反復は従来どおり
+def t113() { s = 0; for x in [1, 2, 3] { x = 99; s = s + 1; } return s; }
 
 def t076() { s = "ABCA"; for x in s { if (x != "A") { x = "."; } } if (s == "A..A") { return 1; } return 0; }
 
@@ -610,10 +633,10 @@ def main() {
     mark(69); fails=fails+check(t069(), 15);
     mark(70); fails=fails+check(t070(), 16);
     mark(71); fails=fails+check(t071(), 33);
-    mark(72); fails=fails+check(t072(), 123);
-    mark(73); fails=fails+check(t073(), 1234);
-    mark(74); fails=fails+check(t074(), 10203);
-    mark(75); fails=fails+check(t075(), 1320);
+    mark(72); fails=fails+check(t072(), 246);
+    mark(73); fails=fails+check(t073(), 12034);
+    mark(74); fails=fails+check(t074(), 200340);
+    mark(75); fails=fails+check(t075(), 1342);
     mark(76); fails=fails+check(t076(), 1);
     mark(77); fails=fails+check(t077(), 3);
     mark(78); fails=fails+check(t078(), 12);
@@ -643,7 +666,15 @@ def main() {
     mark(102); fails=fails+check(t102(), 1);
     mark(103); fails=fails+check(t103(), 43);
     mark(104); fails=fails+check(t104(), 12);
-    mark(105); fails=fails+check(t105(), 13);
+    mark(105); fails=fails+check(t105(), 1089);
+    mark(106); fails=fails+check(t106(), 1203);
+    mark(107); fails=fails+check(t107(), 7234);
+    mark(108); fails=fails+check(t108(), 123);
+    mark(109); fails=fails+check(t109(), 234);
+    mark(110); fails=fails+check(t110(), 233);
+    mark(111); fails=fails+check(t111(), 99);
+    mark(112); fails=fails+check(t112(), 234001);
+    mark(113); fails=fails+check(t113(), 3);
 
     print_str("done"); putchar(10);
     return fails > 0;

@@ -1160,6 +1160,9 @@ static Node* make_for_iter(Token* var, Node* init, Token* kw) {
     node->init = init;
     register_any();
     node->offset = locals->offset;
+    // step 98: 借用モードの添え字スロットも並べて確保しておく
+    register_any();
+    node->idx_offset = locals->offset;
     node->left_child = bind_target_node(create_ident_node(var));
     node->then = stmt_branch(kw);
     Token* else_tok = token;

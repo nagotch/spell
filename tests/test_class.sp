@@ -1048,6 +1048,15 @@ def t085() { p: OvPair<int, str> = OvPair(); return p.go(1, "a"); }
 def t086() { g = Grid96(); src = [[1, 2], [3, 4]]; g.rows = src; src[0][0] = 99; g.rows[1][1] = 44; return g.rows[0][0] * 1000 + src[1][1] * 10 + g.rows[1][1]; }
 def t087() { d: Dict<str, [int]> = Dict(zero_array); v = [10, 20]; d["k"] = v; v[0] = 99; got = d["k"]; got[1] = 88; return d["k"][0] * 100 + d["k"][1] * 10 + got[0]; }
 
+// step 98: フィールドで辿れる配列も借用できる
+class Bag98 {
+    rows: [[int]];
+    vals: [int];
+    def __init__(self, rows: [[int]], vals: [int]) { self.rows = rows; self.vals = vals; }
+}
+def t088() { b = Bag98([[1, 2], [3, 4]], [5, 6, 7]); for row in b.rows { row[0] = 99; } return b.rows[0][0] * 10 + b.rows[1][0]; }
+def t089() { b = Bag98([[1]], [5, 6, 7]); for x in b.vals { x = x * 2; } return b.vals[0] * 100 + b.vals[1] * 10 + b.vals[2]; }
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -1142,6 +1151,8 @@ def main() {
     mark(85); fails=fails+check(t085(), 12);
     mark(86); fails=fails+check(t086(), 1084);
     mark(87); fails=fails+check(t087(), 1210);
+    mark(88); fails=fails+check(t088(), 1089);
+    mark(89); fails=fails+check(t089(), 1134);
 
     print_str("done"); putchar(10);
     return fails > 0;
