@@ -114,9 +114,10 @@ put x</pre>
 
 <h3>文字列リテラル</h3>
 <p>
-  <code>"..."</code> で囲みます。エスケープは <code>\n</code>（改行）、<code>\t</code>（タブ）、<code>\\</code>、<code>\"</code>、<code>\0</code> だけが特別で、
+  <code>"..."</code> または <code>'...'</code> で囲みます（Python と同じで、どちらの形でも同じ <code>str</code> です）。エスケープは <code>\n</code>（改行）、<code>\t</code>（タブ）、<code>\\</code>、<code>\"</code>、<code>\'</code>、<code>\0</code> だけが特別で、
   それ以外の <code>\x</code> は <code>x</code> そのものになります（たとえば <code>\r</code> は復帰コードではなく文字 <code>r</code> です）。
-  文字列は改行をまたげません。1文字だけの文字リテラルはありません（文字は <code>str</code> の添字が返す <code>int</code> の文字コードで扱います）。
+  文字列は改行をまたげません。文字リテラルという別種のものはなく、<code>'a'</code> も長さ1の <code>str</code> です。
+  添字 <code>s[i]</code> は1文字の <code>str</code> を返し、文字コード（<code>int</code>）が欲しい場合は <code>s.chars[i]</code> を使います。
 </p>
 
 <figure class="code">
@@ -564,7 +565,7 @@ a 7
 <table>
   <tr><th>操作</th><th>内容</th></tr>
   <tr><td><code>len</code></td><td>文字数（バイト数ではなく文字コードの個数）</td></tr>
-  <tr><td><code>s[i]</code>（<code>__getitem__</code>）</td><td>i 番目の文字コード（<code>int</code>）を返す。添字への代入はできない（<code>__setitem__</code> は無い）</td></tr>
+  <tr><td><code>s[i]</code>（<code>__getitem__</code>）</td><td>i 番目の文字だけからなる長さ1の <code>str</code> を返す。文字コード（<code>int</code>）は <code>s.chars[i]</code> で取る。添字への代入はできない（<code>__setitem__</code> は無い）</td></tr>
   <tr><td><code>__add__</code></td><td>連結</td></tr>
   <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較</td></tr>
   <tr><td><code>__lt__</code> / <code>__le__</code></td><td>辞書順（文字コードの列としての大小）。共通部分が等しければ短い方が小さい</td></tr>
@@ -590,7 +591,7 @@ put "abc".rev</pre>
 
 <figure class="out">
   <figcaption>出力</figcaption>
-<pre>5 104 111
+<pre>5 h o
 hello world
 true true
 A..A

@@ -682,7 +682,7 @@ def t057() {
             nr = r + dr[k];
             nc = c + dc[k];
             if (0 <= nr && nr < 4 && 0 <= nc && nc < 4) {
-                if (rows[nr][nc] != 35 && dist[nr * 4 + nc] == 0 - 1) {
+                if (rows[nr][nc] != "#" && dist[nr * 4 + nc] == 0 - 1) {
                     dist[nr * 4 + nc] = dist[cur] + 1;
                     q.push_back(nr * 4 + nc);
                 }
@@ -781,7 +781,7 @@ def t063() {
             nr = r + dr[k];
             nc = c + dc[k];
             if (0 <= nr && nr < 4 && 0 <= nc && nc < 4) {
-                if (rows[nr][nc] != 35 && dist[nr * 4 + nc] == 0 - 1) {
+                if (rows[nr][nc] != "#" && dist[nr * 4 + nc] == 0 - 1) {
                     dist[nr * 4 + nc] = dist[cur] + 1;
                     q <- nr * 4 + nc;
                 }

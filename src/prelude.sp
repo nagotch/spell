@@ -14,8 +14,8 @@ class str {
         return self.chars.len;
     }
 
-    def __getitem__(self, i: int) -> int {
-        return self.chars[i];
+    def __getitem__(self, i: int) -> str {
+        return str([self.chars[i]]);
     }
 
     def __add__(self, o: str) -> str {
