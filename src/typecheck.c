@@ -191,6 +191,9 @@ static void rewrite_to_setitem(Node* node, Class* klass, Node* base, Node* index
 
 static Type* check_node(Node* node);
 static Type* check_funcref(Node* node);
+static Node* make_mcall(Node* receiver, Class* klass, Function* fn, const char* name, int len);
+static Node* boolify(Node* expr, Type* t);
+static void ensure_defs(Function* fn);
 
 // 引数を全部検査し、型を最大 6 個まで記録する。引数の数を返す。
 // expected_list があれば、各引数の期待型として渡す（ラムダの型決定用）
@@ -272,6 +275,12 @@ static Type* check_array_cmp(Node* node, Type* lt, Type* rt) {
 static Type* check_binop(Node* node) {
     Type* lt = check_node(node->left_child);
     Type* rt = check_node(node->right_child);
+    if (node->op.binop == OP_AND || node->op.binop == OP_OR) {
+        // 論理演算の被演算子は真理値として解釈する（step 79）
+        node->left_child = boolify(node->left_child, lt);
+        node->right_child = boolify(node->right_child, rt);
+        return bool_type();
+    }
     const char* dunder = arith_dunder(node->op.binop);
     if (dunder) {
         if (lt->kind == TY_CLASS) {
@@ -799,6 +808,7 @@ static Type* check_lambda(Node* node, Type* expected) {
     Type* saved_return = current_return;
     Capture* saved_captures = current_captures;
     memset(local_types, 0, sizeof(local_types));
+    ensure_defs(fn);
     current_fn = fn;
     current_return = fn->return_type;
     current_captures = fn->captures;
@@ -1441,6 +1451,274 @@ static Node* make_mcall(Node* receiver, Class* klass, Function* fn, const char* 
     return call;
 }
 
+// 条件位置の真理値解釈（step 79）: 検査済みの式 expr（型 t）を、条件
+// として使える形へ書き換えて返す。bool と int はそのまま使う。
+// クラス・配列は `__bool__() -> bool` が定義されていれば、その呼び
+// 出しへ書き換える。定義が無ければ位置つきエラーにする（以前は
+// ポインタの真偽で常に真として黙って通っていた）
+static Node* boolify(Node* expr, Type* t) {
+    if (!t || t->kind == TY_UNKNOWN || t->kind == TY_INT) {
+        return expr;
+    }
+    if (t->kind == TY_CLASS && t->klass && t->klass->len == 4
+            && !memcmp(t->klass->name, "bool", 4)) {
+        return expr;
+    }
+    if (t->kind == TY_ARRAY || t->kind == TY_CLASS) {
+        Class* klass = class_of(t);
+        Function* method = klass ? find_callable(klass, "__bool__", 8) : NULL;
+        if (!method) {
+            if (klass) {
+                error_node(expr, "クラス`%.*s`の値は条件に使えません（`__bool__`が定義されていません）", klass->len, klass->name);
+            } else {
+                error_node(expr, "`%s`型の値は条件に使えません", type_text(t));
+            }
+            return expr;
+        }
+        if (method->nparams != 1) {
+            error_node(expr, "クラス`%.*s`のメソッド`__bool__`は引数を取れませんが、%d個が定義されています", klass->len, klass->name, method->nparams - 1);
+            return expr;
+        }
+        if (method->return_type && !type_equals(method->return_type, bool_type())) {
+            error_node(expr, "クラス`%.*s`のメソッド`__bool__`の戻り値は`bool`でなければなりません", klass->len, klass->name);
+            return expr;
+        }
+        Node* call = make_mcall(expr, klass, method, "__bool__", 8);
+        call->tok = expr->tok;
+        call->type = bool_type();
+        return call;
+    }
+    error_node(expr, "`%s`型の値は条件に使えません", type_text(t));
+    return expr;
+}
+
+// ---- 未定義変数の検出（step 79） ----
+// パースは「代入で変数が生まれる」言語仕様のため、読み取りでも暗黙に
+// 変数を登録してしまう。そこで型検査の前に、代入される名前を関数
+// ごとに集めておき、どこでも代入されていない名前の読み取りをエラー
+// にする。文同士の前後関係は見ない（関数全体・プログラム全体で
+// 代入が存在すれば定義済みとする。前方参照を許すため）
+
+typedef struct DefName DefName;
+struct DefName {
+    char* name;
+    int len;
+    int offset;   // ローカル用。グローバルでは -1
+    Token* tok;   // 定義位置（タイポ候補の行表示用）
+    DefName* next;
+};
+
+typedef struct FnDefs FnDefs;
+struct FnDefs {
+    Function* fn;
+    DefName* locals;
+    FnDefs* next;
+};
+
+static FnDefs* fn_defs_list;
+// プログラム全体で代入されるグローバルの名前
+static DefName* global_defs;
+
+static void def_add(DefName** list, char* name, int len, int offset, Token* tok) {
+    for (DefName* d = *list; d; d = d->next) {
+        if (d->len == len && d->offset == offset && !memcmp(d->name, name, len)) {
+            return;
+        }
+    }
+    DefName* d = calloc(1, sizeof(DefName));
+    d->name = name;
+    d->len = len;
+    d->offset = offset;
+    d->tok = tok;
+    d->next = *list;
+    *list = d;
+}
+
+static DefName* def_find(DefName* list, char* name, int len) {
+    for (DefName* d = list; d; d = d->next) {
+        if (d->len == len && !memcmp(d->name, name, len)) {
+            return d;
+        }
+    }
+    return NULL;
+}
+
+static DefName* def_find_offset(DefName* list, int offset) {
+    for (DefName* d = list; d; d = d->next) {
+        if (d->offset == offset) {
+            return d;
+        }
+    }
+    return NULL;
+}
+
+// 代入先になりうる場所に直接現れた変数を、定義として記録する
+static void collect_def_target(Node* target, DefName** locals) {
+    if (!target || !target->name) {
+        return;
+    }
+    if (target->kind == ND_LVAR) {
+        def_add(locals, target->name, target->len, target->offset, target->tok);
+    } else if (target->kind == ND_GVAR) {
+        def_add(&global_defs, target->name, target->len, -1, target->tok);
+    }
+}
+
+static void collect_defs_node(Node* node, DefName** locals) {
+    if (!node) {
+        return;
+    }
+    if (node->kind == ND_LAMBDA) {
+        // ラムダ本体は別の関数として個別に集める。中には入らない
+        collect_defs_node(node->next, locals);
+        return;
+    }
+    if (node->kind == ND_ASSIGN) {
+        collect_def_target(node->left_child, locals);
+    } else if (node->kind == ND_MULTIASSIGN) {
+        for (Node* t = node->body; t; t = t->next) {
+            collect_def_target(t, locals);
+        }
+    } else if (node->kind == ND_FOR) {
+        collect_def_target(node->left_child, locals);
+    } else if (node->kind == ND_ARROW_L || node->kind == ND_ARROW_R) {
+        // 矢印は向きと型で代入先が決まる。収集の段階では判別できない
+        // ため、両辺の直接の変数を定義として拾う（安全側）
+        collect_def_target(node->left_child, locals);
+        collect_def_target(node->right_child, locals);
+    }
+    collect_defs_node(node->left_child, locals);
+    collect_defs_node(node->right_child, locals);
+    collect_defs_node(node->cond, locals);
+    collect_defs_node(node->then, locals);
+    collect_defs_node(node->els, locals);
+    collect_defs_node(node->init, locals);
+    collect_defs_node(node->inc, locals);
+    collect_defs_node(node->body, locals);
+    collect_defs_node(node->args, locals);
+    collect_defs_node(node->next, locals);
+}
+
+// 関数の定義済みローカルを（まだなら）集める。グローバルの定義も
+// この関数の分を全体の集合へ足す（実体化で後から現れる関数の分も
+// 拾えるようにするため）
+static void ensure_defs(Function* fn) {
+    if (!fn) {
+        return;
+    }
+    for (FnDefs* fd = fn_defs_list; fd; fd = fd->next) {
+        if (fd->fn == fn) {
+            return;
+        }
+    }
+    FnDefs* fd = calloc(1, sizeof(FnDefs));
+    fd->fn = fn;
+    fd->next = fn_defs_list;
+    fn_defs_list = fd;
+    collect_defs_node(fn->body, &fd->locals);
+}
+
+static DefName* current_local_defs() {
+    for (FnDefs* fd = fn_defs_list; fd; fd = fd->next) {
+        if (fd->fn == current_fn) {
+            return fd->locals;
+        }
+    }
+    return NULL;
+}
+
+// トークンが現在のソース（利用者のファイル）の範囲内にある場合に
+// その行番号（1始まり）を返し、範囲外なら 0 を返す
+static long token_line_in_src(Token* tok) {
+    if (!tok || !tok->str || !src) {
+        return 0;
+    }
+    uintptr_t p = (uintptr_t)tok->str;
+    uintptr_t lo = (uintptr_t)src;
+    uintptr_t hi = lo + (uintptr_t)strlen(src);
+    if (p < lo || p >= hi) {
+        return 0;
+    }
+    long line = 1;
+    for (char* c = src; c < tok->str; c++) {
+        if (*c == '\n') {
+            line++;
+        }
+    }
+    return line;
+}
+
+// 編集距離（レーベンシュタイン、バイト単位）
+static int edit_distance(const char* a, int alen, const char* b, int blen) {
+    int prev[256];
+    int cur[256];
+    if (alen > 255 || blen > 255) {
+        return 1 << 20;
+    }
+    for (int j = 0; j <= blen; j++) {
+        prev[j] = j;
+    }
+    for (int i = 1; i <= alen; i++) {
+        cur[0] = i;
+        for (int j = 1; j <= blen; j++) {
+            int cost = a[i - 1] == b[j - 1] ? 0 : 1;
+            int del = prev[j] + 1;
+            int ins = cur[j - 1] + 1;
+            int sub = prev[j - 1] + cost;
+            int m = del < ins ? del : ins;
+            cur[j] = m < sub ? m : sub;
+        }
+        memcpy(prev, cur, (blen + 1) * sizeof(int));
+    }
+    return prev[blen];
+}
+
+// 未定義変数の読み取りを報告する。設計メモの規定に従い、参照できる
+// 変数の中に編集距離の近いものが1つだけ突出してあれば、ヒントとして
+// typo の候補を添える（同率・僅差なら出さない。最大1件）
+static void error_undef(Node* node) {
+    const char* best_name = NULL;
+    int best_len = 0;
+    long best_line = 0;
+    int best_dist = 1 << 20;
+    int second_dist = 1 << 20;
+    if (node->len >= 2) {
+        DefName* lists[2] = { current_local_defs(), global_defs };
+        for (int li = 0; li < 2; li++) {
+            for (DefName* d = lists[li]; d; d = d->next) {
+                if (d->len == node->len && !memcmp(d->name, node->name, node->len)) {
+                    continue;
+                }
+                long line = token_line_in_src(d->tok);
+                if (line == 0) {
+                    continue;
+                }
+                int dist = edit_distance(node->name, node->len, d->name, d->len);
+                if (dist < best_dist) {
+                    second_dist = best_dist;
+                    best_dist = dist;
+                    best_name = d->name;
+                    best_len = d->len;
+                    best_line = line;
+                } else if (dist < second_dist) {
+                    second_dist = dist;
+                }
+            }
+        }
+        // 短い名前ほど厳しく: 許容距離は名前の長さで段階を付ける
+        int longer = node->len > best_len ? node->len : best_len;
+        int limit = longer <= 2 ? 1 : longer <= 5 ? 2 : 3;
+        if (best_name && (best_dist > limit || second_dist - best_dist <= 1)) {
+            best_name = NULL;
+        }
+    }
+    if (best_name) {
+        error_node(node, "変数`%.*s`は定義されていません ヒント: もしかして `%.*s` ですか（定義は %ld 行目）", node->len, node->name, best_len, best_name, best_line);
+    } else {
+        error_node(node, "変数`%.*s`は定義されていません", node->len, node->name);
+    }
+}
+
 static bool is_loop_var(Node* target, Node* var) {
     if (!target || !var) {
         return false;
@@ -1907,6 +2185,23 @@ static Type* check_node(Node* node) {
         case ND_LVAR:
             result = local_types[node->offset / 8];
             if (!result) {
+                // 型が付いていない読み取りは、定義済みかを確認する
+                // （step 79）。内部スロット（名前なし）と引数
+                // （offset が引数の範囲）は対象外
+                int slot = node->offset / 8;
+                bool is_param = current_fn && slot >= 1 && slot <= current_fn->nparams;
+                if (node->name && current_fn && !is_param
+                        && !def_find_offset(current_local_defs(), node->offset)) {
+                    if (def_find(global_defs, node->name, node->len)) {
+                        // パース時点では後方のトップレベル代入が見えず
+                        // ローカルとして解釈された、定義済みグローバル
+                        // の前方参照。グローバル変数として読み直す
+                        node->kind = ND_GVAR;
+                        result = find_global_type(node);
+                        break;
+                    }
+                    error_undef(node);
+                }
                 result = &ty_unknown;
             }
             break;
@@ -1940,14 +2235,22 @@ static Type* check_node(Node* node) {
             result = check_assign(node);
             break;
         case ND_GVAR:
+            // どこでも代入されていない名前の読み取りはエラー（step 79）。
+            // 合成ノード（名前なし）は対象外
+            if (node->name && !def_find(global_defs, node->name, node->len)) {
+                error_undef(node);
+            }
             result = find_global_type(node);
             break;
-        case ND_UNARY:
-            check_node(node->left_child);
+        case ND_UNARY: {
+            Type* operand = check_node(node->left_child);
             if (node->op.unop == OP_NOT) {
+                // `!` の被演算子は真理値として解釈する（step 79）
+                node->left_child = boolify(node->left_child, operand);
                 result = bool_type();
             }
             break;
+        }
         case ND_FUNCALL:
             result = check_funcall(node, my_expected);
             break;
@@ -1977,11 +2280,14 @@ static Type* check_node(Node* node) {
             break;
         case ND_IF:
             check_node(node->cond);
+            // 条件は真理値として解釈する（step 79）
+            node->cond = boolify(node->cond, node->cond->type);
             check_node(node->then);
             check_node(node->els);
             break;
         case ND_WHILE:
             check_node(node->cond);
+            node->cond = boolify(node->cond, node->cond->type);
             check_node(node->then);
             break;
         case ND_FOR:
@@ -2119,6 +2425,28 @@ static bool check_init_stmts(Node* stmt, Class* klass, bool* assigned, int nfiel
 
 void typecheck(Function* prog) {
     functions = prog;
+    // 定義収集の状態はコンパイル単位ごとに作り直す（同一プロセスで
+    // 複数回コンパイルされても、前のソースの定義が残らないように）
+    while (fn_defs_list) {
+        FnDefs* fd = fn_defs_list;
+        fn_defs_list = fd->next;
+        while (fd->locals) {
+            DefName* d = fd->locals;
+            fd->locals = d->next;
+            free(d);
+        }
+        free(fd);
+    }
+    while (global_defs) {
+        DefName* d = global_defs;
+        global_defs = d->next;
+        free(d);
+    }
+    // 未定義変数の検出（step 79）に備え、先に全関数の代入を集める。
+    // グローバルはプログラム全体が対象（前方参照を許すため）
+    for (Function* fn = prog; fn; fn = fn->next) {
+        ensure_defs(fn);
+    }
     for (Function* fn = prog; fn; fn = fn->next) {
         if (fn->klass && fn->klass->tparam_count > 0) {
             continue;
@@ -2128,6 +2456,7 @@ void typecheck(Function* prog) {
             continue;
         }
         memset(local_types, 0, sizeof(local_types));
+        ensure_defs(fn);
         current_fn = fn;
         current_return = fn->return_type;
         for (int i = 0; i < fn->nparams && i < 6; i++) {

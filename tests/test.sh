@@ -42,6 +42,15 @@ tests=(
     "sp = 1; bp = 2; ax = 3; def main() { return sp + bp + ax + 36; }|42"
     "def si() -> int { return 42; } def main() { return si(); }|42"
     "def r8() -> int { return 40; } def main() { f = r8; return f() + 2; }|42"
+    # step 79: 後方で定義されるグローバルを関数から読む（前方参照）
+    "def f() -> int { return g; } g = 42; def main() { return f(); }|42"
+    "def f() -> int { return g + 1; } def main() { return f(); } g = 41;|42"
+    # step 79: 関数名を値として使う形は従来どおり
+    "def inc(v: int) -> int { return v + 1; } def apply(f: fn(int) -> int, v: int) -> int { return f(v); } def main() { return apply(inc, 41); }|42"
+    # step 79: ユーザー定義クラスの __bool__ で条件分岐する
+    "class Box { n: int; def __init__(self, n: int) { self.n = n; } def __bool__(self) -> bool { return self.n > 0; } } def main() { a = Box(0); b = Box(3); if (a) { return 1; } if (b) { return 42; } return 0; }|42"
+    # step 79: while の条件に Deque を直接書く（空になるまで）
+    "def main() { q = Deque(); q.push_back(1); q.push_back(2); q.push_back(3); n = 0; while q { q.pop_front(); n = n + 1; } return n; }|3"
 )
 
 error_tests=(
@@ -183,6 +192,15 @@ def main():
     "def main() { a = [10, 20]; if a?[0] == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
     "def main() { a = [10, 20]; while a?[0] == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
     "def main() { a = [10, 20]; if a[0] == 1: print(1); elif a?[0] == 10: print(2); return 0; }|条件の直後に\`?\`は書けません"
+    # step 79: 未定義変数の読み取りはエラー
+    "def main() { return j; }|変数\`j\`は定義されていません"
+    "def main() { x = y + 1; return x; }|変数\`y\`は定義されていません"
+    # step 79: タイポ候補が1つだけ突出していればヒントを出す
+    "def main() { count = 1; return cuont; }|もしかして \`count\` ですか"
+    # step 79: __bool__ の無いクラスは条件に使えない
+    "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { p = P(1); if (p) { return 1; } return 0; }|条件に使えません"
+    "def main() { p = (1, 2); if (p) { return 1; } return 0; }|条件に使えません"
+    "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { p = P(1); if (!p) { return 1; } return 0; }|条件に使えません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -985,6 +1003,12 @@ one_io_test "def main() {
     if a[0] == 10 { ? a[1] == 99 { print(3) } | { print(4) } }
     return 0
 }" "" "1\n4\n"
+# step 79: while の条件に Deque を直接書く BFS 風ループ（空で止まる）
+one_io_test "def main() { q = Deque(); q.push_back(0); seen = [0; 8]; seen[0] = 1; order = \"\"; while q { v = q.pop_front(); order = order + v.__str__(); if (v + 1 < 6 && seen[v + 1] == 0) { seen[v + 1] = 1; q.push_back(v + 1); } if (v + 2 < 6 && seen[v + 2] == 0) { seen[v + 2] = 1; q.push_back(v + 2); } } print(order); return 0; }" "" "012345\n"
+# step 79: Vec / str / Dict / 配列の __bool__（空かどうか）
+one_io_test "def main() { v = Vec(); if (v) { print(1); } else { print(0); } v.append(1); if (v) { print(1); } else { print(0); } s = \"\"; if (s) { print(1); } else { print(0); } s = \"x\"; if (s) { print(1); } else { print(0); } d: Dict<str, int> = Dict(zero_int); if (d) { print(1); } else { print(0); } d[\"a\"] = 1; if (d) { print(1); } else { print(0); } a = [0; 0]; if (a) { print(1); } else { print(0); } a = [7]; if (a) { print(1); } else { print(0); } return 0; }" "" "0\n1\n0\n1\n0\n1\n0\n1\n"
+# step 79: && の短絡と ! でも __bool__ が効く（空の間は pop_front を呼ばない）
+one_io_test "def main() { q = Deque(); x = 0; if (q && q.pop_front()) { x = 1; } print(x); q.push_back(5); if (q && q.pop_front() == 5) { x = 2; } print(x); if (!q) { print(9); } return 0; }" "" "0\n2\n9\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then

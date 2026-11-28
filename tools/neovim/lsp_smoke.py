@@ -247,14 +247,18 @@ send({"jsonrpc": "2.0", "method": "textDocument/didChange",
       "params": {"textDocument": {"uri": URI, "version": 10},
                  "contentChanges": [{"text": EOF_LATE_LINE_PROGRAM}]}})
 diags = wait_diagnostics()
-check("didChange（EOF・後ろの行）: 診断1件", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
-if len(diags) == 1:
+# step 79 以降は、回復後に残った `b` の読み取りが未定義エラーとして
+# もう1件出る（1件目が従来の EOF 診断）
+check("didChange（EOF・後ろの行）: 診断2件", len(diags) == 2, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 2:
     r = diags[0]["range"]
     check("EOF・後ろの行: 範囲は b の位置（line=2, char=4-5）",
           r["start"] == {"line": 2, "character": 4} and r["end"] == {"line": 2, "character": 5},
           json.dumps(r))
     check("EOF・後ろの行: メッセージに「数値が必要ですが」",
           "数値が必要ですが" in diags[0]["message"], diags[0]["message"])
+    check("EOF・後ろの行: 2件目は未定義変数の診断",
+          "変数`b`は定義されていません" in diags[1]["message"], diags[1]["message"])
 
 # 5.10 矢印演算子（step 66）: 正しい矢印は診断なし、dunder を持たない
 # クラスへの矢印はキャプチャモードでも位置つき診断になる
@@ -415,6 +419,46 @@ check("didChange（a[p] の次元不一致）: 診断1件", len(diags) == 1, jso
 if len(diags) == 1:
     check("a[p] の次元不一致: メッセージに「3次元ですが」",
           "3次元ですが" in diags[0]["message"], diags[0]["message"])
+
+# 5.16 未定義変数と __bool__（step 79）: 未定義の読み取りはタイポ候補
+# つきの診断に、__bool__ の無いクラスを条件にすると診断が出る
+UNDEF_PROGRAM = (
+    "def main() {\n"
+    "    count = 1;\n"
+    "    return cuont;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 20},
+                 "contentChanges": [{"text": UNDEF_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（未定義変数）: 診断1件", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 1:
+    check("未定義変数: メッセージに「変数`cuont`は定義されていません」",
+          "変数`cuont`は定義されていません" in diags[0]["message"], diags[0]["message"])
+    check("未定義変数: メッセージにタイポ候補「もしかして `count` ですか」",
+          "もしかして `count` ですか" in diags[0]["message"], diags[0]["message"])
+    r = diags[0]["range"]
+    check("未定義変数: 範囲は cuont の位置（line=2, char=11-16）",
+          r["start"] == {"line": 2, "character": 11} and r["end"] == {"line": 2, "character": 16},
+          json.dumps(r))
+
+BOOL_PROGRAM = (
+    "class P { x: int; def __init__(self, x: int) { self.x = x; } }\n"
+    "def main() {\n"
+    "    p = P(1);\n"
+    "    if (p) { return 1; }\n"
+    "    return 0;\n"
+    "}\n"
+)
+send({"jsonrpc": "2.0", "method": "textDocument/didChange",
+      "params": {"textDocument": {"uri": URI, "version": 21},
+                 "contentChanges": [{"text": BOOL_PROGRAM}]}})
+diags = wait_diagnostics()
+check("didChange（__bool__ の無いクラスの条件）: 診断1件", len(diags) == 1, json.dumps(diags, ensure_ascii=False))
+if len(diags) == 1:
+    check("__bool__ の無いクラス: メッセージに「条件に使えません」",
+          "条件に使えません" in diags[0]["message"], diags[0]["message"])
 
 # 6. didClose: 空の診断が送られて消える
 send({"jsonrpc": "2.0", "method": "textDocument/didClose",
