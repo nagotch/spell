@@ -636,7 +636,9 @@ PAGES = [
             "<code>mapping(f, x)</code> は、作用後のノード値が作用前のノード値 <code>x</code> だけから決まるものでなければなりません。"
             "例えば区間代入で区間和を取りたい場合は、要素を (合計, 長さ) の組で持ち、<code>mapping</code> が長さを使える形にします"
             "（下の「区間代入＋区間和」の例）",
-            "<code>mapping(idf, x) == x</code> と <code>composition(idf, f) == f</code> の成立が前提で、"
+            "<code>mapping(idf, x) == x</code>、<code>composition(idf, f) == f</code>、"
+            "<code>composition(f, idf) == f</code>、<code>composition</code> の結合則、そして作用と演算の整合性 "
+            "<code>mapping(f, op(x, y)) == op(mapping(f, x), mapping(f, y))</code> の成立が前提で、"
             "遅延の押し下げはこの前提のもとで無条件に行われます",
         ]),
         ("example", {

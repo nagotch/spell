@@ -45,6 +45,9 @@ tests=(
     # step 83: 呼ばれない実体化メソッドの本体エラーは報告されない
     # （実体化メソッドの遅延検査）
     "class Wrap<T> { v: T; def __init__(self, v: T) { self.v = v; } def broken(self) -> int { return self.v + \"x\"; } def get(self) -> T { return self.v; } } def main() { w = Wrap<int>(3); return w.get(); }|3"
+    # step 99: 使われない __init__ オーバーロードの未初期化は誤検出しない
+    # （初期化チェックは検査済みの本体だけに効く。step 83 と同じ割り切り）
+    "class P<T> { x: int; y: int; def __init__(self, v: T) { self.x = 1; self.y = 2; } def __init__(self, a: [T], v: T) { self.x = 1; } def get(self) -> int { return self.x + self.y; } } def main() { p = P(3); return p.get(); }|3"
     # step 79: 後方で定義されるグローバルを関数から読む（前方参照）
     "def f() -> int { return g; } g = 42; def main() { return f(); }|42"
     "def f() -> int { return g + 1; } def main() { return f(); } g = 41;|42"
@@ -212,6 +215,8 @@ error_tests=(
     "class P { x: int; y: int; def __init__(self) { self.x = 1; } } def main() { p = P(); return p.x; }|フィールド\`y\`が初期化されていません"
     "class P { x: int; y: int; def __init__(self, c: int) { self.x = 1; if (c) { self.y = 2; } } } def main() { p = P(1); return p.x; }|フィールド\`y\`が初期化されていません"
     "class P { x: int; y: int; def __init__(self, c: int) { self.x = 1; while (c) { self.y = 2; c = 0; } } } def main() { p = P(1); return p.x; }|フィールド\`y\`が初期化されていません"
+    # step 99: ジェネリッククラスでも、実際に使われる __init__ の未初期化は従来どおり診断される
+    "class P<T> { x: int; y: int; def __init__(self, v: T) { self.x = 1; } def get(self) -> int { return self.x; } } def main() { p = P(3); return p.get(); }|フィールド\`y\`が初期化されていません"
     "class P { x: int; def __init__(self, x: int) { self.x = x; } } def main() { p = P(1); q = P(2); r = p + q; return 0; }|演算子\`+\`は定義されていません"
     "def main() { return 1 + (1 < 2); }|演算子\`+\`は使えません"
     "def main() { a = [1]; b = a + 1; return 0; }|型の値に演算子\`+\`は使えません"

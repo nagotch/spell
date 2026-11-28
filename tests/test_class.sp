@@ -1343,6 +1343,20 @@ def t096() {
     return seg_diff_lazy_asg() + seg_diff_lazy_asg_sum();
 }
 
+// 非可換な演算（文字列連結）で prod の左から右への順序を固定する
+def seg_cat(a: str, b: str) -> str { return a + b; }
+def t097() {
+    t = SegTree(["a", "b", "c", "d"], "", seg_cat);
+    r = 0;
+    if (t.prod(0, 4) == "abcd") { r = r + 1; }
+    if (t.prod(1, 3) == "bc") { r = r + 2; }
+    if (t.all_prod() == "abcd") { r = r + 4; }
+    t.set(0, "z");
+    if (t.prod(0, 2) == "zb") { r = r + 8; }
+    if (t.get(3) == "d") { r = r + 16; }
+    return r;
+}
+
 def check(got, expected) {
     if (got != expected) return 1;
     return 0;
@@ -1446,6 +1460,7 @@ def main() {
     mark(94); fails=fails+check(t094(), 0);
     mark(95); fails=fails+check(t095(), 0);
     mark(96); fails=fails+check(t096(), 0);
+    mark(97); fails=fails+check(t097(), 31);
 
     print_str("done"); putchar(10);
     return fails > 0;

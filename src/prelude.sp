@@ -1268,7 +1268,10 @@ class SegTree<T> {
 // 6点（長さ・単位元・演算・単位元・適用・合成）がそのままでは渡せない
 // ため、この形にしている。composition(f, g) は「g を適用した後に f を
 // 適用する」合成を返す（AtCoder Library と同じ規約）。mapping(idf, x)
-// == x と composition(idf, f) == f の成立が前提。もう1つの前提として、
+// == x と composition(idf, f) == f の成立が前提。加えて
+// composition(f, idf) == f、composition の結合則、そして作用と演算の
+// 整合性 mapping(f, op(x, y)) == op(mapping(f, x), mapping(f, y)) が
+// 必要。もう1つの前提として、
 // mapping(f, x) は作用後のノード値が作用前のノード値 x だけから決まる
 // ものでなければならない。例えば区間代入で区間和を取りたい場合は、
 // 要素を (合計, 長さ) の組（Pos2 等）で持ち、mapping が長さを使える
