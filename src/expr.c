@@ -550,7 +550,9 @@ static Node* unary() {
         node->tok = op_tok;
         node->left_child = unary();
         return node;
-    } else if (consume("!")) {
+    } else if (consume("!") || consume_keyword(KW_NOT)) {
+        // `not` は `!` の英字形（step 94）。意味も優先順位も `!` と
+        // 完全に同じ（単項の前置で強く結ぶ。Python の `not` とは違う）
         Node* node = create_node(ND_UNARY);
         node->op.unop = OP_NOT;
         node->tok = op_tok;
@@ -720,7 +722,8 @@ static Node* equality() {
 static Node* and() {
     Node* node = equality();
     Token* op_tok = token;
-    if (!at_expr_line_break() && consume("&&")) {
+    // `and` は `&&` の英字形（step 94）。意味も優先順位も完全に同じ
+    if (!at_expr_line_break() && (consume("&&") || consume_keyword(KW_AND))) {
         node = create_binary_operation_node(OP_AND, node, and());
         node->tok = op_tok;
     }
@@ -730,7 +733,8 @@ static Node* and() {
 static Node* or() {
     Node* node = and();
     Token* op_tok = token;
-    if (!at_expr_line_break() && consume("||")) {
+    // `or` は `||` の英字形（step 94）。意味も優先順位も完全に同じ
+    if (!at_expr_line_break() && (consume("||") || consume_keyword(KW_OR))) {
         node = create_binary_operation_node(OP_OR, node, or());
         node->tok = op_tok;
     }

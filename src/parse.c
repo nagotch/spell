@@ -188,7 +188,7 @@ Token* consume_ident() {
     return NULL;
 }
 
-static bool consume_keyword(Keyword keyword) {
+bool consume_keyword(Keyword keyword) {
     if (token->kind == TK_KEYWORD && token->keyword == keyword) {
         token = token->next;
         return true;

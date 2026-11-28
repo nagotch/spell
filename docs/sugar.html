@@ -634,6 +634,35 @@ he
 0</pre>
 </figure>
 
+<h3 id="sugar-logic-words">論理演算子の英字形 <code>and</code> / <code>or</code> / <code>not</code></h3>
+<table>
+  <tr><th>英字形</th><th>記号形</th></tr>
+  <tr><td><code>a and b</code></td><td><code>a &amp;&amp; b</code></td></tr>
+  <tr><td><code>a or b</code></td><td><code>a || b</code></td></tr>
+  <tr><td><code>not a</code></td><td><code>!a</code></td></tr>
+</table>
+<p>
+  英字形は記号形の別表記で、意味も優先順位も完全に同じです（短絡評価を含み、混在もできます）。
+  <code>not</code> は <code>!</code> と同じく単項の前置で強く結ぶため、<code>not a == b</code> は <code>(!a) == b</code> になります（Python の <code>not</code> とは優先順位が違います）。
+  3語ともキーワードで、識別子としては使えません。
+</p>
+
+<figure class="code">
+  <figcaption>例 — 論理演算子の英字形</figcaption>
+<pre>a = true
+b = false
+put a and b, a or b
+put not a, not b and a
+put not true == false</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>false true
+false true
+true</pre>
+</figure>
+
 <h2 id="s05"><span class="no">05</span>文とブロックの糖衣</h2>
 
 <h3>セミコロンの省略</h3>

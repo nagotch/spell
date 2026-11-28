@@ -78,6 +78,18 @@ def t077() { T || F; }
 def t078() { true == T; }
 def t079() { false != T; }
 def t080() { true && (1 < 2); }
+def t081() { true and false; }
+def t082() { true or false; }
+def t083() { false or true and false; }
+def t084() { true or false and false; }
+def t085() { not true; }
+def t086() { not false and false; }
+def t087() { not not true; }
+def t088() { !false and not false; }
+def t089() { true && false or not false; }
+def t090() { not true == false; }
+def t091() { 0 and 10 % 0; }
+def t092() { 1 or 10 % 0; }
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -172,6 +184,18 @@ def main() {
     mark(78); fails=fails+check(t078(), 1);
     mark(79); fails=fails+check(t079(), 1);
     mark(80); fails=fails+check(t080(), 1);
+    mark(81); fails=fails+check(t081(), 0);
+    mark(82); fails=fails+check(t082(), 1);
+    mark(83); fails=fails+check(t083(), 0);
+    mark(84); fails=fails+check(t084(), 1);
+    mark(85); fails=fails+check(t085(), 0);
+    mark(86); fails=fails+check(t086(), 0);
+    mark(87); fails=fails+check(t087(), 1);
+    mark(88); fails=fails+check(t088(), 1);
+    mark(89); fails=fails+check(t089(), 1);
+    mark(90); fails=fails+check(t090(), 1);
+    mark(91); fails=fails+check(t091(), 0);
+    mark(92); fails=fails+check(t092(), 1);
 
     print_str("done"); putchar(10);
     return fails > 0;
