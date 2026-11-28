@@ -1089,6 +1089,18 @@ static void reject_cond_question() {
     }
 }
 
+// for のヘッダ（反復対象・回数）の直後に `[` を伴わない `?` が来たら
+// エラーにする（step 81、reject_cond_question の for 版）。そのまま
+// 進むと stmt_branch 経由の stmt() が `?` を文頭の if 糖衣として
+// 飲み込み、ヘッダの意味を静かに変えてしまうため。安全添え字
+// `x@a?[0]` は式として読まれるため、ここには当たらない
+static void reject_for_question() {
+    if (token_is_char(token, '?')) {
+        error_at(token_start(token), token_end(token),
+                 "for のヘッダの直後に`?`は書けません（`?`は文の頭でのみ if の糖衣として使えます）");
+    }
+}
+
 static Node* stmt_if(Token* kw) {
     Node* node;
     node = create_node(ND_IF);
@@ -1129,6 +1141,7 @@ static Node* stmt_while(Token* kw) {
 }
 
 static Node* make_for_iter(Token* var, Node* init, Token* kw) {
+    reject_for_question();
     Node* node = create_node(ND_FOR);
     node->tok = kw;
     node->init = init;
@@ -1147,6 +1160,7 @@ static Node* make_for_iter(Token* var, Node* init, Token* kw) {
 }
 
 static Node* make_for_count(Node* count, Token* kw) {
+    reject_for_question();
     // 束縛なしの回数リピートは Range(0, n) の要素走査として扱う
     Node* node = create_node(ND_FOR);
     node->tok = kw;

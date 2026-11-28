@@ -194,6 +194,9 @@ static Type* check_funcref(Node* node);
 static Node* make_mcall(Node* receiver, Class* klass, Function* fn, const char* name, int len);
 static Node* boolify(Node* expr, Type* t);
 static void ensure_defs(Function* fn);
+// 安全添え字（step 81）: 部品の組み立てと比較への横取り
+static Type* build_safe_parts(Node* node, Node** guard_out, Node** value_out);
+static Type* check_safe_cmp(Node* node);
 
 // 引数を全部検査し、型を最大 6 個まで記録する。引数の数を返す。
 // expected_list があれば、各引数の期待型として渡す（ラムダの型決定用）
@@ -272,9 +275,8 @@ static Type* check_array_cmp(Node* node, Type* lt, Type* rt) {
     return bool_type();
 }
 
-static Type* check_binop(Node* node) {
-    Type* lt = check_node(node->left_child);
-    Type* rt = check_node(node->right_child);
+// 両辺の型が確定した後の二項演算の検査。子は検査しない
+static Type* check_binop_rest(Node* node, Type* lt, Type* rt) {
     if (node->op.binop == OP_AND || node->op.binop == OP_OR) {
         // 論理演算の被演算子は真理値として解釈する（step 79）
         node->left_child = boolify(node->left_child, lt);
@@ -323,7 +325,85 @@ static Type* check_binop(Node* node) {
     return bool_type();
 }
 
+static Type* check_binop(Node* node) {
+    // 比較の直接の被演算子が安全添え字なら、範囲チェックで
+    // ゲートした比較へ作り替える（step 81）
+    if ((node->op.binop == OP_EQ || node->op.binop == OP_NE
+                || node->op.binop == OP_LT || node->op.binop == OP_LE)
+            && (node->left_child->kind == ND_SAFEIDX
+                || node->right_child->kind == ND_SAFEIDX)) {
+        return check_safe_cmp(node);
+    }
+    Type* lt = check_node(node->left_child);
+    Type* rt = check_node(node->right_child);
+    return check_binop_rest(node, lt, rt);
+}
+
+// 安全添え字を被演算子に持つ比較の検査（step 81）。安全添え字の側は
+// 部品（guard と value）に分解し、通常の比較として検査したうえで、
+// 全体を `guard && 比較` に作り替える。guard が偽（どこかの段が
+// 範囲外）なら、value は評価されず比較全体が偽になる
+static Type* check_safe_cmp(Node* node) {
+    Node* guard = NULL;
+    Type* lt;
+    Type* rt;
+    if (node->left_child->kind == ND_SAFEIDX) {
+        Node* value;
+        lt = build_safe_parts(node->left_child, &guard, &value);
+        node->left_child = value;
+    } else {
+        lt = check_node(node->left_child);
+    }
+    if (node->right_child->kind == ND_SAFEIDX) {
+        Node* g2;
+        Node* value;
+        rt = build_safe_parts(node->right_child, &g2, &value);
+        node->right_child = value;
+        if (g2) {
+            if (guard) {
+                Node* both = create_node(ND_BINOP);
+                both->op.binop = OP_AND;
+                both->tok = node->tok;
+                both->left_child = guard;
+                both->right_child = g2;
+                both->type = bool_type();
+                guard = both;
+            } else {
+                guard = g2;
+            }
+        }
+    } else {
+        rt = check_node(node->right_child);
+    }
+    Type* result = check_binop_rest(node, lt, rt);
+    if (!guard) {
+        return result;
+    }
+    Node* self = create_node(ND_BINOP);
+    Node* nxt = node->next;
+    *self = *node;
+    self->next = NULL;
+    self->type = result;
+    Node* combined = create_node(ND_BINOP);
+    combined->op.binop = OP_AND;
+    combined->tok = node->tok;
+    combined->left_child = guard;
+    combined->right_child = self;
+    combined->type = bool_type();
+    *node = *combined;
+    node->next = nxt;
+    node->type = bool_type();
+    return bool_type();
+}
+
 static Type* check_assign(Node* node) {
+    // 安全添え字は読み取り専用（step 81）。複合代入・入力対象・
+    // 複数代入の対象も、脱糖や check_multiassign 経由でここへ来る。
+    // 右辺の検査より先に判定する（複合代入では対象ノードが右辺と
+    // 共有されており、先に検査すると書き換えられてしまうため）
+    if (node->left_child->kind == ND_SAFEIDX) {
+        error_node(node->left_child, "安全添え字には代入できません");
+    }
     // 右辺への期待型: 注釈があれば注釈、なければ代入先の記録済みの型
     if (node->anno) {
         expected_type = node->anno;
@@ -1319,6 +1399,255 @@ static int pos_dim(Class* klass) {
     return 0;
 }
 
+// ---- 安全添え字（step 81）と、Pos 添字の末尾 str の段で使う道具 ----
+
+// str クラスかどうか
+static bool is_str_type(Type* t) {
+    if (!t || t->kind != TY_CLASS || !t->klass) {
+        return false;
+    }
+    Class* o = t->klass->origin ? t->klass->origin : t->klass;
+    return o->len == 3 && !memcmp(o->name, "str", 3);
+}
+
+// 1段アクセスした後の要素の型。配列は要素型、str は `__getitem__`
+// の戻り型。str の段は通常の `s[i]` と全く同じ扱いで、戻り型は
+// prelude の定義に従うだけ（ここで int 前提の特別扱いはしない）
+static Type* stage_elem_type(Type* cont_type) {
+    if (cont_type->kind == TY_ARRAY) {
+        return cont_type->elem;
+    }
+    Function* fn = find_callable(class_of(cont_type), "__getitem__", 11);
+    return fn ? fn->return_type : &ty_unknown;
+}
+
+// 一時スロットを読むノード。型は local_types にも記録しておく
+static Node* safe_slot(Node* at, int offset, Type* type) {
+    Node* slot = create_node(ND_LVAR);
+    slot->offset = offset;
+    slot->tok = at->tok;
+    slot->type = type;
+    local_types[offset / 8] = type;
+    return slot;
+}
+
+static Node* safe_assign(Node* at, Node* slot, Node* value, Type* type) {
+    Node* a = create_node(ND_ASSIGN);
+    a->tok = at->tok;
+    a->left_child = slot;
+    a->right_child = value;
+    a->type = type;
+    return a;
+}
+
+static Node* safe_binop(Node* at, BinOp op, Node* l, Node* r) {
+    Node* b = create_node(ND_BINOP);
+    b->op.binop = op;
+    b->tok = at->tok;
+    b->left_child = l;
+    b->right_child = r;
+    b->type = bool_type();
+    return b;
+}
+
+static Node* safe_num(Node* at, long val) {
+    Node* n = create_number_node(val);
+    n->tok = at->tok;
+    n->type = &ty_int;
+    return n;
+}
+
+// コンテナ式の長さを読むノード。配列は ND_LEN、str は len() 呼び出し
+static Node* safe_len(Node* at, Node* cont, Type* cont_type) {
+    if (is_str_type(cont_type)) {
+        Class* klass = class_of(cont_type);
+        Function* fn = find_callable(klass, "len", 3);
+        Node* call = make_mcall(cont, klass, fn, "len", 3);
+        call->tok = at->tok;
+        call->type = &ty_int;
+        return call;
+    }
+    Node* n = create_node(ND_LEN);
+    n->tok = at->tok;
+    n->left_child = cont;
+    n->type = &ty_int;
+    return n;
+}
+
+// スロットに退避したコンテナと添え字から、1段分の要素アクセスを作る。
+// 配列は通常の添え字、str は通常の `s[i]` と同じ __getitem__ 呼び出し
+// （戻り型は prelude の定義どおり）
+static Node* safe_elem(Node* at, Node* cont, Type* cont_type, Node* idx) {
+    if (is_str_type(cont_type)) {
+        Class* klass = class_of(cont_type);
+        Function* fn = find_callable(klass, "__getitem__", 11);
+        Node* call = make_mcall(cont, klass, fn, "__getitem__", 11);
+        call->tok = at->tok;
+        call->args = idx;
+        call->type = fn ? fn->return_type : &ty_unknown;
+        return call;
+    }
+    Node* n = create_node(ND_INDEX);
+    n->tok = at->tok;
+    n->left_child = cont;
+    n->right_child = idx;
+    n->type = cont_type->kind == TY_ARRAY ? cont_type->elem : &ty_unknown;
+    return n;
+}
+
+// Pos の d 番目の成分を取り出すノード（レシーバは呼び出し側で用意する）
+static Node* safe_pos_comp(Node* at, Node* recv, Type* pos_type, int d) {
+    Class* klass = class_of(pos_type);
+    Function* fn = find_callable(klass, "__getitem__", 11);
+    Node* call = make_mcall(recv, klass, fn, "__getitem__", 11);
+    call->tok = at->tok;
+    call->args = safe_num(at, d);
+    call->type = &ty_int;
+    return call;
+}
+
+// 安全添え字（ND_SAFEIDX）を検査し、部品に分解する:
+// - guard: 全段の範囲チェック。対象・各添え字・中間値は、パース時に
+//   確保された一時スロット（node->offset から連続）へ、&& の短絡を
+//   使って浅い段から順に1回だけ評価・退避する代入を含む
+// - value: guard が真のときにだけ評価してよい要素アクセス。
+//   スロット読みだけで組み立てる
+// 対象の型が分からない場合は guard を NULL にし、value に通常の
+// 添え字の連鎖を入れて従来どおり緩く通す。戻り値は要素の型
+static Type* build_safe_parts(Node* node, Node** guard_out, Node** value_out) {
+    *guard_out = NULL;
+    *value_out = NULL;
+    Type* lt = check_node(node->left_child);
+    int nb = 0;
+    for (Node* a = node->args; a; a = a->next) {
+        nb++;
+    }
+    Node** idx_nodes = malloc(sizeof(Node*) * (nb ? nb : 1));
+    Type** idx_types = malloc(sizeof(Type*) * (nb ? nb : 1));
+    int bi = 0;
+    for (Node* a = node->args; a; a = a->next, bi++) {
+        idx_nodes[bi] = a;
+        idx_types[bi] = check_node(a);
+    }
+    if (lt->kind == TY_UNKNOWN) {
+        Node* cur = node->left_child;
+        for (int i = 0; i < nb; i++) {
+            Node* step = create_node(ND_INDEX);
+            step->tok = node->tok;
+            step->left_child = cur;
+            step->right_child = idx_nodes[i];
+            step->type = &ty_unknown;
+            cur = step;
+        }
+        *value_out = cur;
+        free(idx_nodes);
+        free(idx_types);
+        return &ty_unknown;
+    }
+    // 段の計画: コンテナの型と添え字式の列を作る。Pos 添え字は
+    // 成分の数だけ段に展開する
+    int max_stages = nb * 3;
+    Type** stage_cont = malloc(sizeof(Type*) * max_stages);
+    Node** stage_index = malloc(sizeof(Node*) * max_stages);
+    int ns = 0;
+    Type* cont = lt;
+    int base = node->offset;
+    for (int b = 0; b < nb; b++) {
+        Node* idx = idx_nodes[b];
+        Type* it = idx_types[b];
+        if (cont->kind == TY_ARRAY && it->kind == TY_CLASS && pos_dim(it->klass) > 0) {
+            int dim = pos_dim(it->klass);
+            // 深さは配列の入れ子の段数。末尾の str はもう1段と数える
+            int depth = 0;
+            Type* t = cont;
+            while (t->kind == TY_ARRAY) {
+                depth++;
+                t = t->elem;
+            }
+            if (is_str_type(t)) {
+                depth++;
+            }
+            if (depth != dim) {
+                error_node(node, "座標`%s`は%d次元ですが、配列の入れ子は%d段です", type_text(it), dim, depth);
+                *value_out = safe_num(node, 0);
+                return &ty_unknown;
+            }
+            int pos_off = base + 8 * (1 + 9 * nb + b);
+            for (int d = 0; d < dim; d++) {
+                Node* recv;
+                if (d == 0) {
+                    recv = safe_assign(node, safe_slot(node, pos_off, it), idx, it);
+                } else {
+                    recv = safe_slot(node, pos_off, it);
+                }
+                stage_cont[ns] = cont;
+                stage_index[ns] = safe_pos_comp(node, recv, it, d);
+                ns++;
+                cont = stage_elem_type(cont);
+            }
+        } else {
+            if (cont->kind != TY_ARRAY && !is_str_type(cont)) {
+                if (cont->kind == TY_CLASS) {
+                    error_node(node, "安全添え字は配列と文字列にだけ使えます（`%s`型には使えません）", type_text(cont));
+                } else {
+                    error_node(node, "`%s`型の値に安全添え字は使えません", type_text(cont));
+                }
+                *value_out = safe_num(node, 0);
+                return &ty_unknown;
+            }
+            if (it->kind != TY_UNKNOWN && it->kind != TY_INT) {
+                error_node(idx, "添え字には`int`が必要ですが、`%s`が指定されています", type_text(it));
+                *value_out = safe_num(node, 0);
+                return &ty_unknown;
+            }
+            stage_cont[ns] = cont;
+            stage_index[ns] = idx;
+            ns++;
+            cont = stage_elem_type(cont);
+        }
+    }
+    Type* elem_type = cont;
+    // guard と value の組み立て。スロットの割り当て（base からの
+    // スロット番号）: 0 = 対象（C0）、段 k（0始まり）ごとに
+    // 1+3k = 長さ、2+3k = 添え字、3+3k = 次のコンテナ（C{k+1}）
+    Node* guard = NULL;
+    Node* prev_access = NULL;
+    for (int k = 0; k < ns; k++) {
+        Type* ct = stage_cont[k];
+        int cont_off = base + 8 * (k == 0 ? 0 : 3 * k);
+        int len_off = base + 8 * (1 + 3 * k);
+        int idx_off = base + 8 * (2 + 3 * k);
+        Node* cont_expr;
+        if (k == 0) {
+            cont_expr = safe_assign(node, safe_slot(node, cont_off, ct), node->left_child, ct);
+        } else {
+            cont_expr = safe_assign(node, safe_slot(node, cont_off, ct), prev_access, ct);
+        }
+        Node* len_assign = safe_assign(node, safe_slot(node, len_off, &ty_int),
+                                       safe_len(node, cont_expr, ct), &ty_int);
+        Node* a = safe_binop(node, OP_LE, safe_num(node, 0), len_assign);
+        Node* idx_assign = safe_assign(node, safe_slot(node, idx_off, &ty_int), stage_index[k], &ty_int);
+        Node* bnode = safe_binop(node, OP_LE, safe_num(node, 0), idx_assign);
+        Node* c = safe_binop(node, OP_LT, safe_slot(node, idx_off, &ty_int),
+                             safe_slot(node, len_off, &ty_int));
+        Node* conj = safe_binop(node, OP_AND, safe_binop(node, OP_AND, a, bnode), c);
+        guard = guard ? safe_binop(node, OP_AND, guard, conj) : conj;
+        Node* access = safe_elem(node, safe_slot(node, cont_off, ct), ct,
+                                 safe_slot(node, idx_off, &ty_int));
+        if (k == ns - 1) {
+            *value_out = access;
+        } else {
+            prev_access = access;
+        }
+    }
+    *guard_out = guard;
+    free(idx_nodes);
+    free(idx_types);
+    free(stage_cont);
+    free(stage_index);
+    return elem_type;
+}
+
 // Pos 添字の糖衣（step 77）: 配列への `a[p]`（p は Pos2 / Pos3）を
 // `a[p[0]][p[1]]`（Pos3 は3段）へ書き換える。深さは Pos の次元で
 // 決め、配列の入れ子の深さと一致しなければエラーにする。p は一度
@@ -1334,6 +1663,11 @@ static Type* check_pos_index(Node* node, Type* lt, Type* it) {
     while (elem->kind == TY_ARRAY) {
         depth++;
         elem = elem->elem;
+    }
+    // 末尾の str はもう1段と数える（step 81）: [str] への Pos2 は
+    // 「行を取り、行の中の文字を取る」2段として扱う
+    if (is_str_type(elem)) {
+        depth++;
     }
     if (depth != dim) {
         error_node(node, "座標`%s`は%d次元ですが、配列の入れ子は%d段です", type_text(it), dim, depth);
@@ -1386,9 +1720,24 @@ static Type* check_pos_index(Node* node, Type* lt, Type* it) {
         step->tok = node->tok;
         step->left_child = cur;
         step->right_child = idx;
-        cur = step;
-        cur_elem = cur_elem->elem;
-        cur->type = cur_elem;
+        if (is_str_type(cur_elem)) {
+            // 文字列への段（step 81）: 通常の `s[i]` と同じ
+            // __getitem__ 呼び出しにする。cur_elem は要素ではなく
+            // str そのものなので、その戻り型が次の要素型になる
+            Class* sklass = class_of(cur_elem);
+            Function* sgetitem = find_callable(sklass, "__getitem__", 11);
+            if (!sgetitem) {
+                error_node(node, "クラス`%.*s`に`__getitem__`は定義されていません", sklass->len, sklass->name);
+                return &ty_unknown;
+            }
+            cur_elem = rewrite_to_mcall(step, cur_elem, &ty_int, "__getitem__", 11, sgetitem);
+            cur = step;
+            cur->type = cur_elem;
+        } else {
+            cur = step;
+            cur_elem = cur_elem->elem;
+            cur->type = cur_elem;
+        }
     }
     Node* nxt = node->next;
     *node = *cur;
@@ -2049,6 +2398,17 @@ static Type* check_multiassign(Node* node) {
 
 // 連鎖比較: 中間値を2つの一時置き場に交互へ退避しながら、比較を && でつなぐ
 static Type* check_chain(Node* node) {
+    // 安全添え字は連鎖比較の中では扱わない（step 81）。被演算子の
+    // 位置にあると、範囲チェックの無い bool として静かに比較されて
+    // しまうため、位置つきエラーにする
+    if (node->left_child->kind == ND_SAFEIDX) {
+        error_node(node->left_child, "連鎖比較の中では安全添え字は使えません");
+    }
+    for (Node* pair = node->body; pair; pair = pair->next) {
+        if (pair->left_child->kind == ND_SAFEIDX) {
+            error_node(pair->left_child, "連鎖比較の中では安全添え字は使えません");
+        }
+    }
     Node* prev_operand = node->left_child;
     Node* combined = NULL;
     int i = 0;
@@ -2269,6 +2629,21 @@ static Type* check_node(Node* node) {
         case ND_INDEX:
             result = check_index(node);
             break;
+        case ND_SAFEIDX: {
+            // 安全添え字の単独形は「全段とも範囲内か」の bool
+            // （step 81）。比較の被演算子の形は check_binop が
+            // 先回りして check_safe_cmp で処理する
+            Node* guard;
+            Node* value;
+            build_safe_parts(node, &guard, &value);
+            Node* replacement = guard ? guard : value;
+            Type* rt = guard ? bool_type() : replacement->type;
+            Node* nxt = node->next;
+            *node = *replacement;
+            node->next = nxt;
+            result = rt;
+            break;
+        }
         case ND_LEN:
             check_node(node->left_child);
             result = &ty_int;

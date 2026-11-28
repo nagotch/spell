@@ -154,7 +154,7 @@ arb</pre>
   <tr><td>代入</td><td><code>=</code> <code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code></td><td>代入は式で、値は代入した値。<code>a = b = 3</code> とつなげられる。複数代入 <code>a, b = b, a</code> も可</td></tr>
   <tr><td>増減</td><td><code>++</code> <code>--</code></td><td>後置のみ。<code>x++</code> は <code>x += 1</code> と同じで、式の値は代入後の値</td></tr>
   <tr><td>範囲</td><td><code>..</code> <code>..=</code></td><td><code>a..b</code> は半開、<code>a..=b</code> は終端を含む。降順も可（<a href="#s10">§10</a>）</td></tr>
-  <tr><td>添字・メンバ</td><td><code>a[i]</code> <code>a.x</code> <code>a.m()</code></td><td>添字は <code>__getitem__</code> / <code>__setitem__</code> へ展開。0引数メソッドは括弧を省略できる</td></tr>
+  <tr><td>添字・メンバ</td><td><code>a[i]</code> <code>a?[i]</code> <code>a.x</code> <code>a.m()</code></td><td>添字は <code>__getitem__</code> / <code>__setitem__</code> へ展開。<code>a?[i]</code> は範囲チェックつきの安全添え字（配列の節を参照）。0引数メソッドは括弧を省略できる</td></tr>
   <tr><td>矢印</td><td><code>&lt;-</code> <code>-&gt;</code></td><td>型で解決される（下記）。連鎖はエラー</td></tr>
   <tr><td>関数値</td><td><code>x -&gt; 式</code>、<code>fn(...) { }</code></td><td>矢印形は式1つの無名関数。<code>fn</code> 形は本体がブロック（<a href="#s06">§06</a>）</td></tr>
 </table>
@@ -565,6 +565,7 @@ a 7
   <tr><th>操作</th><th>内容</th></tr>
   <tr><td><code>len</code></td><td>文字数（バイト数ではなく文字コードの個数）</td></tr>
   <tr><td><code>s[i]</code>（<code>__getitem__</code>）</td><td>i 番目の文字コード（<code>int</code>）を返す。添字への代入はできない（<code>__setitem__</code> は無い）</td></tr>
+  <tr><td><code>s?[i]</code></td><td>安全添え字（配列の節を参照）。要素は通常の <code>s[i]</code> と同じ</td></tr>
   <tr><td><code>__add__</code></td><td>連結</td></tr>
   <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較。<code>&lt;</code> 系の順序比較はない</td></tr>
   <tr><td><code>__hash__</code></td><td>文字コード列からのハッシュ</td></tr>
@@ -601,6 +602,7 @@ cba</pre>
   <tr><th>操作</th><th>内容</th></tr>
   <tr><td><code>len</code></td><td>要素数</td></tr>
   <tr><td><code>a[i]</code></td><td>要素の読み書き。範囲外（負数を含む）は検査されず、結果は不定</td></tr>
+  <tr><td><code>a?[i][j]...</code></td><td>安全添え字（下記）。全段の範囲を検査する読み取り専用の形</td></tr>
   <tr><td><code>__add__</code></td><td>連結した新しい配列</td></tr>
   <tr><td><code>__mul__</code></td><td><code>a * n</code> で n 回繰り返した新しい配列</td></tr>
   <tr><td><code>__eq__</code> / <code>__ne__</code></td><td>中身の比較。<code>&lt;</code> 系の順序比較はない（エラーになる）</td></tr>
@@ -618,6 +620,31 @@ cba</pre>
   容量を超える append では新しいブロックへコピーして対象の変数だけが付け替わります（別名や、引数として渡した先の呼び出し元には伝わりません）。
   作りたての配列は容量＝要素数なので、最初の append は必ず付け替えになります。
 </p>
+<p>
+  <strong>安全添え字</strong> <code>a?[i][j]...</code> は、範囲チェックつきの読み取りです。対象の直後に <code>?</code> を1回だけ置き、後ろに通常の添え字の連鎖を続けます。
+  単独で書くと「連鎖の全段とも範囲内（0 &lt;= 添え字 &lt; その段の長さ）か」を表す <code>bool</code> になります。
+  比較（<code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>）の直接の被演算子として書くと、どこかの段で範囲外なら比較全体が <code>false</code>（<code>!=</code> でも <code>false</code>）になり、全段範囲内なら要素同士の通常の比較になります。
+  対象と各添え字はちょうど1回だけ評価され、範囲チェックは浅い段から順に短絡します。対象にできるのは配列と <code>str</code> だけで、<code>Dict</code> や <code>__getitem__</code> を持つクラスには使えません。
+  代入先には使えず、連鎖比較の中でも使えません（どちらもコンパイルエラー）。
+  添字に <code>Pos2</code> / <code>Pos3</code> を渡すこともでき、座標添字と同じ展開を安全化したものになります。要素が <code>str</code> の配列では末尾の文字列も1段と数え、安全形では文字列の長さも範囲チェックに含めます。文字列の段の要素は通常の <code>s[i]</code> と同じです（<code>__getitem__</code> の戻り型に従います）。
+</p>
+
+<figure class="code">
+  <figcaption>例</figcaption>
+<pre>a = [10, 20, 30]
+put a?[1]
+put a?[3]
+put a?[1] == 20
+put a?[5] != 20</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>true
+false
+true
+false</pre>
+</figure>
 
 <figure class="code">
   <figcaption>例</figcaption>
