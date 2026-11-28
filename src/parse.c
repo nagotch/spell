@@ -678,6 +678,13 @@ static Node* stmt() {
         expect_stmt_end("文");
         return node;
     } else if (consume("@")) {
+        if (consume("?")) {
+            // `@? 条件` は while の糖衣（step 80）。`@ x` が「x 回／x の
+            // 反復」の意味を持つため、条件ループには条件の印 `?` を足して
+            // 判別できるようにした。読み方・本体・エラーは通常の while と
+            // 完全に同じ（stmt_while をそのまま使う）
+            return stmt_while(start);
+        }
         if (token->kind == TK_SYMBOL && token->len == 1 && (token->str[0] == '{' || token->str[0] == ':')) {
             // `@ {}` / `@:` は while true の省略形（無限ループ）
             Node* node = create_node(ND_WHILE);

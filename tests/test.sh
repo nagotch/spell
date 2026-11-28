@@ -51,6 +51,10 @@ tests=(
     "class Box { n: int; def __init__(self, n: int) { self.n = n; } def __bool__(self) -> bool { return self.n > 0; } } def main() { a = Box(0); b = Box(3); if (a) { return 1; } if (b) { return 42; } return 0; }|42"
     # step 79: while の条件に Deque を直接書く（空になるまで）
     "def main() { q = Deque(); q.push_back(1); q.push_back(2); q.push_back(3); n = 0; while q { q.pop_front(); n = n + 1; } return n; }|3"
+    # step 80: `@?` は while の糖衣（波括弧形・コロン形とも test_stmt で検証）
+    "def main() { n = 5; s = 0; @? n > 0 { s = s + n; n = n - 1; } return s; }|15"
+    # step 80: `@?` の条件でもユーザー定義 __bool__ が効く
+    "class Box { n: int; def __init__(self, n: int) { self.n = n; } def __bool__(self) -> bool { return self.n > 0; } def dec(self) -> int { self.n = self.n - 1; return self.n; } } def main() { b = Box(3); c = 0; @? b { b.dec(); c = c + 1; } return c; }|3"
 )
 
 error_tests=(
@@ -191,6 +195,8 @@ def main():
     # 位置つきエラーにする（if / while / elif）
     "def main() { a = [10, 20]; if a?[0] == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
     "def main() { a = [10, 20]; while a?[0] == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
+    # step 80: `@?` の条件直後の `?` も同じくエラー
+    "def main() { a = [10, 20]; @? a?[0] == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
     "def main() { a = [10, 20]; if a[0] == 1: print(1); elif a?[0] == 10: print(2); return 0; }|条件の直後に\`?\`は書けません"
     # step 79: 未定義変数の読み取りはエラー
     "def main() { return j; }|変数\`j\`は定義されていません"
@@ -1005,6 +1011,20 @@ one_io_test "def main() {
 }" "" "1\n4\n"
 # step 79: while の条件に Deque を直接書く BFS 風ループ（空で止まる）
 one_io_test "def main() { q = Deque(); q.push_back(0); seen = [0; 8]; seen[0] = 1; order = \"\"; while q { v = q.pop_front(); order = order + v.__str__(); if (v + 1 < 6 && seen[v + 1] == 0) { seen[v + 1] = 1; q.push_back(v + 1); } if (v + 2 < 6 && seen[v + 2] == 0) { seen[v + 2] = 1; q.push_back(v + 2); } } print(order); return 0; }" "" "012345\n"
+# step 80: `@? q:` でも同じ BFS 風ループが書ける（コロン形・矢印ポップ）
+one_io_test "
+q = Deque()
+q.push_back(0)
+seen = [0; 8]
+seen[0] = 1
+order = \"\"
+@? q:
+    v <- q
+    order = order + v.__str__()
+    if (v + 1 < 6 && seen[v + 1] == 0) { seen[v + 1] = 1; q.push_back(v + 1); }
+    if (v + 2 < 6 && seen[v + 2] == 0) { seen[v + 2] = 1; q.push_back(v + 2); }
+print(order)
+" "" "012345\n"
 # step 79: Vec / str / Dict / 配列の __bool__（空かどうか）
 one_io_test "def main() { v = Vec(); if (v) { print(1); } else { print(0); } v.append(1); if (v) { print(1); } else { print(0); } s = \"\"; if (s) { print(1); } else { print(0); } s = \"x\"; if (s) { print(1); } else { print(0); } d: Dict<str, int> = Dict(zero_int); if (d) { print(1); } else { print(0); } d[\"a\"] = 1; if (d) { print(1); } else { print(0); } a = [0; 0]; if (a) { print(1); } else { print(0); } a = [7]; if (a) { print(1); } else { print(0); } return 0; }" "" "0\n1\n0\n1\n0\n1\n0\n1\n"
 # step 79: && の短絡と ! でも __bool__ が効く（空の間は pop_front を呼ばない）

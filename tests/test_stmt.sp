@@ -459,6 +459,51 @@ def t097() {
     return r
 }
 
+def t098() {
+    n = 10
+    s = 0
+    @? n > 0:
+        n -= 1
+        ? n == 5: continue
+        ? n == 2: break
+        s += n
+    return s * 10 + n
+}
+
+def t099() {
+    q = Deque()
+    q.push_back(1)
+    q.push_back(2)
+    q.push_back(3)
+    s = 0
+    @? q:
+        v <- q
+        s = s * 10 + v
+    return s
+}
+
+def t100() {
+    i = 0
+    s = 0
+    @? i < 3 {
+        i += 1
+        @2 { s += 1 }
+        ? i == 2: s += 10
+    }
+    return s * 10 + i
+}
+
+def t101() {
+    i = 0
+    s = 0
+    @? i < 2:
+        j = 0
+        @? j < 3: j += 1
+        s += j
+        i += 1
+    return s * 10 + i
+}
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -570,6 +615,10 @@ def main() {
     mark(95); fails=fails+check(t095(), 313);
     mark(96); fails=fails+check(t096(), 22);
     mark(97); fails=fails+check(t097(), 12);
+    mark(98); fails=fails+check(t098(), 372);
+    mark(99); fails=fails+check(t099(), 123);
+    mark(100); fails=fails+check(t100(), 163);
+    mark(101); fails=fails+check(t101(), 62);
 
     print_str("done"); putchar(10);
     return fails > 0;
