@@ -504,6 +504,47 @@ for i in (1..4).rev { put i }</pre>
 1</pre>
 </figure>
 
+<h3>座標リテラル <code>(1, 2)</code></h3>
+<table>
+  <tr><th>記号形</th><th>正規形</th></tr>
+  <tr><td><code>(式, 式)</code></td><td><code>Pos2(式, 式)</code></td></tr>
+  <tr><td><code>(式, 式, 式)</code></td><td><code>Pos3(式, 式, 式)</code></td></tr>
+</table>
+<p>
+  式の位置のカンマ区切り括弧リストは、座標クラス <code>Pos2</code> / <code>Pos3</code> の構築として読まれます。要素は任意の式です。
+  要素が4つ以上あるとエラーになります。<code>(式)</code> は従来どおりの括弧式で、関数呼び出しの引数リストや <code>(x, y) -&gt; 式</code> のラムダとは混同されません。
+  配列リテラルの要素位置でも使えるため、方向ベクトルの表をそのまま書けます。
+</p>
+
+<h3>座標添字 <code>a[p]</code></h3>
+<table>
+  <tr><th>記号形</th><th>正規形</th></tr>
+  <tr><td><code>a[p]</code>（<code>p: Pos2</code>）</td><td><code>a[p[0]][p[1]]</code></td></tr>
+  <tr><td><code>a[p]</code>（<code>p: Pos3</code>）</td><td><code>a[p[0]][p[1]][p[2]]</code></td></tr>
+</table>
+<p>
+  添字の型が <code>Pos2</code> / <code>Pos3</code> のとき、入れ子配列への多段添字に展開されます。座標 <code>p</code> は一度だけ評価されます。
+  深さは座標の次元で決まり、配列の入れ子の深さと一致しない場合はエラーになります。読み取りと代入の両方で使えます。
+  <code>Dict</code> のキーとしての <code>d[p]</code> は対象外で、従来どおりキー照合になります。
+</p>
+
+<figure class="code">
+  <figcaption>例 — 方向ベクトルと座標添字</figcaption>
+<pre>q = Deque(Pos2)
+q &lt;- (1, 2)
+q &lt;- (3, 4)
+put q.pop_front(), q.pop_back()
+a = [[1, 2], [3, 4]]
+a[(0, 1)] = 9
+put a[(1, 0)], a[0][1]</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>1 2 3 4
+3 9</pre>
+</figure>
+
 <h2 id="s05"><span class="no">05</span>文とブロックの糖衣</h2>
 
 <h3>セミコロンの省略</h3>

@@ -577,6 +577,11 @@ class Dict<K, V> {
 def zero_int() -> int { return 0; }
 def zero_bool() -> bool { return 1 == 0; }
 def zero_str() -> str { return ""; }
+def zero_pos2() -> Pos2 { return Pos2(0, 0); }
+def zero_pos3() -> Pos3 { return Pos3(0, 0, 0); }
+// 配列型のゼロ値（新しい空配列）。要素型は呼び出し側の文脈で決まるため、
+// 戻り値の注釈は付けず、空リテラルから推論される「要素型不明」のままにする
+def zero_array() { return []; }
 
 // 伸びる配列。末尾への追加が容量の倍増で均し定数時間になる。生成は
 // Dict と同じく既定値ファクトリを受け取る（広げた領域の埋め草に使う）。
@@ -749,6 +754,107 @@ class Deque<T> {
             i = i + 1;
         }
         return r;
+    }
+}
+
+// 2次元の座標（step 77）。リテラル `(x, y)` はこのクラスの構築への糖衣。
+// 演算は要素ごとで、`__eq__` / `__hash__` があるため Dict のキーにも
+// 使える。添字 `p[0]` / `p[1]` は x / y に対応する。グリッド配列への
+// `a[p]` は、型検査が `a[p[0]][p[1]]` へ書き換える
+class Pos2 {
+    x: int;
+    y: int;
+
+    def __init__(self, x: int, y: int) {
+        self.x = x;
+        self.y = y;
+    }
+
+    def __add__(self, o: Pos2) -> Pos2 {
+        return Pos2(self.x + o.x, self.y + o.y);
+    }
+
+    def __sub__(self, o: Pos2) -> Pos2 {
+        return Pos2(self.x - o.x, self.y - o.y);
+    }
+
+    def __mul__(self, n: int) -> Pos2 {
+        return Pos2(self.x * n, self.y * n);
+    }
+
+    def __eq__(self, o: Pos2) -> bool {
+        return self.x == o.x && self.y == o.y;
+    }
+
+    def __ne__(self, o: Pos2) -> bool {
+        return !(self == o);
+    }
+
+    def __hash__(self) -> int {
+        h = 5381;
+        h = h * 33 + self.x;
+        h = h * 33 + self.y;
+        return h;
+    }
+
+    def __getitem__(self, i: int) -> int {
+        if (i == 0) { return self.x; }
+        return self.y;
+    }
+
+    def __str__(self) -> str {
+        return self.x.__str__() + " " + self.y.__str__();
+    }
+}
+
+// 3次元の座標（step 77）。Pos2 の3要素版で、リテラルは `(x, y, z)`
+class Pos3 {
+    x: int;
+    y: int;
+    z: int;
+
+    def __init__(self, x: int, y: int, z: int) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+    }
+
+    def __add__(self, o: Pos3) -> Pos3 {
+        return Pos3(self.x + o.x, self.y + o.y, self.z + o.z);
+    }
+
+    def __sub__(self, o: Pos3) -> Pos3 {
+        return Pos3(self.x - o.x, self.y - o.y, self.z - o.z);
+    }
+
+    def __mul__(self, n: int) -> Pos3 {
+        return Pos3(self.x * n, self.y * n, self.z * n);
+    }
+
+    def __eq__(self, o: Pos3) -> bool {
+        return self.x == o.x && self.y == o.y && self.z == o.z;
+    }
+
+    def __ne__(self, o: Pos3) -> bool {
+        return !(self == o);
+    }
+
+    def __hash__(self) -> int {
+        h = 5381;
+        h = h * 33 + self.x;
+        h = h * 33 + self.y;
+        h = h * 33 + self.z;
+        return h;
+    }
+
+    def __getitem__(self, i: int) -> int {
+        if (i == 0) { return self.x; }
+        if (i == 1) { return self.y; }
+        return self.z;
+    }
+
+    def __str__(self) -> str {
+        return self.x.__str__() + " " + self.y.__str__() + " " + self.z.__str__();
     }
 }
 

@@ -409,8 +409,8 @@ static bool is_vec_or_deque(Class* klass) {
 }
 
 // 要素型の既定値を返す prelude 関数の参照ノードを作る。自動で作れるのは
-// int / bool / str だけで、それ以外は NULL を返す。利用者が手で書いた
-// `Deque(zero_int)` の引数と全く同じ形のノードにする
+// int / bool / str / Pos2 / Pos3 だけで、それ以外は NULL を返す。
+// 利用者が手で書いた `Deque(zero_int)` の引数と全く同じ形のノードにする
 static Node* make_zero_factory(Node* node, Type* elem) {
     const char* name = NULL;
     if (elem->kind == TY_INT) {
@@ -421,6 +421,10 @@ static Node* make_zero_factory(Node* node, Type* elem) {
             name = "zero_bool";
         } else if (o->len == 3 && !memcmp(o->name, "str", 3)) {
             name = "zero_str";
+        } else if (o->len == 4 && !memcmp(o->name, "Pos2", 4)) {
+            name = "zero_pos2";
+        } else if (o->len == 4 && !memcmp(o->name, "Pos3", 4)) {
+            name = "zero_pos3";
         }
     }
     if (!name) {
@@ -432,6 +436,150 @@ static Node* make_zero_factory(Node* node, Type* elem) {
     fref->len = (int)strlen(name);
     fref->tok = node->tok;
     return fref;
+}
+
+// 型のゼロ値を作る式を合成する（step 77 の型を引数に渡す構築用）。
+// 配列・文字列のリテラルノードは合成しない: 文字列は prelude の
+// zero_str 呼び出し、配列は zero_array 呼び出し（どちらも prelude 側で
+// 通常に解析されたリテラルを返す）で代用し、クラスは __init__ の
+// 引数を再帰的にゼロで埋めた構築にする。型検査の段階で配列リテラルを
+// 合成すると、置き場所（offset）が割り当てられず壊れるため
+// （step 76 の知見）。数値・真理値の葉ノードは置き場所を必要とせず、
+// 既存の書き換え（check_for など）と同じく合成してよい。
+// ゼロ化できない型（関数型・型変数・型不明、注釈のない引数を持つ
+// __init__ など）では NULL を返す。自己参照クラスは有限の構築では
+// ゼロ化できないため、展開中のクラス型の並び（path）に同じ型が
+// 再び現れたら NULL を返す（配列は空配列で循環を断てるので、
+// path にはクラス型だけを積む）。depth は保険の上限
+static Node* build_zero_expr(Node* node, Type* type, Type* path[], int path_len, int depth) {
+    if (depth > 64) {
+        return NULL;
+    }
+    switch (type->kind) {
+        case TY_INT: {
+            Node* num = create_node(ND_NUM);
+            num->val = 0;
+            num->tok = node->tok;
+            return num;
+        }
+        case TY_ARRAY: {
+            // 要素型によらず、新しい空配列でよい（長さ0なら要素は無い）
+            Node* call = create_node(ND_FUNCALL);
+            call->name = "zero_array";
+            call->len = 10;
+            call->tok = node->tok;
+            return call;
+        }
+        case TY_CLASS: {
+            Class* klass = class_of(type);
+            if (!klass) {
+                return NULL;
+            }
+            Class* origin = klass->origin ? klass->origin : klass;
+            if (origin->len == 4 && !memcmp(origin->name, "bool", 4)) {
+                Node* b = create_node(ND_BOOL);
+                b->val = 0;
+                b->name = "false";
+                b->len = 5;
+                b->tok = node->tok;
+                return b;
+            }
+            if (origin->len == 3 && !memcmp(origin->name, "str", 3)) {
+                Node* call = create_node(ND_FUNCALL);
+                call->name = "zero_str";
+                call->len = 8;
+                call->tok = node->tok;
+                return call;
+            }
+            for (int i = 0; i < path_len; i++) {
+                if (path[i]->kind == TY_CLASS && type_strict_equals(path[i], type)) {
+                    return NULL;
+                }
+            }
+            path[path_len] = type;
+            Function* init = find_callable(klass, "__init__", 8);
+            Node* call = create_node(ND_FUNCALL);
+            call->name = origin->name;
+            call->len = origin->len;
+            call->tok = node->tok;
+            // 実体化したクラスの構築では、型引数を明示しておく
+            // （引数の値だけからの推論に頼らないため）
+            if (type->targ_count > 0) {
+                for (int i = 0; i < type->targ_count && i < MAX_TPARAMS; i++) {
+                    call->ctor_targs[i] = type->targs[i];
+                }
+                call->ctor_targ_count = type->targ_count;
+            }
+            if (!init) {
+                // __init__ が無いクラスは引数なしで構築できる
+                // （フィールドは 0 で埋まる、通常の構築と同じ）
+                return call;
+            }
+            Node head;
+            head.next = NULL;
+            Node* cur = &head;
+            for (int i = 1; i < init->nparams && i < 6; i++) {
+                Type* pt = init->param_types[i];
+                if (!pt) {
+                    return NULL;
+                }
+                Node* arg = build_zero_expr(node, pt, path, path_len + 1, depth + 1);
+                if (!arg) {
+                    return NULL;
+                }
+                cur->next = arg;
+                cur = arg;
+            }
+            call->args = head.next;
+            return call;
+        }
+        default:
+            return NULL;
+    }
+}
+
+// ゼロ値ファクトリ（fn() -> 要素型）を合成する。名前のある prelude
+// 関数で済む場合はその関数参照を、そうでなければゼロ値の式を返す
+// ラムダを合成して関数チェーンへ足す（generics.c の実体化が複製品を
+// チェーンへ足すのと同じ方式）。合成できない場合は NULL
+static Node* make_zero_value_factory(Node* node, Type* elem) {
+    Node* fref = make_zero_factory(node, elem);
+    if (fref) {
+        return fref;
+    }
+    Type* path[66];
+    Node* zero = build_zero_expr(node, elem, path, 0, 0);
+    if (!zero) {
+        return NULL;
+    }
+    static int synth_counter = 0;
+    Function* fn = calloc(1, sizeof(Function));
+    char* name = malloc(48);
+    snprintf(name, 48, "__zero_factory_%d", synth_counter++);
+    fn->name = name;
+    fn->len = (int)strlen(name);
+    fn->is_lambda = true;
+    fn->nparams = 0;
+    fn->return_type = elem;
+    Node* ret = create_node(ND_RETURN);
+    ret->left_child = zero;
+    ret->tok = node->tok;
+    fn->body = ret;
+    // ローカルを持たない本体なので、フレームは環境スロット分だけ
+    // （parse_lambda の最小形と同じ）
+    fn->env_offset = 8;
+    fn->stack_size = 16;
+    Function* tail = functions;
+    while (tail->next) {
+        tail = tail->next;
+    }
+    tail->next = fn;
+    Node* lam = create_node(ND_LAMBDA);
+    lam->func = fn;
+    lam->name = name;
+    lam->len = fn->len;
+    lam->tok = node->tok;
+    return lam;
 }
 
 static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int nargs, Type* expected_ty) {
@@ -515,6 +663,27 @@ static Type* check_construct(Node* node, Class* klass, Type* arg_types[6], int n
     node->klass = klass;
     Function* init = find_callable(klass, "__init__", 8);
     node->func = init;
+    // 型を引数に渡す構築（step 77）: `Deque(int)` のように要素型だけが
+    // 指定された場合は、その型のゼロ値ファクトリを合成して引数へ
+    // 差し込む。ゼロ化できない要素型は、ファクトリを渡すよう促す
+    // エラーにする。合成した引数は、この後の通常の引数照合にかける
+    if (node->ctor_type_arg && nargs == 0 && init && init->nparams == 2 && klass->targ_count == 1 && is_vec_or_deque(klass)) {
+        Type* elem = klass->targs[0];
+        Node* factory = make_zero_value_factory(node, elem);
+        if (!factory) {
+            error_node(node, "要素型`%s`のゼロ値は自動で作れないため、ファクトリを渡してください", type_text(elem));
+            return &ty_unknown;
+        }
+        if (factory->kind == ND_FUNCREF) {
+            arg_types[0] = check_funcref(factory);
+        } else {
+            expected_type = func_type(NULL, 0, elem);
+            arg_types[0] = check_node(factory);
+            expected_type = NULL;
+        }
+        node->args = factory;
+        nargs = 1;
+    }
     // Vec / Deque の引数なし構築（step 76）: 埋め草のファクトリを要素型の
     // 既定値で補う。要素型が int / bool / str 以外（クラス・配列・関数型）
     // の既定値は自動で作れないため、ファクトリを渡すよう促すエラーに
@@ -1125,9 +1294,105 @@ static Type* check_arraylit(Node* node, Type* expected) {
     return array_type(elem);
 }
 
+// Pos2 / Pos3 かどうかと、その次元を返す（Pos でなければ 0）
+static int pos_dim(Class* klass) {
+    if (!klass) {
+        return 0;
+    }
+    Class* o = klass->origin ? klass->origin : klass;
+    if (o->len == 4 && !memcmp(o->name, "Pos2", 4)) {
+        return 2;
+    }
+    if (o->len == 4 && !memcmp(o->name, "Pos3", 4)) {
+        return 3;
+    }
+    return 0;
+}
+
+// Pos 添字の糖衣（step 77）: 配列への `a[p]`（p は Pos2 / Pos3）を
+// `a[p[0]][p[1]]`（Pos3 は3段）へ書き換える。深さは Pos の次元で
+// 決め、配列の入れ子の深さと一致しなければエラーにする。p は一度
+// だけ評価するため、パース時に確保された一時置き場（node->offset）
+// へ退避する代入を、最初の要素取り出しのレシーバとして埋め込む
+// （代入式の値が p 自身になる）。添字の p 自体は検査済みなので、
+// 書き換え後のノードは再検査せず、手で型を確定させる
+// （check_chain と同じ方針）
+static Type* check_pos_index(Node* node, Type* lt, Type* it) {
+    int dim = pos_dim(it->klass);
+    int depth = 0;
+    Type* elem = lt;
+    while (elem->kind == TY_ARRAY) {
+        depth++;
+        elem = elem->elem;
+    }
+    if (depth != dim) {
+        error_node(node, "座標`%s`は%d次元ですが、配列の入れ子は%d段です", type_text(it), dim, depth);
+        return &ty_unknown;
+    }
+    if (node->offset == 0) {
+        // パースで一時置き場を確保していない添字（コンパイラ内部で
+        // 合成されたノード）は対象外。通常の利用者の添字は全て
+        // primary の後置解析で確保される
+        error_node(node, "座標`%s`での添え字はここでは使えません", type_text(it));
+        return &ty_unknown;
+    }
+    Class* pklass = class_of(it);
+    Function* getitem = find_callable(pklass, "__getitem__", 11);
+    if (!getitem) {
+        error_node(node, "クラス`%.*s`に`__getitem__`は定義されていません", pklass->len, pklass->name);
+        return &ty_unknown;
+    }
+    // 一時置き場の型を記録し、退避代入（左辺スロット＋検査済みの p）を組む
+    local_types[node->offset / 8] = it;
+    Node* slot = create_node(ND_LVAR);
+    slot->offset = node->offset;
+    slot->tok = node->tok;
+    slot->type = it;
+    Node* assign = create_node(ND_ASSIGN);
+    assign->tok = node->tok;
+    assign->left_child = slot;
+    assign->right_child = node->right_child;
+    assign->type = it;
+    Node* cur = node->left_child;
+    Type* cur_elem = lt;
+    for (int i = 0; i < dim; i++) {
+        // p[i] の取り出し。最初の段は退避代入をレシーバにする
+        Node* recv;
+        if (i == 0) {
+            recv = assign;
+        } else {
+            recv = create_node(ND_LVAR);
+            recv->offset = node->offset;
+            recv->tok = node->tok;
+            recv->type = it;
+        }
+        Node* idx = create_node(ND_INDEX);
+        idx->tok = node->tok;
+        idx->left_child = recv;
+        idx->right_child = create_number_node(i);
+        rewrite_to_mcall(idx, it, &ty_int, "__getitem__", 11, getitem);
+        idx->type = &ty_int;
+        Node* step = create_node(ND_INDEX);
+        step->tok = node->tok;
+        step->left_child = cur;
+        step->right_child = idx;
+        cur = step;
+        cur_elem = cur_elem->elem;
+        cur->type = cur_elem;
+    }
+    Node* nxt = node->next;
+    *node = *cur;
+    node->next = nxt;
+    node->type = cur_elem;
+    return cur_elem;
+}
+
 static Type* check_index(Node* node) {
     Type* lt = check_node(node->left_child);
     Type* it = check_node(node->right_child);
+    if (lt->kind == TY_ARRAY && it->kind == TY_CLASS && pos_dim(it->klass) > 0) {
+        return check_pos_index(node, lt, it);
+    }
     if (lt->kind == TY_CLASS) {
         Function* method = find_callable(class_of(lt), "__getitem__", 11);
         if (!method) {
