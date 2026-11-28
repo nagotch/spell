@@ -13,6 +13,7 @@ static void gen_discard(Node* node);
 static void gen_push(Node* node);
 static void gen_rax_num(Node* node);
 static bool fits_imm32(long val);
+static Function* find_plain_function(char* name, int len);
 
 static int max_label = 0;
 
@@ -72,29 +73,90 @@ static void print_klass_label(Class* klass) {
     }
 }
 
-// rsp の 16 バイト境界をそろえてから call する。klass があればメソッド呼び出し
-static void print_call_target(Class* klass, int len, char* name) {
+// ---- ユーザー由来シンボルの接頭辞（step 78） ----
+//
+// グローバル変数と素の関数の名前は、そのままだと asm のラベルや
+// [rip + 名前] の参照になる。名前が x86 のレジスタ名（si, sp, ax,
+// rip, xmm0 など）と一致すると、アセンブラが組み立てを拒否したり、
+// `call si` がレジスタ間接呼び出しに化けて実行時に落ちたりする。
+// そこでユーザー由来のシンボルには種別ごとの接頭辞を付ける:
+//   グローバル変数 … spell_g_<名前>
+//   素の関数       … spell_f_<名前>
+// 接頭辞まで含めた形は、ユーザー識別子にもレジスタ名にもコンパイラ
+// 内部のシンボル（__spell_* / __rt_spell_*）にも一致しないため、
+// 接頭辞を付ける変換は単射になる。種別ごとに接頭辞を分けるのは、
+// 変数と関数が同名でも衝突しないようにするため。
+// メソッドのラベルは `クラス.メソッド` で必ずドットを含み、
+// ジェネリクスの実体化ラベルは `$` を含むので、どちらもレジスタ名
+// にはなり得ず対象外。main と __spell_init は、リンカ（C の入口）と
+// ドライバ（main の本体から __spell_init を呼ぶ）の都合で変えない。
+// libc の外部シンボル（malloc 等）も変えない
+
+static bool is_entry_symbol(int len, char* name) {
+    return (len == 4 && !memcmp(name, "main", 4))
+        || (len == 12 && !memcmp(name, "__spell_init", 12));
+}
+
+// 素の関数のラベルを出す（定義・呼び出し・関数参照で共用する）
+static void print_func_label(int len, char* name) {
+    if (is_entry_symbol(len, name)) {
+        printf("%.*s", len, name);
+    } else {
+        printf("spell_f_%.*s", len, name);
+    }
+}
+
+// グローバル変数のラベルを出す（定義と全ての参照で共用する）
+static void print_global_label(int len, char* name) {
+    printf("spell_g_%.*s", len, name);
+}
+
+// [rip + グローバル変数] の参照を出す
+static void print_global_ref(int len, char* name) {
+    printf("[rip + ");
+    print_global_label(len, name);
+    printf("]");
+}
+
+// 名前がプログラム内の素の関数（prelude の関数を含む）を指すか。
+// 指さない名前は libc 側の外部シンボルとしてそのまま出す
+static bool is_plain_func_name(int len, char* name) {
+    return find_plain_function(name, len) != NULL;
+}
+
+// rsp の 16 バイト境界をそろえてから call する。klass があればメソッド呼び出し。
+// mangle が真なら、素の関数のラベルとして接頭辞つきで出す
+static void print_call_target(Class* klass, int len, char* name, bool mangle) {
     printf("  call ");
     if (klass) {
         print_klass_label(klass);
         printf(".");
+        printf("%.*s\n", len, name);
+    } else if (mangle) {
+        print_func_label(len, name);
+        printf("\n");
+    } else {
+        printf("%.*s\n", len, name);
     }
-    printf("%.*s\n", len, name);
 }
 
-static void emit_call(int label, Class* klass, int len, char* name) {
+static void emit_call_mangled(int label, Class* klass, int len, char* name, bool mangle) {
     printf("  mov rax, rsp\n");
     printf("  and rax, 15\n");
     printf("  jnz .Lcall%d\n", label);
     printf("  mov rax, 0\n");
-    print_call_target(klass, len, name);
+    print_call_target(klass, len, name, mangle);
     printf("  jmp .Lend%d\n", label);
     printf(".Lcall%d:\n", label);
     printf("  sub rsp, 8\n");
     printf("  mov rax, 0\n");
-    print_call_target(klass, len, name);
+    print_call_target(klass, len, name, mangle);
     printf("  add rsp, 8\n");
     printf(".Lend%d:\n", label);
+}
+
+static void emit_call(int label, Class* klass, int len, char* name) {
+    emit_call_mangled(label, klass, len, name, false);
 }
 
 // r11 に入っているコードポインタへの間接呼び出し（値経由の呼び出し用）。
@@ -135,7 +197,9 @@ static void gen_index_addr(Node* node) {
 // 左辺値のアドレスを push する
 static void gen_addr(Node* node) {
     if (node->kind == ND_GVAR) {
-        printf("  lea rax, [rip + %.*s]\n", node->len, node->name);
+        printf("  lea rax, ");
+        print_global_ref(node->len, node->name);
+        printf("\n");
         printf("  push rax\n");
         return;
     }
@@ -376,7 +440,9 @@ static void emit_leaf_to_reg(Node* arg, char* reg) {
     } else if (arg->kind == ND_LVAR) {
         printf("  mov %s, [rbp-%d]\n", reg, arg->offset);
     } else {
-        printf("  mov %s, [rip + %.*s]\n", reg, arg->len, arg->name);
+        printf("  mov %s, ", reg);
+        print_global_ref(arg->len, arg->name);
+        printf("\n");
     }
 }
 
@@ -545,7 +611,10 @@ static void gen_funcall(Node* node) {
         error_plain("関数に渡せる引数は6個までですが、%d個が指定されています", args_cnt);
     }
     gen_call_args(node->args, args_cnt, 0);
-    emit_call(label, NULL, node->len, node->name);
+    // プログラム内の素の関数なら接頭辞つきラベルへ、そうでなければ
+    // libc の外部シンボル（getchar 等）としてそのまま呼ぶ（step 78）
+    emit_call_mangled(label, NULL, node->len, node->name,
+                      is_plain_func_name(node->len, node->name));
     if (node->len == 7 && (!memcmp(node->name, "getchar", 7) || !memcmp(node->name, "putchar", 7))) {
         printf("  movsxd rax, eax\n");
     }
@@ -556,7 +625,13 @@ static void gen_funcall(Node* node) {
 static void gen_funcref(Node* node) {
     printf("  mov rdi, 16\n");
     emit_call(new_label(), NULL, 6, "malloc");
-    printf("  lea rcx, [rip + %.*s]\n", node->len, node->name);
+    printf("  lea rcx, [rip + ");
+    if (is_plain_func_name(node->len, node->name)) {
+        print_func_label(node->len, node->name);
+    } else {
+        printf("%.*s", node->len, node->name);
+    }
+    printf("]\n");
     printf("  mov [rax], rcx\n");
     printf("  mov qword ptr [rax + 8], 0\n");
     printf("  push rax\n");
@@ -575,7 +650,9 @@ static void gen_lambda(Node* node) {
     if (ncaptures == 0) {
         printf("  mov rdi, 16\n");
         emit_call(new_label(), NULL, 6, "malloc");
-        printf("  lea rcx, [rip + %.*s]\n", node->func->len, node->func->name);
+        printf("  lea rcx, [rip + ");
+        print_func_label(node->func->len, node->func->name);
+        printf("]\n");
         printf("  mov [rax], rcx\n");
         printf("  mov qword ptr [rax + 8], 0\n");
         printf("  push rax\n");
@@ -583,7 +660,9 @@ static void gen_lambda(Node* node) {
     }
     printf("  mov rdi, %d\n", 16 + 8 * ncaptures);
     emit_call(new_label(), NULL, 6, "malloc");
-    printf("  lea rcx, [rip + %.*s]\n", node->func->len, node->func->name);
+    printf("  lea rcx, [rip + ");
+    print_func_label(node->func->len, node->func->name);
+    printf("]\n");
     printf("  mov [rax], rcx\n");
     printf("  lea rcx, [rax + 16]\n");
     printf("  mov [rax + 8], rcx\n");
@@ -693,7 +772,9 @@ static void gen_rax_var(Node* node) {
         return;
     }
     if (node->kind == ND_GVAR) {
-        printf("  mov rax, [rip + %.*s]\n", node->len, node->name);
+        printf("  mov rax, ");
+        print_global_ref(node->len, node->name);
+        printf("\n");
         return;
     }
     // ND_CAPVAR: フレームに退避済みの環境ポインタ経由で読む
@@ -713,7 +794,9 @@ static void gen_rax_assign(Node* node) {
     if (left->kind == ND_GVAR) {
         // グローバルのアドレスも同様に副作用がない
         gen_rax(node->right_child);
-        printf("  mov [rip + %.*s], rax\n", left->len, left->name);
+        printf("  mov ");
+        print_global_ref(left->len, left->name);
+        printf(", rax\n");
         return;
     }
     // 複雑な左辺（メンバ・添字・捕捉変数など）は従来の push 経路のまま。
@@ -1451,7 +1534,8 @@ void codegen(Function* prog) {
     printf("  .zero 8\n");
     if (globals) {
         for (LVar* var = globals; var; var = var->next) {
-            printf("%.*s:\n", var->len, var->name);
+            print_global_label(var->len, var->name);
+            printf(":\n");
             printf("  .zero 8\n");
         }
     }
@@ -1472,8 +1556,11 @@ void codegen(Function* prog) {
             print_klass_label(prog->klass);
             printf(".%.*s:\n", prog->len, prog->name);
         } else {
-            printf(".global %.*s\n", prog->len, prog->name);
-            printf("%.*s:\n", prog->len, prog->name);
+            printf(".global ");
+            print_func_label(prog->len, prog->name);
+            printf("\n");
+            print_func_label(prog->len, prog->name);
+            printf(":\n");
         }
         if (!prog->klass && prog->len == 4 && memcmp(prog->name, "main", 4) == 0) {
             // プロセスの入口: argc（rdi）と argv（rsi）を、プリミティブが

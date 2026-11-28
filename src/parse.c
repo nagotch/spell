@@ -1069,11 +1069,25 @@ static Node* stmt_return(Token* kw) {
     return node;
 }
 
+// 条件の直後に `:` も `{` も介さず `?` が来たらエラーにする（step 78）。
+// `if a?[0] == 10:` のような v0 の安全添字のつもりの書き方が、条件を
+// `a` だけにして、残りを入れ子の if 糖衣文として静かに飲み込んで
+// しまうため。コロン形・波括弧形の正当な入れ子（`if c: ? d: ...` や
+// `if c { ? d {} }`）は、stmt_branch が区切りを消費してから stmt() を
+// 呼ぶので、ここには影響しない
+static void reject_cond_question() {
+    if (token_is_char(token, '?')) {
+        error_at(token_start(token), token_end(token),
+                 "条件の直後に`?`は書けません（`?`は文の頭でのみ if の糖衣として使えます）");
+    }
+}
+
 static Node* stmt_if(Token* kw) {
     Node* node;
     node = create_node(ND_IF);
     node->tok = kw;
     node->cond = cond_expr();
+    reject_cond_question();
     node->then = stmt_branch(kw);
     Token* else_tok = token;
     if (consume_keyword(KW_ELSE)) {
@@ -1102,6 +1116,7 @@ static Node* stmt_while(Token* kw) {
     node = create_node(ND_WHILE);
     node->tok = kw;
     node->cond = cond_expr();
+    reject_cond_question();
     node->then = stmt_branch(kw);
     return node;
 }

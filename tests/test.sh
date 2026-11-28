@@ -37,6 +37,11 @@ tests=(
     "class P { x: int; def __init__(self, a: int) { self.x = a; } } def main() { p = P(1); p.__init__(5); return p.x; }|5"
     # step 76: クラス名と同名の変数は値として扱い、比較式を構築と誤認しない
     "class Pair { x: int; def __init__(self, x: int) { self.x = x; } } def main() { Pair = 5; if (Pair < 10 > 3) { return 42; } return 0; }|42"
+    # step 78: レジスタ名と同名のグローバル変数・関数が壊れない
+    "si = 40; def main() { return si + 2; }|42"
+    "sp = 1; bp = 2; ax = 3; def main() { return sp + bp + ax + 36; }|42"
+    "def si() -> int { return 42; } def main() { return si(); }|42"
+    "def r8() -> int { return 40; } def main() { f = r8; return f() + 2; }|42"
 )
 
 error_tests=(
@@ -173,6 +178,11 @@ def main():
     "def main() { a = [1, 2]; print(a[(0, 1)]); return 0; }|は2次元ですが、配列の入れ子は1段です"
     # step 77: ゼロ化できない要素型への型渡しは、ファクトリを促すエラー
     "class Wrap { f: fn() -> int; def __init__(self, f: fn() -> int) { self.f = f; } } def main() { q = Deque(Wrap); return 0; }|ゼロ値は自動で作れないため、ファクトリを渡してください"
+    # step 78: 条件の直後の `?` は、安全添字の誤記を静かに飲み込まないよう
+    # 位置つきエラーにする（if / while / elif）
+    "def main() { a = [10, 20]; if a?[0] == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
+    "def main() { a = [10, 20]; while a?[0] == 10: print(1); return 0; }|条件の直後に\`?\`は書けません"
+    "def main() { a = [10, 20]; if a[0] == 1: print(1); elif a?[0] == 10: print(2); return 0; }|条件の直後に\`?\`は書けません"
 )
 
 cc -c -o funcs.o funcs.c
@@ -947,6 +957,34 @@ one_io_test "def main() {
     return 0;
 }
 " "5 5\n.....\n.###.\n.#...\n.###.\n.....\n" "8\n"
+# step 78: レジスタ名のグローバル変数を関数内から読み書きする
+one_io_test "si = 0
+xmm0 = 40
+def bump() { si = si + 1; }
+def main() {
+    bump();
+    bump();
+    print(si);
+    print(xmm0 + 2);
+    return 0;
+}" "" "2\n42\n"
+# step 78: トップレベルの @ ループ変数がレジスタ名（si）でも壊れない
+# （利用者が ABC088 D で踏んだ実例の形）
+one_io_test "s = [\"ab\", \"cd\"]
+si@s:
+    print(si)" "" "ab\ncd\n"
+# step 78: 条件の直後の `?` はエラーになるが、コロン形・波括弧形の
+# 正当な入れ子の `?` は動き続ける
+one_io_test "def main() {
+    a = [10, 20]
+    if a[0] == 10:
+        ? a[1] == 20:
+            print(1)
+        |:
+            print(2)
+    if a[0] == 10 { ? a[1] == 99 { print(3) } | { print(4) } }
+    return 0
+}" "" "1\n4\n"
 
 echo $(($n-$fail_count)) / $n tests passed.
 if [ $fail_count -eq 0 ]; then
