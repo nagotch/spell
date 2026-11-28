@@ -498,7 +498,7 @@ false</pre>
 </figure>
 
 <p class="note">
-  <code>zero_int</code>、<code>zero_bool</code>、<code>zero_str</code> は prelude が用意する既定値ファクトリです。
+  <code>zero_int</code>、<code>zero_bool</code>、<code>zero_str</code>、<code>zero_pos2</code>、<code>zero_pos3</code> は prelude が用意する既定値ファクトリです。
   配列のような値は <code>Dict(fn() -&gt; [int] { return []; })</code> のようにラムダで渡します。
   生成には型の手がかり（注釈など）が要ります。辞書自体に文字列化は無いので、そのまま <code>put</code> には渡せません。
 </p>
@@ -507,13 +507,15 @@ false</pre>
 <p>
   <code>Vec&lt;T&gt;</code> は末尾へ追加していける配列です。通常の配列も <code>append</code> で伸ばせますが、
   <code>Vec</code> は容量と論理長を分けて持つため、別名や引数経由でも伸びが常に見えます。
-  生成には <code>Dict</code> と同じく既定値ファクトリを渡します。<code>len</code> と反復が見るのは論理長（容量ではありません）で、
+  生成は引数なしの <code>v = Vec()</code>（要素型は <code>int</code>）が基本で、型引数つきの <code>Vec&lt;str&gt;()</code>、
+  型を渡す <code>Vec(str)</code>、注釈で受ける <code>v: Vec&lt;str&gt; = Vec()</code> の形も書けます。
+  要素型がクラスのときは <code>Dict</code> と同じく既定値ファクトリを渡します。<code>len</code> と反復が見るのは論理長（容量ではありません）で、
   反復は開始時点のスナップショットをたどります。配列として取り出すには <code>to_array()</code> を使います。
 </p>
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>v: Vec&lt;int&gt; = Vec(zero_int);
+<pre>v = Vec();
 v.append(3);
 v.append(1);
 v.append(4);
@@ -536,13 +538,14 @@ put s;</pre>
   <code>Deque&lt;T&gt;</code> は両端から出し入れできるキューです。<code>push_back</code> と <code>pop_front</code> を使えば Queue、
   <code>push_back</code> と <code>pop_back</code> を使えば Stack として使えます（幅優先探索のキューは前者です）。
   中身は円環バッファで、両端の出し入れは容量の倍増を除いて定数時間です。
-  生成には <code>Vec</code> と同じく既定値ファクトリを渡します。添字は論理位置で、<code>q[0]</code> が先頭です。
+  生成は <code>Vec</code> と同じく、引数なしの <code>q = Deque()</code>（要素型は <code>int</code>）が基本で、
+  <code>Deque&lt;str&gt;()</code>、<code>Deque(str)</code>、<code>Deque(Pos2)</code> のように型を指定する形も書けます。添字は論理位置で、<code>q[0]</code> が先頭です。
   <code>front()</code> と <code>back()</code> は取り出さずに両端を覗きます。反復は先頭から末尾へ、開始時点のスナップショットをたどります。
 </p>
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>q: Deque&lt;int&gt; = Deque(zero_int);
+<pre>q = Deque();
 q.push_back(1);
 q.push_back(2);
 q.push_front(0);
@@ -573,7 +576,7 @@ put q.front();</pre>
 
 <figure class="code">
   <figcaption>例</figcaption>
-<pre>q: Deque&lt;int&gt; = Deque(zero_int);
+<pre>q = Deque();
 q &lt;- 1;
 q &lt;- 2;
 0 -&gt; q;
@@ -594,6 +597,52 @@ put q.front();</pre>
   空のときに <code>pop_front</code>、<code>pop_back</code>、<code>front</code>、<code>back</code> を呼ぶのは誤りで、結果は不定です
   （配列の範囲外アクセスと同じく、検査はしません）。
 </p>
+
+<h3>Pos2 / Pos3（座標）</h3>
+<p>
+  <code>Pos2</code> と <code>Pos3</code> は座標を表す prelude のクラスで、フィールドは <code>x</code>、<code>y</code>（と <code>z</code>）です。
+  リテラルは <code>(1, 2)</code> の形で、要素が2つなら <code>Pos2</code>、3つなら <code>Pos3</code> になります。
+  加減算は要素ごとで、<code>int</code> との乗算はスカラー倍です。<code>==</code> とハッシュも持つので、
+  <code>Dict</code> のキーや <code>Deque</code> の要素としてそのまま使えます。
+  二次元配列などへの添字に座標を渡すと、<code>g[p]</code> は <code>g[p[0]][p[1]]</code> の意味になります（次元が合わない場合はエラー）。
+</p>
+
+<figure class="code">
+  <figcaption>例 — 座標の演算と4方向</figcaption>
+<pre>p = (1, 2);
+q = (2, 3);
+put p + q;
+put p.x, p.y;
+dirs = [(1, 0), (0, 1), (-1, 0), (0, -1)];
+for d in dirs { put p + d; }</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>3 5
+1 2
+2 2
+1 3
+0 2
+1 1</pre>
+</figure>
+
+<figure class="code">
+  <figcaption>例 — グリッドへの添字と辞書のキー</figcaption>
+<pre>g = [[1, 2], [3, 4]];
+put g[(0, 1)];
+dist: Dict&lt;Pos2, int&gt; = Dict(zero_int);
+dist[(0, 0)] = 5;
+put dist[(0, 0)];
+put dist.has((1, 1));</pre>
+</figure>
+
+<figure class="out">
+  <figcaption>出力</figcaption>
+<pre>2
+5
+false</pre>
+</figure>
 
 <h2 id="s11"><span class="no">11</span>入力</h2>
 <p>
