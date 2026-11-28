@@ -132,6 +132,11 @@ tests=(
     # step 91: 関数型を引数に取るオーバーロード同士でラベルが衝突
     # しないこと（fn 型の表記には引数の個数も入る）
     "def f(g: fn() -> fn(int) -> str) -> int { return 1; } def f(g: fn(fn() -> int) -> str) -> int { return 2; } def main() { a: fn() -> fn(int) -> str = fn() -> fn(int) -> str { return fn(x: int) -> str { return \"a\"; }; }; b: fn(fn() -> int) -> str = fn(g: fn() -> int) -> str { return \"b\"; }; return f(a) * 10 + f(b); }|12"
+    # step 92: 可変引数の min / max と abs。ユーザ定義の同名関数が
+    # あればそちらが優先される（print と同じ方針）
+    "def main() { return min(3, 5) * 10 + max(3, 5) + 7; }|42"
+    "def min(a: int, b: int) -> int { return a - b; } def main() { return min(45, 3); }|42"
+    "def main() { return abs(0 - 42); }|42"
 )
 
 error_tests=(
@@ -353,8 +358,9 @@ def main():
     # step 87: 矢印 push の値側でも未定義変数の検査が効く
     "def main() { q = Deque(int); q <- misspelled; return 0; }|変数\`misspelled\`は定義されていません"
     # step 88: 未定義の関数呼び出しはリンクエラーに漏らさず、位置つき
-    # のコンパイルエラーにする。typo の候補も出す
-    "def main() { x: int = min(3, 5); return x; }|関数\`min\`は定義されていません"
+    # のコンパイルエラーにする。typo の候補も出す（step 92 で min は
+    # 組み込みになったため、例は minimum に差し替え）
+    "def main() { x: int = minimum(3, 5); return x; }|関数\`minimum\`は定義されていません"
     "def main() { x = getchr(); return x; }|関数\`getchr\`は定義されていません ヒント: もしかして \`getchar\` ですか"
     "def main() { nosuchfunc(); return 0; }|関数\`nosuchfunc\`は定義されていません"
     # step 88: 外部関数（署名表）も引数の個数と型を照合する
@@ -408,6 +414,15 @@ def main():
     # step 91: 定義側の上限（6個）を超える引数の呼び出しは、個数の
     # 合う候補なしとしてエラーになる（配列外アクセスをしない）
     "def f(a: int, b: int, c: int, d: int, e: int, g: int) -> int { return 1; } def f(a: int, b: int, c: int, d: int, e: int, g: str) -> int { return 2; } def main() { return f(1, 2, 3, 4, 5, 6, 7); }|合うオーバーロードがありません"
+    # step 92: min / max は1個以上。0個は位置つきエラー
+    "def main() { x = min(); return 0; }|関数\`min\`の引数は1個以上ですが"
+    "def main() { x = max(); return 0; }|関数\`max\`の引数は1個以上ですが"
+    # step 92: 引数の型が揃わなければエラー（配列リテラルの要素型の
+    # 統一検査がそのまま効く）。`__lt__` の無い型同士もエラー
+    "def main() { x = min(1, \"a\"); return 0; }|配列の要素は\`int\`ですが、\`str\`が含まれています"
+    "def main() { b = min(true, false); return 0; }|クラス\`bool\`に演算子\`<\`は定義されていません"
+    # step 92: abs は int 用（prelude 関数なので通常の引数照合が効く）
+    "def main() { x = abs(\"a\"); return 0; }|関数\`abs\`の引数には\`int\`が必要ですが"
 )
 
 cc -c -o funcs.o funcs.c

@@ -549,6 +549,8 @@ static void ensure_defs(Function* fn);
 // 安全添え字（step 81）: 部品の組み立てと比較への横取り
 static Type* build_safe_parts(Node* node, Node** guard_out, Node** value_out);
 static Type* check_safe_cmp(Node* node);
+// 可変引数の min / max（step 92）
+static Type* check_minmax(Node* node, bool is_min, Type* expected);
 
 // 引数を全部検査し、型を最大 6 個まで記録する。引数の数を返す。
 // expected_list があれば、各引数の期待型として渡す（ラムダの型決定用）
@@ -1700,6 +1702,56 @@ static Function* resolve_overloaded_call(Node* node, Class* klass, char* name, i
     return winner;
 }
 
+// 可変引数の min / max（step 92）。spell には可変引数の構文が無い
+// ため、print / exit と同じく型検査で扱う組み込みにする。書き換え先
+// は配列リテラルへの `.min()` / `.max()` で、意味論は配列メソッドと
+// 正確に一致する（`__lt__` で順序が決まる型に使える、要素型が揃わな
+// ければ位置つきエラー、型不明が絡めば緩く通す）。配列リテラルは
+// 要素を左から右へちょうど1回ずつ評価するため、「各引数は1回だけ
+// 左から右へ」の要件もそのまま満たされる。引数の個数に上限は設け
+// ない。通常の関数呼び出しの6個上限は ABI のレジスタ渡しに由来し、
+// リテラル経由のこの形には当てはまらない（配列リテラル自体に個数の
+// 上限が無い）
+static Type* check_minmax(Node* node, bool is_min, Type* expected) {
+    int nargs = 0;
+    for (Node* a = node->args; a; a = a->next) {
+        nargs++;
+    }
+    if (nargs == 0) {
+        error_node(node, "関数`%.*s`の引数は1個以上ですが、0個が指定されています", node->len, node->name);
+        return &ty_unknown;
+    }
+    if (nargs == 1) {
+        // 1個ならその値自体。期待型はそのまま引数へ渡す（呼び出し
+        // 時点の expected_type は check_node の前処理で NULL に戻され
+        // ているが、保存・復元して文脈に依存しない形にする）
+        Type* saved_expected = expected_type;
+        expected_type = expected;
+        Type* t = check_node(node->args);
+        expected_type = saved_expected;
+        Node* nxt = node->next;
+        *node = *node->args;
+        node->next = nxt;
+        return t;
+    }
+    // 2個以上は [引数...].min() / .max() へ書き換える。引数の検査は
+    // 配列リテラルの検査（要素型の統一）が担う。呼び出し側の期待型
+    // （= 要素の型）は要素へ伝播しないため、型の手がかりの無いラムダ
+    // や曖昧な関数参照を引数にするときは注釈が要る（メソッド呼び出し
+    // の検査が期待型を受け取らないための制限）
+    Node* arr = create_node(ND_ARRAY);
+    arr->tok = node->tok;
+    arr->body = node->args;
+    arr->array_len = nargs;
+    Node* call = make_mcall(arr, NULL, NULL, is_min ? "min" : "max", 3);
+    call->tok = node->tok;
+    Type* t = check_node(call);
+    Node* nxt = node->next;
+    *node = *call;
+    node->next = nxt;
+    return t;
+}
+
 static Type* check_funcall(Node* node, Type* expected) {
     // 同名の定義が複数ある場合はオーバーロード解決へ（step 91）
     if (count_callables(NULL, node->name, node->len) >= 2) {
@@ -1721,6 +1773,13 @@ static Type* check_funcall(Node* node, Type* expected) {
     Function* callee = find_callable(NULL, node->name, node->len);
     Class* klass = callee ? NULL : find_class(node->name, node->len);
     BuiltinInfo* builtin = (callee || klass) ? NULL : find_builtin(node->name, node->len);
+    // min / max は可変引数の組み込み（step 92）。ユーザ定義の関数・
+    // クラスがあればそちらが優先される（print / exit と同じ方針）
+    bool is_min = node->len == 3 && !memcmp(node->name, "min", 3);
+    bool is_max = node->len == 3 && !memcmp(node->name, "max", 3);
+    if ((is_min || is_max) && !callee && !klass) {
+        return check_minmax(node, is_min, expected);
+    }
     // 引数の期待型を先に用意する（引数位置のラムダの型を決めるため）
     Type* expected_list[6] = {};
     if (callee) {
