@@ -284,6 +284,17 @@ def t065() {
     q = max((1, 2, 3), (1, 2, 2));
     return a.v * 1000 + b.v * 100 + p.z * 10 + q.z;
 }
+// step 100: 入れ子の min / max（外側の評価中に内側が走る。スロットは
+// 呼び出し地点ごとに別枠）
+def t066() {
+    a = min(min(9, 4), min(2, 8));
+    b = max(max(1, 7), max(9, 3));
+    c = min(max(5, 1), min(6, 2), 4);
+    d = min(3, min(9, 1));
+    s = min("m", min("z", "a"));
+    if (s == "a") { return a * 1000 + b * 100 + c * 10 + d; }
+    return 0;
+}
 
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
@@ -366,6 +377,7 @@ def main() {
     mark(66); fails=fails+check(t063(), 509);
     mark(67); fails=fails+check(t064(), 101);
     mark(68); fails=fails+check(t065(), 2923);
+    mark(69); fails=fails+check(t066(), 2921);
 
     print_str("done"); putchar(10);
     return fails > 0;
