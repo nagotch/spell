@@ -367,6 +367,14 @@ put 10</pre>
   <code>main</code> が無ければ、トップレベルの文そのものがプログラムで、終了コードは 0 です。
 </p>
 
+<p>
+  組み込みの <code>min(a, b, ...)</code> / <code>max(a, b, ...)</code> は可変引数（1個以上、個数の上限なし）で、
+  引数のうち最も小さい / 大きい値を返します。引数は全て同じ型で、その型の順序（<code>__lt__</code>）で比べます
+  （配列メソッドの <code>min()</code> / <code>max()</code> と同じ意味論）。引数は左から右へ1回ずつ評価されます。
+  同名のユーザー定義関数があればそちらが優先されます。prelude の <code>abs(x: int) -&gt; int</code> は絶対値を返します
+  （最も小さい <code>int</code> の絶対値は範囲に収まらないため未定義）。
+</p>
+
 <figure class="code">
   <figcaption>例</figcaption>
 <pre>def fib(n: int) -&gt; int {
@@ -1234,7 +1242,7 @@ false 0</pre>
 <h2 id="s16"><span class="no">16</span>prelude 一覧</h2>
 <p>
   起動時に読み込まれる <code>prelude.sp</code> が定義する型と関数の全一覧です。各項目の詳しい仕様はリンク先の節にあります。名前からは、使い方と例を載せた<a href="lib/index.html">ライブラリ</a>の個別ページへも飛べます。
-  <code>print</code> / <code>eprint</code> / <code>exit</code> は prelude の関数ではなく、コンパイラが直接書き換える組み込みです（<a href="#s13">§13</a>）。
+  <code>print</code> / <code>eprint</code> / <code>exit</code> は prelude の関数ではなく、コンパイラが直接書き換える組み込みです（<a href="#s13">§13</a>）。<code>min</code> / <code>max</code> も組み込みで、可変引数を受けます。
 </p>
 
 <h3>型・クラス</h3>
@@ -1266,6 +1274,9 @@ false 0</pre>
   <tr><td><a href="lib/zero_pos2.html"><code>zero_pos2() -&gt; Pos2</code></a></td><td>初期値ファクトリ（原点 <code>(0, 0)</code> を返す）</td><td><a href="#s11">§11</a></td></tr>
   <tr><td><a href="lib/zero_pos3.html"><code>zero_pos3() -&gt; Pos3</code></a></td><td>初期値ファクトリ（原点 <code>(0, 0, 0)</code> を返す）</td><td><a href="#s11">§11</a></td></tr>
   <tr><td><a href="lib/chr.html"><code>chr(n: int) -&gt; str</code></a></td><td>文字コードから長さ1の文字列を作る（<code>s.chars[i]</code> の逆）。出力時はコードの下位バイトが書かれるため、実用範囲は 0〜255（文字としては ASCII の 0〜127）。範囲外の扱いは未定義</td><td><a href="#s09">§09</a></td></tr>
+  <tr><td><a href="lib/min.html"><code>min(a, b, ...)</code></a></td><td>引数のうち最も小さい値を返す（組み込み・可変引数、1個以上）。引数は全て同じ型で、<code>__lt__</code> を持つ型に使える</td><td><a href="#s05">§05</a></td></tr>
+  <tr><td><a href="lib/max.html"><code>max(a, b, ...)</code></a></td><td>引数のうち最も大きい値を返す（組み込み・可変引数、1個以上）。引数は全て同じ型で、<code>__lt__</code> を持つ型に使える</td><td><a href="#s05">§05</a></td></tr>
+  <tr><td><a href="lib/abs.html"><code>abs(x: int) -&gt; int</code></a></td><td>絶対値。最も小さい <code>int</code> の絶対値は範囲に収まらないため未定義</td><td><a href="#s05">§05</a></td></tr>
   <tr><td><a href="lib/args.html"><code>args() -&gt; [str]</code></a></td><td>コマンドライン引数全体</td><td><a href="#s13">§13</a></td></tr>
   <tr><td><a href="lib/read_file.html"><code>read_file(path: str) -&gt; FileData</code></a></td><td>ファイル全体を読む</td><td><a href="#s13">§13</a></td></tr>
   <tr><td><a href="lib/write_file.html"><code>write_file(path: str, text: str) -&gt; bool</code></a></td><td>ファイルへ書き出す</td><td><a href="#s13">§13</a></td></tr>

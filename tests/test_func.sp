@@ -211,6 +211,33 @@ def ov3(x: int, y: int) -> int { return 6; }
 def passthrough91(v) -> int { return ov3(v); }
 def t048() { return passthrough91(0); }
 
+// step 92: 可変引数の min / max と abs（組み込み）
+def t049() { return min(3, 5) * 10 + max(3, 5); }
+def t050() { return min(7) + max(9); }
+def t051() { return min(4, 2, 8, 1, 9, 3, 5) * 10 + max(4, 2, 8, 1, 9, 3, 5); }
+mm_cnt = 0;
+mm_log = 0;
+def mm_nxt(v: int) -> int { mm_cnt = mm_cnt + 1; mm_log = mm_log * 10 + v; return v; }
+// 引数は左から右へちょうど1回ずつ評価される（cnt=3, log=312）
+def t052() { r = min(mm_nxt(3), mm_nxt(1), mm_nxt(2)); return r * 1000 + mm_cnt * 100 + mm_log; }
+def t053() {
+    a = min("b", "a", "c");
+    b = max("b", "a", "c");
+    if (a == "a" && b == "c") { return 1; }
+    return 0;
+}
+def t054() {
+    p = min((1, 2), (0, 5), (3, 0));
+    q = max((1, 2), (0, 5), (3, 0));
+    return (p.x * 10 + p.y) + (q.x * 10 + q.y);
+}
+def t055() { x = 10; return min(x + 1, x * 2, x - 3) + max(x + 1, x * 2, x - 3); }
+def t056() { return abs(-5) + abs(5) + abs(0); }
+def pick92(v: int) -> int { return min(v, 3); }
+def t057() { return min(max(1, 9), max(2, 3)) + pick92(5) + pick92(2); }
+def fmax92(v) -> int { return max(v, 10); }
+def t058() { return fmax92(5) + fmax92(20); }
+
 def mark(n) {
     print_int(n); putchar(10); fflush(0);
     return 0;
@@ -275,6 +302,16 @@ def main() {
     mark(49); fails=fails+check(t046(), 3);
     mark(50); fails=fails+check(t047(), 12);
     mark(51); fails=fails+check(t048(), 5);
+    mark(52); fails=fails+check(t049(), 35);
+    mark(53); fails=fails+check(t050(), 16);
+    mark(54); fails=fails+check(t051(), 19);
+    mark(55); fails=fails+check(t052(), 1612);
+    mark(56); fails=fails+check(t053(), 1);
+    mark(57); fails=fails+check(t054(), 35);
+    mark(58); fails=fails+check(t055(), 27);
+    mark(59); fails=fails+check(t056(), 10);
+    mark(60); fails=fails+check(t057(), 8);
+    mark(61); fails=fails+check(t058(), 30);
 
     print_str("done"); putchar(10);
     return fails > 0;
